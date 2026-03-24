@@ -1,0 +1,31 @@
+---
+description: AI orchestration pipeline rules
+globs: "src/lib/orchestrator/**,src/lib/ai/**,src/server/services/**"
+alwaysApply: false
+---
+
+# AI Orchestration Rules
+
+## Pipeline is Deterministic
+The orchestrator is CODE that calls AI workers in explicit order — not autonomous agents. Each step: typed input → AI call → Zod validate → fallback if invalid.
+
+## Model Routing
+- HEAVY (GPT-4o): narration, campaign seeding, memory compression, complex intent
+- LIGHT (GPT-4o-mini): simple intent, rules interpret, visual delta, image prompts
+- NONE: dice, turn advance, state validation, HP calc
+
+## Every Worker Must Have
+1. Zod schema for input AND output
+2. Fallback behavior if AI fails
+3. OrchestrationTrace logging (model, tokens, latency, success)
+4. Timeout (10s default, configurable)
+
+## Fallbacks
+- Intent parser fails → ask player to rephrase
+- Rules interpreter fails → default d20 check
+- Narrator fails → template: "{player} {action}. {result}. {next}, your turn."
+- Memory fails → skip, use raw recent turns
+- Image fails → keep old image, continue
+
+## Provider Adapter
+Use `AIProvider` interface — never call OpenAI/Anthropic directly in business logic. MockProvider for tests.

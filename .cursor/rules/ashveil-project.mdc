@@ -1,0 +1,47 @@
+---
+description: Ashveil project context, delegation rules, and cost control
+alwaysApply: true
+---
+
+# Ashveil — Project Rules
+
+## Spec
+Read `docs/ASHVEIL_SPEC.md` for full architecture, design system, data model, AI pipeline, and build phases.
+
+## What This Is
+Mobile-first multiplayer AI-powered tabletop RPG. 2-6 players, shared state, AI or Human DM, turn-based, real-time via Pusher.
+
+## Stack
+Next.js 15+ (App Router), TypeScript (strict), Tailwind v4, Framer Motion, Zustand, Neon Postgres + Drizzle, Upstash Redis, Pusher, NextAuth, fal.ai, Vercel.
+
+## Non-Negotiable Rules
+1. Canonical DB state is truth — AI never directly mutates it
+2. Every AI output validated with Zod before use
+3. Turn order enforced server-side with Redis locks
+4. Narration 60-140 words, structured JSON output
+5. Images async, never block gameplay
+6. Mobile-first — thumb zone, no clutter
+
+## Delegation (CRITICAL for cost)
+- ALWAYS use Task tool with `model: "fast"` for: scaffolding, boilerplate, repetitive code, file creation, simple components, tests, migrations
+- Reserve Opus (yourself) for: architectural decisions, reviewing fast agent output, complex AI orchestration logic, debugging
+- Do NOT write large code blocks directly — delegate to fast agents with detailed instructions, then review
+- Do NOT create markdown docs, READMEs, or documentation files unless explicitly asked
+- Keep responses concise — no verbose explanations unless asked
+
+## Phase Status
+- Phase 0: DONE (scaffold, design tokens, base components)
+- Phase 1: DONE (Zod schemas — enums, domain, AI I/O, events, state patches, fixtures)
+- Phase 2: DONE (Drizzle schema, Neon connection, migrations, db scripts)
+- Phase 3: DONE (session service, API routes, home screen, lobby screen, Pusher wiring)
+- Phase 4: DONE (character creation, stat rolling, class/race selection)
+- Phase 5: DONE (gameplay shell, Zustand store, Pusher hooks, 5-zone layout)
+- Phase 6: DONE (turn engine, dice service, Redis locks, state versioning, dice overlay, 20 tests)
+- Phase 7: DONE (action feed polish, turn banner, zone layout, entry animations)
+- Phase 8: DONE (AI orchestration pipeline, providers, step-runner, trace logging, narrator)
+- Phase 9: DONE (narration typewriter animation, fal.ai scene image gen, crossfade)
+- Phase 10: DONE (full AI workers — intent parser, rules interpreter, visual delta, narrator)
+- Phase 11: DONE (bottom sheets — character, party, journal)
+- Phase 12: DONE (human DM mode, DM tools, narrate/roll/set-dc/event/advance-turn)
+- Phase 13: DONE (NextAuth guest auth, Drizzle adapter, API auth guards, Pusher auth)
+- Phase 14: DONE (error boundaries, loading skeletons, toasts, connection status, PWA manifest)

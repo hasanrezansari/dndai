@@ -1,0 +1,33 @@
+---
+description: Liquid Obsidian design system rules
+globs: "**/*.tsx,**/*.css"
+alwaysApply: false
+---
+
+# Liquid Obsidian Design Rules
+
+## Gold Hierarchy
+- Tier 1 (#D4AF37): ONLY for current player, primary CTA, active turn, critical moments
+- Tier 2 (#B8860B): dimmed icons, hover states
+- Default: NO gold — silver/muted for most UI
+
+## Layout
+- Void gaps between modules (Card → VOID → Card), not stacked tight
+- No tab navigation during active gameplay — use bottom sheets
+- Thumb-first: actions in bottom 30%
+- `min-h-dvh` not `min-h-screen`
+
+## Surfaces
+- Cold (background): minimal glow, flat
+- Mid (cards): `glass` or `glass-heavy` class, backdrop-blur
+- Hot (interactive): glow, gold, animation
+
+## Typography
+- `.text-fantasy` (Noto Serif): lore, titles, character names
+- Default (Manrope): gameplay text
+- `.text-data` (Inter): HP, dice, stats
+
+## Motion
+- Subtle, breathing, selective — no overanimation
+- Respect `prefers-reduced-motion`
+- Use CSS variables: `--duration-fast`, `--duration-med`, `--duration-slow`
