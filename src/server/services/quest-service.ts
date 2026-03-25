@@ -131,7 +131,12 @@ async function allPartyMembersIncapacitated(sessionId: string): Promise<boolean>
     const hp = r.hp ?? 1;
     const conditions = Array.isArray(r.conditions) ? r.conditions : [];
     const lowered = conditions.map((c) => String(c).toLowerCase());
-    return hp <= 0 || lowered.includes("dead") || lowered.includes("unconscious");
+    return (
+      hp <= 0 ||
+      lowered.includes("dead") ||
+      lowered.includes("unconscious") ||
+      lowered.includes("incapacitated")
+    );
   });
 }
 
@@ -350,6 +355,7 @@ export async function applyTurnQuestProgress(params: {
 
   const nextState: QuestState = {
     objective: current.objective,
+    subObjectives: current.subObjectives,
     progress,
     risk,
     status,

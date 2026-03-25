@@ -48,6 +48,8 @@ async function refetchPlayersFromState(sessionId: string) {
   const data = (await res.json()) as {
     session?: GameSessionView;
     players: GamePlayerView[];
+    sceneTitle?: string | null;
+    sceneImage?: string | null;
     quest?: {
       objective: string;
       progress: number;
@@ -77,6 +79,12 @@ async function refetchPlayersFromState(sessionId: string) {
   }
   if (data.rollingMemories) {
     useGameStore.getState().setRollingMemories(data.rollingMemories);
+  }
+  if (data.sceneTitle) {
+    useGameStore.getState().setSceneTitle(data.sceneTitle);
+  }
+  if (data.sceneImage) {
+    useGameStore.getState().setSceneImage(data.sceneImage);
   }
 }
 
@@ -396,7 +404,27 @@ export function useSessionChannel(sessionId: string | null) {
     channel.bind("awaiting-dm", onAwaitingDm);
     channel.bind("dm-notice", onDmNotice);
 
+    function signalDisconnect() {
+      const pid = useGameStore.getState().currentPlayerId;
+      if (!pid) return;
+      const body = JSON.stringify({ playerId: pid });
+      if (navigator.sendBeacon) {
+        navigator.sendBeacon(`/api/sessions/${sessionId}/disconnect`, body);
+      } else {
+        void fetch(`/api/sessions/${sessionId}/disconnect`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body,
+          keepalive: true,
+        });
+      }
+    }
+
+    window.addEventListener("beforeunload", signalDisconnect);
+
     return () => {
+      signalDisconnect();
+      window.removeEventListener("beforeunload", signalDisconnect);
       stopScenePoll();
       channel.unbind("player-joined", onPlayerJoined);
       channel.unbind("player-ready", onPlayerReady);

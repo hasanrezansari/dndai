@@ -60,9 +60,6 @@ export async function POST(
       .limit(1);
 
     if (!sessionRow) return apiError("Not found", 404);
-    if (sessionRow.mode !== "ai_dm") {
-      return apiError("Ending vote is only for AI DM sessions", 409);
-    }
     if (sessionRow.status !== "active") {
       return apiError("Session is not active", 409);
     }

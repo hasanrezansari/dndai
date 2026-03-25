@@ -106,6 +106,13 @@ export async function GET(
       return apiError("Forbidden", 403);
     }
 
+    await db
+      .update(players)
+      .set({ is_connected: true })
+      .where(
+        and(eq(players.session_id, sessionId), eq(players.user_id, user.id)),
+      );
+
     const [sessionRow] = await db
       .select()
       .from(sessions)

@@ -24,6 +24,7 @@ import {
   advanceTurn,
   NotYourTurnError,
   resolveCurrentProcessingTurn,
+  resolveAwaitingDmTurn,
   releaseTurnLock,
   submitAction,
   TurnBeingProcessedError,
@@ -99,7 +100,7 @@ export async function POST(
 
     if (pipelineResult.kind === "human_dm") {
       if (pipelineResult.shouldEndSession) {
-        await resolveCurrentProcessingTurn(sessionId);
+        await resolveAwaitingDmTurn(sessionId);
         const stateVersion = await finalizeSessionEnd(sessionId);
         try {
           await broadcastToSession(sessionId, "dm-notice", {
@@ -173,7 +174,39 @@ export async function POST(
       return NextResponse.json({ actionId, turnId }, { status: 202 });
     }
 
-    const { nextPlayerId, roundAdvanced } = await advanceTurn(sessionId);
+    const advanceResult = await advanceTurn(sessionId);
+    const { nextPlayerId, roundAdvanced } = advanceResult;
+
+    if (advanceResult.partyWipe) {
+      const stateVersion = await finalizeSessionEnd(sessionId);
+      try {
+        await broadcastToSession(sessionId, "narration-update", {
+          scene_text: pipelineResult.narrativeEvent.scene_text,
+          visible_changes: pipelineResult.narrativeEvent.visible_changes,
+          next_actor: { player_id: parsed.data.playerId },
+        });
+      } catch (err) {
+        console.error(err);
+      }
+      try {
+        await broadcastToSession(sessionId, "dm-notice", {
+          message: "The party has fallen. The adventure ends here.",
+        });
+      } catch (err) {
+        console.error(err);
+      }
+      try {
+        await broadcastToSession(sessionId, "state-update", {
+          changes: pipelineResult.statePatches,
+          state_version: stateVersion,
+        });
+      } catch (err) {
+        console.error(err);
+      }
+      await releaseTurnLock(sessionId);
+      lockHeld = false;
+      return NextResponse.json({ actionId, turnId }, { status: 202 });
+    }
 
     const [sessionAfterAdvance] = await db
       .select({ state_version: sessions.state_version, current_round: sessions.current_round })

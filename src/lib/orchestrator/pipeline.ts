@@ -57,7 +57,7 @@ export async function scheduleSessionImageGeneration(
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
   };
-  const secret = process.env.NEXTAUTH_SECRET;
+  const secret = process.env.INTERNAL_API_SECRET || process.env.NEXTAUTH_SECRET;
   if (secret) {
     headers.Authorization = `Bearer ${secret}`;
   }
@@ -115,7 +115,6 @@ function computeStatePatches(
         }
         break;
       case "success":
-        patches.push({ op: "player_hp", playerId: actingPlayerId, delta: 1 });
         if (npcTarget) {
           patches.push({ op: "npc_hp", npcId: npcTarget.id, delta: -scaleDelta(2, t), reason: `${type} hit` });
         }

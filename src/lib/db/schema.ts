@@ -101,22 +101,26 @@ export const sessions = pgTable(
   ],
 );
 
-export const players = pgTable("players", {
-  id: uuid("id").defaultRandom().primaryKey(),
-  session_id: uuid("session_id")
-    .notNull()
-    .references(() => sessions.id),
-  user_id: text("user_id").notNull(),
-  character_id: uuid("character_id"),
-  seat_index: integer("seat_index").notNull(),
-  is_ready: boolean("is_ready").notNull().default(false),
-  is_connected: boolean("is_connected").notNull().default(true),
-  is_host: boolean("is_host").notNull().default(false),
-  is_dm: boolean("is_dm").notNull().default(false),
-  joined_at: timestamp("joined_at", { withTimezone: true })
-    .notNull()
-    .defaultNow(),
-});
+export const players = pgTable(
+  "players",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    session_id: uuid("session_id")
+      .notNull()
+      .references(() => sessions.id),
+    user_id: text("user_id").notNull(),
+    character_id: uuid("character_id"),
+    seat_index: integer("seat_index").notNull(),
+    is_ready: boolean("is_ready").notNull().default(false),
+    is_connected: boolean("is_connected").notNull().default(true),
+    is_host: boolean("is_host").notNull().default(false),
+    is_dm: boolean("is_dm").notNull().default(false),
+    joined_at: timestamp("joined_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [index("players_session_id_idx").on(t.session_id)],
+);
 
 export const characters = pgTable("characters", {
   id: uuid("id").defaultRandom().primaryKey(),
@@ -225,37 +229,45 @@ export const diceRolls = pgTable(
   (t) => [index("dice_rolls_action_id_idx").on(t.action_id)],
 );
 
-export const sceneSnapshots = pgTable("scene_snapshots", {
-  id: uuid("id").defaultRandom().primaryKey(),
-  session_id: uuid("session_id")
-    .notNull()
-    .references(() => sessions.id),
-  round_number: integer("round_number").notNull(),
-  state_version: integer("state_version").notNull(),
-  summary: text("summary").notNull(),
-  image_status: text("image_status").notNull().default("none"),
-  image_prompt: text("image_prompt"),
-  image_url: text("image_url"),
-  created_at: timestamp("created_at", { withTimezone: true })
-    .notNull()
-    .defaultNow(),
-});
+export const sceneSnapshots = pgTable(
+  "scene_snapshots",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    session_id: uuid("session_id")
+      .notNull()
+      .references(() => sessions.id),
+    round_number: integer("round_number").notNull(),
+    state_version: integer("state_version").notNull(),
+    summary: text("summary").notNull(),
+    image_status: text("image_status").notNull().default("none"),
+    image_prompt: text("image_prompt"),
+    image_url: text("image_url"),
+    created_at: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [index("scene_snapshots_session_id_idx").on(t.session_id)],
+);
 
-export const memorySummaries = pgTable("memory_summaries", {
-  id: uuid("id").defaultRandom().primaryKey(),
-  session_id: uuid("session_id")
-    .notNull()
-    .references(() => sessions.id),
-  summary_type: text("summary_type").notNull(),
-  content: jsonb("content")
-    .$type<Record<string, unknown>>()
-    .notNull(),
-  turn_range_start: integer("turn_range_start").notNull(),
-  turn_range_end: integer("turn_range_end").notNull(),
-  created_at: timestamp("created_at", { withTimezone: true })
-    .notNull()
-    .defaultNow(),
-});
+export const memorySummaries = pgTable(
+  "memory_summaries",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    session_id: uuid("session_id")
+      .notNull()
+      .references(() => sessions.id),
+    summary_type: text("summary_type").notNull(),
+    content: jsonb("content")
+      .$type<Record<string, unknown>>()
+      .notNull(),
+    turn_range_start: integer("turn_range_start").notNull(),
+    turn_range_end: integer("turn_range_end").notNull(),
+    created_at: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [index("memory_summaries_session_id_idx").on(t.session_id)],
+);
 
 export const narrativeEvents = pgTable(
   "narrative_events",
@@ -288,25 +300,29 @@ export const narrativeEvents = pgTable(
   ],
 );
 
-export const npcStates = pgTable("npc_states", {
-  id: uuid("id").defaultRandom().primaryKey(),
-  session_id: uuid("session_id")
-    .notNull()
-    .references(() => sessions.id),
-  name: text("name").notNull(),
-  role: text("role").notNull(),
-  attitude: text("attitude").notNull(),
-  status: text("status").notNull().default("alive"),
-  location: text("location").notNull(),
-  visual_profile: jsonb("visual_profile")
-    .$type<Record<string, unknown>>()
-    .notNull()
-    .default(sql`'{}'::jsonb`),
-  notes: text("notes").notNull().default(""),
-  updated_at: timestamp("updated_at", { withTimezone: true })
-    .notNull()
-    .defaultNow(),
-});
+export const npcStates = pgTable(
+  "npc_states",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    session_id: uuid("session_id")
+      .notNull()
+      .references(() => sessions.id),
+    name: text("name").notNull(),
+    role: text("role").notNull(),
+    attitude: text("attitude").notNull(),
+    status: text("status").notNull().default("alive"),
+    location: text("location").notNull(),
+    visual_profile: jsonb("visual_profile")
+      .$type<Record<string, unknown>>()
+      .notNull()
+      .default(sql`'{}'::jsonb`),
+    notes: text("notes").notNull().default(""),
+    updated_at: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [index("npc_states_session_id_idx").on(t.session_id)],
+);
 
 export const imageJobs = pgTable(
   "image_jobs",

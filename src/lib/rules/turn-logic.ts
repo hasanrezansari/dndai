@@ -56,7 +56,12 @@ export function computeNextPlayableTurnState(params: {
     params.sessionMode,
   );
   if (playable.length === 0) {
-    throw new Error("No playable seats");
+    return {
+      nextPlayerId: "__party_wipe__",
+      nextTurnIndex: 0,
+      nextRound: params.currentRound,
+      roundAdvanced: false,
+    };
   }
   const idx = playable.findIndex((p) => p.id === params.currentPlayerId);
   const currentIdx = idx >= 0 ? idx : 0;

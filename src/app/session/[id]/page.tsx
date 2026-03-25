@@ -139,6 +139,7 @@ export default function SessionGameplayPage() {
 
   const { data: authSession, status: authStatus } = useSession();
   const [hydrated, setHydrated] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [voteBusy, setVoteBusy] = useState(false);
   const [chapterBusy, setChapterBusy] = useState(false);
   const [sceneTransitionTrigger, setSceneTransitionTrigger] = useState(false);
@@ -164,14 +165,20 @@ export default function SessionGameplayPage() {
 
     async function load() {
       try {
+        setLoadError(null);
         const res = await fetch(`/api/sessions/${sessionId}/state`);
         if (cancelled) return;
-        if (!res.ok) return;
+        if (!res.ok) {
+          setLoadError(`Failed to load session (${res.status})`);
+          return;
+        }
         const data = (await res.json()) as Parameters<typeof hydrate>[0];
         if (cancelled) return;
         hydrate(data);
         const me = data.players.find((p) => p.userId === userId);
         if (me) setCurrentPlayerId(me.id);
+      } catch {
+        if (!cancelled) setLoadError("Network error — could not load session.");
       } finally {
         if (!cancelled) setHydrated(true);
       }
@@ -417,6 +424,24 @@ export default function SessionGameplayPage() {
     );
   }
 
+  if (loadError) {
+    return (
+      <div className="flex min-h-dvh flex-col items-center justify-center gap-4 bg-[var(--color-obsidian)] px-6 text-center">
+        <p className="text-sm text-[var(--color-silver-muted)]">{loadError}</p>
+        <button
+          type="button"
+          onClick={() => {
+            setHydrated(false);
+            setLoadError(null);
+          }}
+          className="min-h-[44px] rounded-[var(--radius-chip)] border border-white/15 bg-[var(--glass-bg)]/40 px-5 py-2 text-sm font-medium text-[var(--color-silver-muted)] backdrop-blur-sm transition-colors hover:bg-white/10"
+        >
+          Retry
+        </button>
+      </div>
+    );
+  }
+
   const atmosphere = atmosphereForPhase(session?.phase);
 
   return (
@@ -524,7 +549,7 @@ export default function SessionGameplayPage() {
                 {dangerLabel(quest.risk).label} ({quest.risk}%)
               </span>
             </div>
-            {session?.mode === "ai_dm" && quest.endingVote?.open && currentPlayerId ? (
+            {quest.endingVote?.open && currentPlayerId ? (
               <div className="mt-2 rounded-[var(--radius-chip)] border border-[var(--color-gold-rare)]/25 bg-black/20 p-2">
                 <p className="mb-2 text-data text-[10px] uppercase tracking-wider text-[var(--color-gold-support)]">
                   End vote: {quest.endingVote.reason === "party_defeated" ? "Party Defeated" : "Objective Complete"}

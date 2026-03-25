@@ -1,7 +1,7 @@
 "use client";
 
 import { AnimatePresence, motion } from "framer-motion";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 interface SceneTransitionProps {
   imageUrl: string | null;
@@ -17,12 +17,15 @@ export function SceneTransition({
   duration = 3000,
 }: SceneTransitionProps) {
   const [visible, setVisible] = useState(false);
+  const prevTrigger = useRef(false);
 
   useEffect(() => {
-    if (!trigger) return;
-    setVisible(true);
-    const timer = setTimeout(() => setVisible(false), duration);
-    return () => clearTimeout(timer);
+    if (trigger && !prevTrigger.current) {
+      setVisible(true);
+      const timer = setTimeout(() => setVisible(false), duration);
+      return () => clearTimeout(timer);
+    }
+    prevTrigger.current = trigger;
   }, [trigger, duration]);
 
   return (

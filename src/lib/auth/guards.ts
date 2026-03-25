@@ -50,7 +50,7 @@ export async function isPlayerForUser(
 }
 
 export function internalBearerAuthorized(request: Request): boolean {
-  const secret = process.env.NEXTAUTH_SECRET;
+  const secret = process.env.INTERNAL_API_SECRET || process.env.NEXTAUTH_SECRET;
   if (!secret) return false;
   const h = request.headers.get("authorization");
   return h === `Bearer ${secret}`;

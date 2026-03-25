@@ -5,7 +5,7 @@ import { z } from "zod";
 export const maxDuration = 60;
 
 import { apiError, handleApiError } from "@/lib/api/errors";
-import { internalBearerAuthorized } from "@/lib/auth/guards";
+import { internalBearerAuthorized, isSessionMember } from "@/lib/auth/guards";
 import { getCurrentUser } from "@/lib/auth/session";
 import { db } from "@/lib/db";
 import { sessions } from "@/lib/db/schema";
@@ -35,6 +35,9 @@ export async function POST(
       const user = await getCurrentUser();
       if (!user) {
         return apiError("Unauthorized", 401);
+      }
+      if (!(await isSessionMember(sessionId, user.id))) {
+        return apiError("Forbidden", 403);
       }
     }
 

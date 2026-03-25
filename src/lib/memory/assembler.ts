@@ -1,4 +1,4 @@
-import { asc, desc, eq } from "drizzle-orm";
+import { and, asc, desc, eq } from "drizzle-orm";
 
 import { db } from "@/lib/db";
 import {
@@ -112,7 +112,12 @@ async function buildRollingSummary(sessionId: string): Promise<string | null> {
     const [rolling] = await db
       .select()
       .from(memorySummaries)
-      .where(eq(memorySummaries.summary_type, "rolling"))
+      .where(
+        and(
+          eq(memorySummaries.session_id, sessionId),
+          eq(memorySummaries.summary_type, "rolling"),
+        ),
+      )
       .orderBy(desc(memorySummaries.created_at))
       .limit(1);
     if (!rolling) return null;

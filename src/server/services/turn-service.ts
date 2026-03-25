@@ -294,7 +294,7 @@ export async function submitAction(params: {
 
 export async function advanceTurn(
   sessionId: string,
-): Promise<{ nextPlayerId: string; roundAdvanced: boolean }> {
+): Promise<{ nextPlayerId: string; roundAdvanced: boolean; partyWipe?: boolean }> {
   const [sessionRow] = await db
     .select()
     .from(sessions)
@@ -329,6 +329,14 @@ export async function advanceTurn(
       currentPlayerId: processingTurn.player_id,
       currentRound: sessionRow.current_round,
     });
+
+  if (nextPlayerId === "__party_wipe__") {
+    await db
+      .update(turns)
+      .set({ status: "resolved", resolved_at: new Date() })
+      .where(and(eq(turns.id, processingTurn.id), eq(turns.status, "processing")));
+    return { nextPlayerId: processingTurn.player_id, roundAdvanced: false, partyWipe: true };
+  }
 
   const nextPlayer = orderedPlayers.find((p) => p.id === nextPlayerId);
   if (!nextPlayer) {
@@ -421,6 +429,36 @@ export async function resolveCurrentProcessingTurn(
 
   if (resolved.length === 0) {
     throw new Error("Failed to resolve turn");
+  }
+}
+
+export async function resolveAwaitingDmTurn(
+  sessionId: string,
+): Promise<void> {
+  const [awaitingTurn] = await db
+    .select()
+    .from(turns)
+    .where(and(eq(turns.session_id, sessionId), eq(turns.status, "awaiting_dm")))
+    .orderBy(desc(turns.started_at))
+    .limit(1);
+
+  if (!awaitingTurn) {
+    throw new Error("No awaiting_dm turn to resolve");
+  }
+
+  const resolved = await db
+    .update(turns)
+    .set({
+      status: "resolved",
+      resolved_at: new Date(),
+    })
+    .where(
+      and(eq(turns.id, awaitingTurn.id), eq(turns.status, "awaiting_dm")),
+    )
+    .returning({ id: turns.id });
+
+  if (resolved.length === 0) {
+    throw new Error("Failed to resolve awaiting_dm turn");
   }
 }
 

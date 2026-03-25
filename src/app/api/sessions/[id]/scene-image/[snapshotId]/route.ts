@@ -1,14 +1,40 @@
 import { and, eq } from "drizzle-orm";
 import { NextRequest, NextResponse } from "next/server";
 
+import { isSessionMember, requireUser } from "@/lib/auth/guards";
 import { db } from "@/lib/db";
 import { sceneSnapshots } from "@/lib/db/schema";
+
+const ALLOWED_IMAGE_HOSTS = new Set([
+  "fal.media",
+  "v3.fal.media",
+  "oaidalleapiprodscus.blob.core.windows.net",
+  "replicate.delivery",
+]);
+
+function isAllowedRedirectUrl(url: string): boolean {
+  try {
+    const parsed = new URL(url);
+    return ALLOWED_IMAGE_HOSTS.has(parsed.hostname) && parsed.protocol === "https:";
+  } catch {
+    return false;
+  }
+}
 
 export async function GET(
   _request: NextRequest,
   context: { params: Promise<{ id: string; snapshotId: string }> },
 ) {
+  const user = await requireUser();
+  if (!user) {
+    return new NextResponse("Unauthorized", { status: 401 });
+  }
+
   const { id: sessionId, snapshotId } = await context.params;
+
+  if (!(await isSessionMember(sessionId, user.id))) {
+    return new NextResponse("Forbidden", { status: 403 });
+  }
 
   const [snap] = await db
     .select({ image_url: sceneSnapshots.image_url })
@@ -27,6 +53,9 @@ export async function GET(
   }
 
   if (!raw.startsWith("data:")) {
+    if (!isAllowedRedirectUrl(raw)) {
+      return new NextResponse("Forbidden redirect target", { status: 403 });
+    }
     return NextResponse.redirect(raw, 302);
   }
 
