@@ -1,8 +1,8 @@
 import type { AIProvider, ModelTier, TokenUsage, ZodSchema } from "@/lib/ai/types";
 
 const MODEL_MAP = {
-  heavy: "google/gemini-2.0-flash-exp:free",
-  light: "google/gemini-2.0-flash-exp:free",
+  heavy: "openrouter/free",
+  light: "openrouter/free",
 } as const;
 
 const DEFAULT_TIMEOUT_MS = 30_000;

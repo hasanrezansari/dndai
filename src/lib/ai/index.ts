@@ -31,22 +31,29 @@ function getSingleProvider(name: string): AIProvider {
 }
 
 function buildFallbackChain(primary: string): Array<{ name: string; provider: AIProvider }> {
+  const added = new Set<string>();
   const chain: Array<{ name: string; provider: AIProvider }> = [];
 
-  chain.push({ name: primary, provider: getSingleProvider(primary) });
+  function add(name: string) {
+    if (added.has(name)) return;
+    added.add(name);
+    chain.push({ name, provider: getSingleProvider(name) });
+  }
+
+  // OpenRouter's free router (27 models, auto-routing) is the most
+  // reliable free option, so always try it first when available.
+  if (process.env.OPENROUTER_API_KEY) add("openrouter");
+
+  add(primary);
 
   const keyToProvider: Array<[string, string]> = [
-    ["OPENROUTER_API_KEY", "openrouter"],
     ["GEMINI_API_KEY", "gemini"],
     ["OPENAI_API_KEY", "openai"],
     ["ANTHROPIC_API_KEY", "anthropic"],
   ];
 
   for (const [envKey, providerName] of keyToProvider) {
-    if (providerName === primary) continue;
-    if (process.env[envKey]) {
-      chain.push({ name: providerName, provider: getSingleProvider(providerName) });
-    }
+    if (process.env[envKey]) add(providerName);
   }
 
   return chain;
