@@ -2,6 +2,8 @@ import { eq } from "drizzle-orm";
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 
+export const maxDuration = 60;
+
 import { apiError, handleApiError } from "@/lib/api/errors";
 import { internalBearerAuthorized } from "@/lib/auth/guards";
 import { getCurrentUser } from "@/lib/auth/session";

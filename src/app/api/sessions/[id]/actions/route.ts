@@ -1,7 +1,6 @@
 import { randomUUID } from "crypto";
 
 import { eq } from "drizzle-orm";
-import { after } from "next/server";
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 
@@ -18,9 +17,8 @@ import { db } from "@/lib/db";
 import { sessions } from "@/lib/db/schema";
 import {
   runTurnPipeline,
-  type SessionImageJobPayload,
+  scheduleSessionImageGeneration,
 } from "@/lib/orchestrator/pipeline";
-import { runImagePipeline } from "@/lib/orchestrator/image-worker";
 import { broadcastToSession } from "@/lib/socket/server";
 import {
   advanceTurn,
@@ -154,35 +152,11 @@ export async function POST(
       } catch (err) {
         console.error(err);
       }
-      const imgPayload = pipelineResult.imageJobPayload;
-      after(async () => {
-        try {
-          const result = await runImagePipeline({
-            sessionId,
-            turnId: imgPayload.turnId,
-            narrativeText: imgPayload.narrativeText,
-            sceneContext: imgPayload.sceneContext,
-            characterNames: imgPayload.characterNames,
-          });
-          if (result.imageUrl) {
-            await broadcastToSession(sessionId, "scene-image-ready", {
-              scene_id: sceneImageId,
-              image_url: result.imageUrl,
-            });
-          } else {
-            await broadcastToSession(sessionId, "scene-image-failed", {
-              scene_id: sceneImageId,
-            });
-          }
-        } catch (err) {
-          console.error("[image-after] action image failed:", err);
-          try {
-            await broadcastToSession(sessionId, "scene-image-failed", {
-              scene_id: sceneImageId,
-            });
-          } catch { /* best effort */ }
-        }
-      });
+      scheduleSessionImageGeneration(
+        sessionId,
+        sceneImageId,
+        pipelineResult.imageJobPayload,
+      );
     }
 
     await releaseTurnLock(sessionId);
