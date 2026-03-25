@@ -24,7 +24,7 @@ export async function generateSceneImageOpenRouter(params: {
     throw new Error("OPENROUTER_API_KEY is not set");
   }
 
-  const imagePrompt = params.negativePrompt
+  const userContent = params.negativePrompt
     ? `${params.prompt}\n\nAvoid: ${params.negativePrompt}`
     : params.prompt;
 
@@ -40,8 +40,13 @@ export async function generateSceneImageOpenRouter(params: {
       model: IMAGE_MODEL,
       messages: [
         {
+          role: "system",
+          content:
+            "You are a fantasy illustrator. Generate a single wide scene image in a consistent dark-fantasy oil-painting style with muted earth tones, amber torchlight, and deep shadows. Keep character designs and environment consistent across scenes. No text, no UI, no watermarks.",
+        },
+        {
           role: "user",
-          content: imagePrompt,
+          content: userContent,
         },
       ],
       modalities: ["image", "text"],
