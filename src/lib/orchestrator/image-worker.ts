@@ -1,6 +1,5 @@
 import { desc, eq } from "drizzle-orm";
 
-import { getAIProvider } from "@/lib/ai";
 import { generateSceneImage } from "@/lib/ai/image-provider";
 import { db } from "@/lib/db";
 import {
@@ -8,12 +7,7 @@ import {
   sceneSnapshots,
   sessions,
 } from "@/lib/db/schema";
-import { ImagePromptComposerOutputSchema } from "@/lib/schemas/ai-io";
 import { logTrace } from "@/lib/orchestrator/trace";
-import { runOrchestrationStep } from "@/lib/orchestrator/step-runner";
-
-const COMPOSER_SYSTEM = `Convert this RPG scene description into a concise image generation prompt. Focus on environment, lighting, and mood. 1-2 sentences max. Fantasy art style.
-Respond with JSON only matching the schema: {"image_generation_prompt": string}.`;
 
 export async function runImagePipeline(params: {
   sessionId: string;
@@ -24,28 +18,9 @@ export async function runImagePipeline(params: {
 }): Promise<{ imageUrl: string | null }> {
   const { sessionId, turnId, narrativeText, sceneContext, characterNames } =
     params;
-  const provider = getAIProvider();
-  const composed = await runOrchestrationStep({
-    stepName: "image_prompt_compose",
-    sessionId,
-    turnId,
-    provider,
-    model: "light",
-    systemPrompt: COMPOSER_SYSTEM,
-    userPrompt: JSON.stringify({
-      narrative_excerpt: narrativeText.slice(0, 3000),
-      scene_context: sceneContext.slice(0, 2000),
-      character_names: characterNames,
-    }),
-    schema: ImagePromptComposerOutputSchema,
-    maxTokens: 400,
-    temperature: 0.45,
-    fallback: () =>
-      ImagePromptComposerOutputSchema.parse({
-        image_generation_prompt: `${narrativeText.slice(0, 500)} Fantasy RPG environment, dramatic lighting, painterly fantasy illustration.`,
-      }),
-  });
-  const composedPrompt = composed.data.image_generation_prompt;
+  const sceneSummary = sceneContext.trim().slice(0, 200) || narrativeText.slice(0, 200);
+  const chars = characterNames.length > 0 ? characterNames.join(", ") : "adventurers";
+  const composedPrompt = `Dark fantasy RPG scene: ${sceneSummary}. Characters: ${chars}. Dramatic cinematic lighting, painterly fantasy illustration, detailed environment, atmospheric, no text or UI.`;
 
   const tFal = Date.now();
   let imageUrl: string;

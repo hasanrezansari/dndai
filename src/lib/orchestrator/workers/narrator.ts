@@ -18,10 +18,38 @@ RULES:
 - Reference the character by name
 - End with a brief transition to the next player's turn
 - Maintain consistency with the scene and recent events
+- DO NOT repeat the player's exact words — rephrase their action cinematically
 - Output JSON matching the provided schema`;
 
 export function wordCount(s: string): number {
   return s.trim().split(/\s+/).filter(Boolean).length;
+}
+
+function cleanAction(raw: string): string {
+  let s = raw.trim();
+  s = s.replace(/^I\s+/i, "");
+  s = s.replace(/^(try|attempt|want) to\s+/i, "");
+  s = s.charAt(0).toLowerCase() + s.slice(1);
+  if (s.length > 80) s = s.slice(0, 77) + "...";
+  return s;
+}
+
+function describeAction(actionType: string, rawContext: string): string {
+  const cleaned = cleanAction(rawContext);
+  const verbMap: Record<string, string> = {
+    attack: "strikes out",
+    cast_spell: "channels arcane energy",
+    move: "pushes forward",
+    talk: "speaks",
+    inspect: "studies their surroundings",
+    use_item: "reaches for an item",
+  };
+  if (cleaned && cleaned.length > 3) return cleaned;
+  return verbMap[actionType] ?? "acts";
+}
+
+function pick<T>(arr: T[]): T {
+  return arr[Math.floor(Math.random() * arr.length)]!;
 }
 
 const ATMOSPHERE = [
@@ -33,62 +61,67 @@ const ATMOSPHERE = [
   "An ember-glow pulses from somewhere deep ahead, warm and beckoning.",
   "The ground trembles faintly, as if the earth itself draws breath.",
   "Cobwebs glisten like silver threads in the half-light.",
+  "Somewhere far off, a bell tolls once and falls silent.",
+  "The torches flicker as though acknowledging something unseen.",
 ];
 
-const CRIT_SUCCESS_TEMPLATES = [
+const CRIT_SUCCESS = [
   (name: string, action: string, next: string) =>
-    `${name} moves with breathtaking precision — ${action}. The result is nothing short of magnificent. The air itself seems to hum with approval, and for a heartbeat the shadows pull back as if in reverence. ${pick(ATMOSPHERE)} A moment of triumph, pure and undeniable. ${next}, the momentum is yours — seize it.`,
+    `${name} moves with breathtaking precision. The attempt to ${action} succeeds beyond all expectation — the kind of moment that shifts the air in the room. ${pick(ATMOSPHERE)} For a heartbeat, even the shadows seem impressed. A moment of triumph, pure and undeniable. ${next}, the momentum is yours — seize it.`,
   (name: string, action: string, next: string) =>
-    `Something extraordinary happens. As ${name} attempts to ${action}, fate intervenes with perfect timing. Every element aligns — strength, will, and fortune conspire to deliver a result that will be spoken of around campfires for years. ${pick(ATMOSPHERE)} ${next}, you stand in the wake of something remarkable. What will you do?`,
+    `Something extraordinary unfolds. As ${name} reaches to ${action}, fate answers with a resounding yes. Every element aligns — strength, will, and fortune conspire in perfect harmony. ${pick(ATMOSPHERE)} The party watches in awe. ${next}, you stand in the wake of something remarkable. What will you do?`,
+  (name: string, action: string, next: string) =>
+    `Brilliance. ${name} attempts to ${action} and the result is nothing short of legendary. The world bends to accommodate the deed. ${pick(ATMOSPHERE)} Tales will be told of this moment. ${next}, fortune rides high — make your move before the tide turns.`,
 ];
 
-const SUCCESS_TEMPLATES = [
-  (name: string, action: string, next: string, scene: string) =>
-    `${name} ${action} with steady resolve, and the effort pays off. ${scene ? `Within ${scene}, the` : "The"} tension eases just a fraction as success settles over the moment. ${pick(ATMOSPHERE)} The party presses on, emboldened. ${next}, the path ahead awaits your decision.`,
-  (name: string, action: string, next: string, scene: string) =>
-    `With practiced confidence, ${name} ${action}. ${scene ? `The ${scene} seems` : "The world seems"} to acknowledge the deed — a subtle shift in the air, a flicker of something that might be hope. ${pick(ATMOSPHERE)} ${next}, the table turns to you. What stirs in your mind?`,
+const SUCCESS = [
   (name: string, action: string, next: string) =>
-    `${name} commits to the action — ${action} — and the result is favorable. A small victory, but in these dark places, small victories are everything. ${pick(ATMOSPHERE)} The group steadies. ${next}, it's your turn to shape what comes next.`,
+    `${name} sets their mind to ${action} — and the effort pays off. The tension eases just a fraction as success settles over the moment. ${pick(ATMOSPHERE)} The party presses on, emboldened. ${next}, the path ahead awaits your decision.`,
+  (name: string, action: string, next: string) =>
+    `With practiced resolve, ${name} manages to ${action}. The world seems to acknowledge the deed — a subtle shift, a flicker of something that might be hope. ${pick(ATMOSPHERE)} ${next}, the table turns to you. What stirs in your mind?`,
+  (name: string, action: string, next: string) =>
+    `${name} commits fully, and the attempt to ${action} finds its mark. A small victory, but in these dark places, small victories are everything. ${pick(ATMOSPHERE)} The group steadies. ${next}, it's your turn to shape what comes next.`,
+  (name: string, action: string, next: string) =>
+    `The dice fall kindly. ${name} reaches to ${action} and the outcome is favorable. A ripple of quiet relief passes through the party. ${pick(ATMOSPHERE)} ${next}, fortune watches — what will you attempt?`,
 ];
 
-const FAILURE_TEMPLATES = [
-  (name: string, action: string, next: string, scene: string) =>
-    `${name} reaches for ${action}, but the moment betrays them. ${scene ? `In the depths of ${scene}, failure` : "Failure"} has a weight all its own — heavy, lingering. ${pick(ATMOSPHERE)} But the journey is far from over. ${next}, perhaps fortune favors you. Step forward.`,
+const FAILURE = [
   (name: string, action: string, next: string) =>
-    `The attempt falters. ${name} tries to ${action}, but something goes wrong — timing, angle, perhaps simple bad luck. The shadows seem to lean in, watching with cold patience. ${pick(ATMOSPHERE)} ${next}, the burden shifts to you now. Choose wisely.`,
-  (name: string, action: string, next: string, scene: string) =>
-    `${name}'s effort to ${action} doesn't find its mark. ${scene ? `The ${scene} offers` : "The darkness offers"} no sympathy, only the quiet reminder that not every swing lands, not every word persuades. ${pick(ATMOSPHERE)} Dust settles. ${next}, your move.`,
+    `${name} reaches to ${action}, but the moment betrays them. The air feels heavier, the darkness just a shade deeper. ${pick(ATMOSPHERE)} But the journey is far from over. ${next}, perhaps fortune favors you. Step forward.`,
+  (name: string, action: string, next: string) =>
+    `The attempt falters. ${name} tries to ${action}, but something goes wrong — timing, angle, perhaps simple bad luck. ${pick(ATMOSPHERE)} ${next}, the burden shifts to you now. Choose wisely.`,
+  (name: string, action: string, next: string) =>
+    `${name}'s effort to ${action} doesn't find its mark. The darkness offers no sympathy, only the quiet reminder that fortune is fickle. ${pick(ATMOSPHERE)} ${next}, your move — the party needs a win.`,
+  (name: string, action: string, next: string) =>
+    `Not this time. ${name} attempts to ${action}, but the world resists. The shadows seem to lean in just a little closer. ${pick(ATMOSPHERE)} ${next}, the party looks to you. What do you do?`,
 ];
 
-const CRIT_FAILURE_TEMPLATES = [
+const CRIT_FAILURE = [
   (name: string, action: string, next: string) =>
-    `Everything goes wrong at once. ${name} attempts to ${action}, and the result is spectacularly unfortunate — the kind of failure that draws gasps, not laughter. ${pick(ATMOSPHERE)} The shadows close in just a little tighter. But despair is a luxury the party cannot afford. ${next}, rally — the tale is not yet written.`,
+    `Everything goes wrong at once. ${name} attempts to ${action}, and the result is spectacularly unfortunate — the kind of failure that draws gasps. ${pick(ATMOSPHERE)} The shadows close in tighter. But despair is a luxury the party cannot afford. ${next}, rally — the tale is not yet written.`,
   (name: string, action: string, next: string) =>
-    `Fate has a cruel sense of humor. As ${name} ${action}, disaster strikes with almost theatrical timing. The ground shifts, the air sours, and for one terrible moment everything hangs by a thread. ${pick(ATMOSPHERE)} ${next}, the party needs you now more than ever. What do you do?`,
+    `Fate has a cruel sense of humor. As ${name} tries to ${action}, disaster strikes with almost theatrical timing. The ground shifts, the air sours. ${pick(ATMOSPHERE)} ${next}, the party needs you now more than ever. What do you do?`,
+  (name: string, action: string, next: string) =>
+    `A terrible moment. ${name}'s attempt to ${action} goes catastrophically wrong. Something breaks, something shifts, and the party collectively holds its breath. ${pick(ATMOSPHERE)} ${next}, there's no time to dwell — act now, before things get worse.`,
 ];
-
-function pick<T>(arr: T[]): T {
-  return arr[Math.floor(Math.random() * arr.length)]!;
-}
 
 function pickTemplate(
   result: DiceRoll["result"] | undefined,
   name: string,
   action: string,
   next: string,
-  scene: string,
 ): string {
   switch (result) {
     case "critical_success":
-      return pick(CRIT_SUCCESS_TEMPLATES)(name, action, next);
+      return pick(CRIT_SUCCESS)(name, action, next);
     case "success":
-      return pick(SUCCESS_TEMPLATES)(name, action, next, scene);
+      return pick(SUCCESS)(name, action, next);
     case "failure":
-      return pick(FAILURE_TEMPLATES)(name, action, next, scene);
+      return pick(FAILURE)(name, action, next);
     case "critical_failure":
-      return pick(CRIT_FAILURE_TEMPLATES)(name, action, next);
+      return pick(CRIT_FAILURE)(name, action, next);
     default:
-      return pick(SUCCESS_TEMPLATES)(name, action, next, scene);
+      return pick(SUCCESS)(name, action, next);
   }
 }
 
@@ -98,10 +131,10 @@ export function buildNarratorFallback(
   rollResult: DiceRoll["result"] | undefined,
   nextPlayerName: string,
   nextActorId: string | null,
-  sceneContext?: string,
+  _sceneContext?: string,
 ): NarratorOutput {
-  const scene = sceneContext?.slice(0, 60) || "";
-  const text = pickTemplate(rollResult, playerName, actionSummary, nextPlayerName, scene);
+  const action = describeAction("other", actionSummary);
+  const text = pickTemplate(rollResult, playerName, action, nextPlayerName);
 
   const toneMap: Record<string, string> = {
     critical_success: "triumphant",
