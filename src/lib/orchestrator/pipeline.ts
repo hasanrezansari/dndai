@@ -10,7 +10,7 @@ import { logTrace } from "@/lib/orchestrator/trace";
 import { parseIntent } from "@/lib/orchestrator/workers/intent-parser";
 import { interpretRules } from "@/lib/orchestrator/workers/rules-interpreter";
 import { generateNarration } from "@/lib/orchestrator/workers/narrator";
-import { checkVisualDelta } from "@/lib/orchestrator/workers/visual-delta";
+
 import type { ActionIntent, NarratorOutput } from "@/lib/schemas/ai-io";
 import type { DiceRoll, NarrativeEvent } from "@/lib/schemas/domain";
 import type { StatePatch } from "@/lib/schemas/state-patches";
@@ -304,27 +304,7 @@ export async function runTurnPipeline(params: {
     throw new Error("Failed to persist narrative");
   }
 
-  let imageNeeded = false;
-  const shouldCheckImage =
-    ctx.roundAdvanced ||
-    ctx.session.currentRound <= 2 ||
-    diceRolls.some(
-      (r) =>
-        r.result === "critical_success" || r.result === "critical_failure",
-    );
-  if (shouldCheckImage) {
-    if (ctx.session.currentRound <= 2) {
-      imageNeeded = true;
-    } else {
-      const vis = await checkVisualDelta({
-        sessionId,
-        turnId,
-        narrativeText: narration.scene_text,
-        currentSceneDescription: ctx.currentSceneDescription,
-      });
-      imageNeeded = vis.data.image_needed;
-    }
-  }
+  const imageNeeded = true;
 
   let imageJobPayload: SessionImageJobPayload | undefined;
   if (imageNeeded) {
