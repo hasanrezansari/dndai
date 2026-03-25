@@ -14,7 +14,7 @@ import { generateNarration } from "@/lib/orchestrator/workers/narrator";
 import { checkVisualDelta } from "@/lib/orchestrator/workers/visual-delta";
 import { buildMemoryBundle, shouldSummarize, runSummarizer } from "@/lib/memory";
 
-import type { ActionIntent, NarratorOutput } from "@/lib/schemas/ai-io";
+import type { ActionIntent, ConsequenceEffect, NarratorOutput } from "@/lib/schemas/ai-io";
 import type { DiceRoll, NarrativeEvent } from "@/lib/schemas/domain";
 import type { StatePatch } from "@/lib/schemas/state-patches";
 import { performRoll } from "@/server/services/dice-service";
@@ -311,6 +311,7 @@ export type TurnPipelineResult =
       narrativeEvent: NarrativeEvent;
       diceRolls: DiceRoll[];
       statePatches: StatePatch[];
+      consequenceEffects: ConsequenceEffect[];
       shouldEndSession: boolean;
       imageNeeded: boolean;
       imageJobPayload: SessionImageJobPayload | undefined;
@@ -319,6 +320,7 @@ export type TurnPipelineResult =
       kind: "human_dm";
       diceRolls: DiceRoll[];
       statePatches: StatePatch[];
+      consequenceEffects: ConsequenceEffect[];
       shouldEndSession: boolean;
       expectedNextPlayerId: string;
     };
@@ -529,6 +531,7 @@ export async function runTurnPipeline(params: {
       kind: "human_dm",
       diceRolls,
       statePatches,
+      consequenceEffects: consequenceResult.data.effects,
       shouldEndSession: questUpdate.shouldEndSession,
       expectedNextPlayerId: ctx.nextPlayerId,
     };
@@ -655,6 +658,7 @@ export async function runTurnPipeline(params: {
     narrativeEvent: mapNarrativeRow(inserted),
     diceRolls,
     statePatches,
+    consequenceEffects: consequenceResult.data.effects,
     shouldEndSession: questUpdate.shouldEndSession,
     imageNeeded,
     imageJobPayload,

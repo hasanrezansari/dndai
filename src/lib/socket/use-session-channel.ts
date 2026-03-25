@@ -17,10 +17,11 @@ import {
   SceneImagePendingEventSchema,
   SceneImageReadyEventSchema,
   SessionStartedEventSchema,
+  StatChangeEventSchema,
   StateUpdateEventSchema,
   TurnStartedEventSchema,
 } from "@/lib/schemas/events";
-import type { GamePlayerView, GameSessionView, RollingMemoryView } from "@/lib/state/game-store";
+import type { GamePlayerView, GameSessionView, RollingMemoryView, StatEffect, StatPopup } from "@/lib/state/game-store";
 import { useGameStore } from "@/lib/state/game-store";
 
 import { getPusherClient, getSessionChannel } from "./client";
@@ -286,6 +287,81 @@ export function useSessionChannel(sessionId: string | null) {
       });
     };
 
+    const onStatChange = (raw: unknown) => {
+      const parsed = StatChangeEventSchema.safeParse(raw);
+      if (!parsed.success) return;
+      const store = useGameStore.getState();
+      const players = store.players;
+
+      function resolveName(targetType: string, targetId: string): string {
+        if (targetType === "player") {
+          const p = players.find((pl) => pl.id === targetId);
+          return p?.character?.name ?? p?.displayName ?? "Unknown";
+        }
+        return "NPC";
+      }
+
+      const effects: StatEffect[] = parsed.data.effects.map((e) => ({
+        targetId: e.target_id,
+        targetName: e.target_name ?? resolveName(e.target_type, e.target_id),
+        hpDelta: e.hp_delta,
+        manaDelta: e.mana_delta,
+        conditionsAdd: e.conditions_add,
+        conditionsRemove: e.conditions_remove,
+        reasoning: e.reasoning,
+      }));
+
+      const parts: string[] = [];
+      for (const e of effects) {
+        const chunks: string[] = [];
+        if (e.hpDelta !== 0) chunks.push(`${e.hpDelta > 0 ? "+" : ""}${e.hpDelta} HP`);
+        if (e.manaDelta !== 0) chunks.push(`${e.manaDelta > 0 ? "+" : ""}${e.manaDelta} MP`);
+        if (e.conditionsAdd.length) chunks.push(`+${e.conditionsAdd.join(", ")}`);
+        if (e.conditionsRemove.length) chunks.push(`-${e.conditionsRemove.join(", ")}`);
+        if (chunks.length) parts.push(`${e.targetName}: ${chunks.join(", ")}`);
+      }
+
+      if (parts.length > 0) {
+        store.addFeedEntry({
+          id: feedId(),
+          type: "stat_change",
+          text: parts.join(" | "),
+          timestamp: nowIso(),
+          statEffects: effects,
+        });
+      }
+
+      const popups: StatPopup[] = [];
+      const flash: Record<string, "damage" | "heal"> = {};
+      for (const e of effects) {
+        if (e.hpDelta !== 0) {
+          popups.push({
+            id: feedId(),
+            playerId: e.targetId,
+            label: `${e.hpDelta > 0 ? "+" : ""}${e.hpDelta} HP`,
+            color: e.hpDelta > 0 ? "green" : "red",
+            createdAt: Date.now(),
+          });
+          flash[e.targetId] = e.hpDelta > 0 ? "heal" : "damage";
+        }
+        if (e.manaDelta !== 0) {
+          popups.push({
+            id: feedId(),
+            playerId: e.targetId,
+            label: `${e.manaDelta > 0 ? "+" : ""}${e.manaDelta} MP`,
+            color: e.manaDelta > 0 ? "blue" : "red",
+            createdAt: Date.now(),
+          });
+        }
+      }
+
+      if (popups.length > 0) store.addStatPopups(popups);
+      if (Object.keys(flash).length > 0) {
+        store.setHpFlash(flash);
+        setTimeout(() => useGameStore.getState().setHpFlash({}), 1200);
+      }
+    };
+
     let scenePollTimer: ReturnType<typeof setInterval> | null = null;
 
     function stopScenePoll() {
@@ -397,6 +473,7 @@ export function useSessionChannel(sessionId: string | null) {
     channel.bind("dice-result", onDiceResult);
     channel.bind("narration-update", onNarrationUpdate);
     channel.bind("state-update", onStateUpdate);
+    channel.bind("stat-change", onStatChange);
     channel.bind("scene-image-pending", onSceneImagePending);
     channel.bind("scene-image-ready", onSceneImageReady);
     channel.bind("scene-image-failed", onSceneImageFailed);
@@ -436,6 +513,7 @@ export function useSessionChannel(sessionId: string | null) {
       channel.unbind("dice-result", onDiceResult);
       channel.unbind("narration-update", onNarrationUpdate);
       channel.unbind("state-update", onStateUpdate);
+      channel.unbind("stat-change", onStatChange);
       channel.unbind("scene-image-pending", onSceneImagePending);
       channel.unbind("scene-image-ready", onSceneImageReady);
       channel.unbind("scene-image-failed", onSceneImageFailed);

@@ -22,6 +22,7 @@ import { PlayerStrip } from "@/components/game/player-strip";
 import { SceneHeader } from "@/components/game/scene-header";
 import { TurnBanner } from "@/components/game/turn-banner";
 import { SceneTransition } from "@/components/game/scene-transition";
+import { StatPopupOverlay } from "@/components/game/stat-popup";
 import { FeedList } from "@/components/feed/feed-list";
 import { useSessionChannel } from "@/lib/socket/use-session-channel";
 import { useGameStore } from "@/lib/state/game-store";
@@ -478,6 +479,7 @@ export default function SessionGameplayPage() {
         </BottomSheet>
       )}
       <DiceOverlay />
+      <StatPopupOverlay />
       <div className="relative z-[1] h-[42vh] w-full shrink-0 overflow-hidden">
         <button
           type="button"

@@ -1,5 +1,6 @@
 "use client";
 
+import { useGameStore } from "@/lib/state/game-store";
 import type { GamePlayerView } from "@/lib/state/game-store";
 
 export interface PlayerStripProps {
@@ -14,6 +15,8 @@ function avatarLetter(p: GamePlayerView) {
 }
 
 export function PlayerStrip({ players, currentTurnPlayerId }: PlayerStripProps) {
+  const hpFlash = useGameStore((s) => s.hpFlash);
+
   return (
     <div className="h-[6rem] shrink-0">
       <div className="scrollbar-hide flex h-full gap-4 overflow-x-auto pb-1 pt-1">
@@ -31,6 +34,7 @@ export function PlayerStrip({ players, currentTurnPlayerId }: PlayerStripProps) 
             p.displayName?.trim() ||
             `Seat ${p.seatIndex + 1}`;
           const dim = !p.isConnected;
+          const flash = hpFlash[p.id];
 
           return (
             <div
@@ -43,12 +47,14 @@ export function PlayerStrip({ players, currentTurnPlayerId }: PlayerStripProps) 
                   active
                     ? "selected-glow bg-[var(--surface-high)] text-[var(--color-gold-rare)] border-2 border-[var(--color-gold-rare)]"
                     : "bg-[var(--color-midnight)] text-[var(--color-silver-dim)] border border-[rgba(77,70,53,0.2)]"
-                }`}
+                } ${flash === "damage" ? "animate-hp-flash-damage" : flash === "heal" ? "animate-hp-flash-heal" : ""}`}
               >
                 {p.isConnected ? avatarLetter(p) : "…"}
               </div>
               <div
-                className="h-1 w-full max-w-[2.75rem] overflow-hidden rounded-sm bg-[var(--color-deep-void)]"
+                className={`h-1.5 w-full max-w-[2.75rem] overflow-hidden rounded-sm bg-[var(--color-deep-void)] ${
+                  flash ? "ring-1 ring-offset-1 ring-offset-transparent" : ""
+                } ${flash === "damage" ? "ring-red-500/60" : flash === "heal" ? "ring-emerald-500/60" : ""}`}
                 aria-hidden
               >
                 <div

@@ -104,6 +104,22 @@ export const SceneImageFailedEventSchema = z.object({
 });
 export type SceneImageFailedEvent = output<typeof SceneImageFailedEventSchema>;
 
+export const StatChangeEffectSchema = z.object({
+  target_type: z.enum(["player", "npc"]),
+  target_id: z.string(),
+  target_name: z.string().optional(),
+  hp_delta: z.number().int().default(0),
+  mana_delta: z.number().int().default(0),
+  conditions_add: z.array(z.string()).default([]),
+  conditions_remove: z.array(z.string()).default([]),
+  reasoning: z.string().default(""),
+});
+
+export const StatChangeEventSchema = z.object({
+  effects: z.array(StatChangeEffectSchema),
+});
+export type StatChangeEvent = output<typeof StatChangeEventSchema>;
+
 export const RoundSummaryEventSchema = z.object({
   summary_text: z.string(),
   round_number: z.number().int().min(1),

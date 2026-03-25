@@ -296,6 +296,28 @@ body {
   }
 }
 
+@keyframes hp-flash-damage {
+  0%, 100% { box-shadow: none; }
+  25% { box-shadow: 0 0 12px 2px rgba(248,113,113,0.7); }
+  50% { box-shadow: 0 0 6px 1px rgba(248,113,113,0.4); }
+  75% { box-shadow: 0 0 12px 2px rgba(248,113,113,0.7); }
+}
+
+@keyframes hp-flash-heal {
+  0%, 100% { box-shadow: none; }
+  25% { box-shadow: 0 0 12px 2px rgba(52,211,153,0.7); }
+  50% { box-shadow: 0 0 6px 1px rgba(52,211,153,0.4); }
+  75% { box-shadow: 0 0 12px 2px rgba(52,211,153,0.7); }
+}
+
+.animate-hp-flash-damage {
+  animation: hp-flash-damage 1.2s ease-in-out;
+}
+
+.animate-hp-flash-heal {
+  animation: hp-flash-heal 1.2s ease-in-out;
+}
+
 .scrollbar-hide {
   -ms-overflow-style: none;
   scrollbar-width: none;

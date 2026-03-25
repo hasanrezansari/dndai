@@ -117,6 +117,15 @@ export async function POST(
         } catch (err) {
           console.error(err);
         }
+        if (pipelineResult.consequenceEffects.length > 0) {
+          try {
+            await broadcastToSession(sessionId, "stat-change", {
+              effects: pipelineResult.consequenceEffects,
+            });
+          } catch (err) {
+            console.error("[actions] stat-change broadcast failed:", err);
+          }
+        }
         await releaseTurnLock(sessionId);
         lockHeld = false;
         return NextResponse.json({ actionId, turnId }, { status: 202 });
@@ -134,6 +143,15 @@ export async function POST(
         });
       } catch (err) {
         console.error(err);
+      }
+      if (pipelineResult.consequenceEffects.length > 0) {
+        try {
+          await broadcastToSession(sessionId, "stat-change", {
+            effects: pipelineResult.consequenceEffects,
+          });
+        } catch (err) {
+          console.error("[actions] stat-change broadcast failed:", err);
+        }
       }
       await releaseTurnLock(sessionId);
       lockHeld = false;
@@ -203,6 +221,15 @@ export async function POST(
       } catch (err) {
         console.error(err);
       }
+      if (pipelineResult.consequenceEffects.length > 0) {
+        try {
+          await broadcastToSession(sessionId, "stat-change", {
+            effects: pipelineResult.consequenceEffects,
+          });
+        } catch (err) {
+          console.error("[actions] stat-change broadcast failed:", err);
+        }
+      }
       await releaseTurnLock(sessionId);
       lockHeld = false;
       return NextResponse.json({ actionId, turnId }, { status: 202 });
@@ -243,6 +270,16 @@ export async function POST(
       });
     } catch (err) {
       console.error(err);
+    }
+
+    if (pipelineResult.consequenceEffects.length > 0) {
+      try {
+        await broadcastToSession(sessionId, "stat-change", {
+          effects: pipelineResult.consequenceEffects,
+        });
+      } catch (err) {
+        console.error("[actions] stat-change broadcast failed:", err);
+      }
     }
 
     if (pipelineResult.imageNeeded && pipelineResult.imageJobPayload) {

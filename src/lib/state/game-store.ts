@@ -6,13 +6,32 @@ export type ActiveSheet = "character" | "party" | "journal";
 
 export interface FeedEntry {
   id: string;
-  type: "action" | "dice" | "narration" | "state_change" | "system";
+  type: "action" | "dice" | "narration" | "state_change" | "stat_change" | "system";
   playerName?: string;
   text: string;
   detail?: string;
   timestamp: string;
   highlight?: boolean;
   imageUrl?: string;
+  statEffects?: StatEffect[];
+}
+
+export interface StatEffect {
+  targetId: string;
+  targetName: string;
+  hpDelta: number;
+  manaDelta: number;
+  conditionsAdd: string[];
+  conditionsRemove: string[];
+  reasoning: string;
+}
+
+export interface StatPopup {
+  id: string;
+  playerId: string;
+  label: string;
+  color: "red" | "green" | "blue";
+  createdAt: number;
 }
 
 export interface GameSessionView {
@@ -114,6 +133,8 @@ interface GameState {
   dmDc: number | null;
   quest: QuestProgressView | null;
   rollingMemories: RollingMemoryView[];
+  statPopups: StatPopup[];
+  hpFlash: Record<string, "damage" | "heal">;
 
   setSessionId: (id: string) => void;
   setSession: (session: GameState["session"]) => void;
@@ -159,6 +180,8 @@ interface GameState {
   setDmDc: (dc: number | null) => void;
   setQuest: (quest: QuestProgressView | null) => void;
   setRollingMemories: (memories: RollingMemoryView[]) => void;
+  addStatPopups: (popups: StatPopup[]) => void;
+  setHpFlash: (flash: Record<string, "damage" | "heal">) => void;
 }
 
 const emptyState = {
@@ -181,6 +204,8 @@ const emptyState = {
   dmDc: null as number | null,
   quest: null as QuestProgressView | null,
   rollingMemories: [] as RollingMemoryView[],
+  statPopups: [] as StatPopup[],
+  hpFlash: {} as Record<string, "damage" | "heal">,
 };
 
 export const useGameStore = create<GameState>((set) => ({
@@ -251,6 +276,11 @@ export const useGameStore = create<GameState>((set) => ({
   setQuest: (quest) => set({ quest }),
 
   setRollingMemories: (memories) => set({ rollingMemories: memories }),
+
+  addStatPopups: (popups) =>
+    set((s) => ({ statPopups: [...s.statPopups, ...popups] })),
+
+  setHpFlash: (flash) => set({ hpFlash: flash }),
 
   updateSessionField: (field, value) =>
     set((s) => {

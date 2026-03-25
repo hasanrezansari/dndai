@@ -3,7 +3,7 @@
 import { type ReactNode } from "react";
 import { motion } from "framer-motion";
 
-import type { FeedEntry } from "@/lib/state/game-store";
+import type { FeedEntry, StatEffect } from "@/lib/state/game-store";
 
 const ROLL_RESULTS = new Set([
   "success",
@@ -77,11 +77,58 @@ function entryIcon(type: string): string {
       return "auto_stories";
     case "dice":
       return "casino";
+    case "stat_change":
+      return "vital_signs";
     case "system":
       return "info";
     default:
       return "notes";
   }
+}
+
+function StatEffectChip({ effect }: { effect: StatEffect }) {
+  const chips: { label: string; cls: string }[] = [];
+  if (effect.hpDelta !== 0) {
+    const sign = effect.hpDelta > 0 ? "+" : "";
+    chips.push({
+      label: `${sign}${effect.hpDelta} HP`,
+      cls: effect.hpDelta > 0 ? "text-emerald-400" : "text-red-400",
+    });
+  }
+  if (effect.manaDelta !== 0) {
+    const sign = effect.manaDelta > 0 ? "+" : "";
+    chips.push({
+      label: `${sign}${effect.manaDelta} MP`,
+      cls: effect.manaDelta > 0 ? "text-blue-400" : "text-red-400",
+    });
+  }
+  for (const c of effect.conditionsAdd) {
+    chips.push({ label: `+${c}`, cls: "text-amber-400" });
+  }
+  for (const c of effect.conditionsRemove) {
+    chips.push({ label: `-${c}`, cls: "text-[var(--outline)]" });
+  }
+
+  return (
+    <div className="flex flex-wrap items-center gap-1.5">
+      <span className="text-[13px] font-bold text-[var(--color-silver-muted)]">
+        {effect.targetName}
+      </span>
+      {chips.map((ch, i) => (
+        <span
+          key={i}
+          className={`rounded-md bg-[var(--color-deep-void)] px-1.5 py-0.5 text-[11px] font-bold tabular-nums ${ch.cls}`}
+        >
+          {ch.label}
+        </span>
+      ))}
+      {effect.reasoning && (
+        <span className="text-[10px] text-[var(--outline)] italic">
+          {effect.reasoning}
+        </span>
+      )}
+    </div>
+  );
 }
 
 const timeClass =
@@ -224,6 +271,37 @@ export function FeedEntryRow({ entry }: FeedEntryRowProps) {
       >
         <div className="flex gap-2">
           <div className="min-w-0 flex-1">{body}</div>
+          <time className={`${timeClass} pt-0.5`} dateTime={entry.timestamp}>
+            {time}
+          </time>
+        </div>
+      </motion.div>
+    );
+  }
+
+  if (entry.type === "stat_change" && entry.statEffects?.length) {
+    return (
+      <motion.div
+        layout={false}
+        initial={{ opacity: 0, y: 8 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
+        className={`${borderBase} border-l-red-500/60 bg-[var(--surface-container)]/30`}
+      >
+        <div className="flex gap-2">
+          <div className="min-w-0 flex-1 space-y-1">
+            <div className="flex items-center gap-2 mb-1">
+              <span className="material-symbols-outlined text-red-400 text-sm">
+                vital_signs
+              </span>
+              <span className="text-[11px] font-bold uppercase tracking-wider text-[var(--outline)]">
+                Stat Changes
+              </span>
+            </div>
+            {entry.statEffects.map((eff, i) => (
+              <StatEffectChip key={i} effect={eff} />
+            ))}
+          </div>
           <time className={`${timeClass} pt-0.5`} dateTime={entry.timestamp}>
             {time}
           </time>
