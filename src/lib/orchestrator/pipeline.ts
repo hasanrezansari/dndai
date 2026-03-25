@@ -26,10 +26,10 @@ export type SessionImageJobPayload = {
 function resolveAppOrigin(): string | null {
   const internal = process.env.INTERNAL_APP_URL?.replace(/\/$/, "");
   if (internal) return internal;
-  const nextAuth = process.env.NEXTAUTH_URL?.replace(/\/$/, "");
-  if (nextAuth) return nextAuth;
   const vercel = process.env.VERCEL_URL?.replace(/\/$/, "");
   if (vercel) return `https://${vercel}`;
+  const nextAuth = process.env.NEXTAUTH_URL?.replace(/\/$/, "");
+  if (nextAuth && !nextAuth.includes("localhost")) return nextAuth;
   return null;
 }
 
@@ -40,10 +40,11 @@ export function scheduleSessionImageGeneration(
 ): void {
   const origin = resolveAppOrigin();
   if (!origin) {
-    console.error("scheduleSessionImageGeneration: missing app origin");
+    console.error("scheduleSessionImageGeneration: missing app origin (VERCEL_URL:", process.env.VERCEL_URL, "NEXTAUTH_URL:", process.env.NEXTAUTH_URL, ")");
     return;
   }
   const url = `${origin}/api/sessions/${sessionId}/image`;
+  console.log("[image] scheduling generation at:", url);
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
   };

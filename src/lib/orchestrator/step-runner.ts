@@ -8,10 +8,11 @@ function asRecord(value: unknown): Record<string, unknown> {
   return { value };
 }
 
-function isQuotaError(err: unknown): boolean {
+function isUnretryable(err: unknown): boolean {
   if (!(err instanceof Error)) return false;
   const msg = err.message.toLowerCase();
   return (
+    msg.includes("timeout") ||
     msg.includes("429") ||
     msg.includes("quota") ||
     msg.includes("rate") ||
@@ -35,7 +36,7 @@ export async function runOrchestrationStep<T>(params: {
   fallback?: () => T;
   timeoutMs?: number;
 }): Promise<OrchestrationStepResult<T>> {
-  const timeoutMs = params.timeoutMs ?? 15_000;
+  const timeoutMs = params.timeoutMs ?? 8_000;
   const t0 = Date.now();
 
   const emptyUsage = (model: string): TokenUsage => ({
@@ -78,10 +79,10 @@ export async function runOrchestrationStep<T>(params: {
       msg1,
     );
 
-    if (isQuotaError(e1) && params.fallback) {
+    if (isUnretryable(e1) && params.fallback) {
       data = params.fallback();
       usage = emptyUsage("fallback");
-      error = `${msg1}; used fallback (quota)`;
+      error = `${msg1}; used fallback`;
     } else if (params.fallback) {
       try {
         const r2 = await runWithTimeout(
@@ -98,10 +99,7 @@ export async function runOrchestrationStep<T>(params: {
         );
         data = params.fallback();
         usage = emptyUsage("fallback");
-        error =
-          e2 instanceof Error
-            ? `${e2.message}; used fallback`
-            : "used fallback";
+        error = `${msg2}; used fallback`;
       }
     } else {
       const latencyMs = Date.now() - t0;

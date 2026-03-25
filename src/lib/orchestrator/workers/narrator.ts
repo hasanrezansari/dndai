@@ -195,6 +195,6 @@ export async function generateNarration(params: {
         null,
         params.sceneContext,
       ),
-    timeoutMs: 15_000,
+    timeoutMs: 8_000,
   });
 }
