@@ -8,6 +8,19 @@ function asRecord(value: unknown): Record<string, unknown> {
   return { value };
 }
 
+function isQuotaError(err: unknown): boolean {
+  if (!(err instanceof Error)) return false;
+  const msg = err.message.toLowerCase();
+  return (
+    msg.includes("429") ||
+    msg.includes("quota") ||
+    msg.includes("rate") ||
+    msg.includes("billing") ||
+    msg.includes("credit") ||
+    msg.includes("insufficient")
+  );
+}
+
 export async function runOrchestrationStep<T>(params: {
   stepName: string;
   sessionId: string;
@@ -22,7 +35,7 @@ export async function runOrchestrationStep<T>(params: {
   fallback?: () => T;
   timeoutMs?: number;
 }): Promise<OrchestrationStepResult<T>> {
-  const timeoutMs = params.timeoutMs ?? 60_000;
+  const timeoutMs = params.timeoutMs ?? 15_000;
   const t0 = Date.now();
 
   const emptyUsage = (model: string): TokenUsage => ({
@@ -63,50 +76,52 @@ export async function runOrchestrationStep<T>(params: {
       `[orchestration:${params.stepName}] attempt 1 failed`,
       params.sessionId,
       msg1,
-      e1,
     );
-    try {
-      const r2 = await runWithTimeout(
-        `${params.userPrompt}\n\nRespond ONLY with valid JSON matching the schema exactly.`,
-      );
-      data = r2.data;
-      usage = r2.usage;
-    } catch (e2) {
-      const msg2 = e2 instanceof Error ? e2.message : String(e2);
-      console.error(
-        `[orchestration:${params.stepName}] attempt 2 failed`,
-        params.sessionId,
-        msg2,
-        e2,
-      );
-      if (params.fallback) {
+
+    if (isQuotaError(e1) && params.fallback) {
+      data = params.fallback();
+      usage = emptyUsage("fallback");
+      error = `${msg1}; used fallback (quota)`;
+    } else if (params.fallback) {
+      try {
+        const r2 = await runWithTimeout(
+          `${params.userPrompt}\n\nRespond ONLY with valid JSON matching the schema exactly.`,
+        );
+        data = r2.data;
+        usage = r2.usage;
+      } catch (e2) {
+        const msg2 = e2 instanceof Error ? e2.message : String(e2);
+        console.error(
+          `[orchestration:${params.stepName}] attempt 2 failed`,
+          params.sessionId,
+          msg2,
+        );
         data = params.fallback();
         usage = emptyUsage("fallback");
         error =
           e2 instanceof Error
             ? `${e2.message}; used fallback`
             : "used fallback";
-      } else {
-        const latencyMs = Date.now() - t0;
-        const msg = e2 instanceof Error ? e2.message : String(e2);
-        await logTrace({
-          sessionId: params.sessionId,
-          turnId: params.turnId,
-          stepName: params.stepName,
-          input: asRecord({
-            systemPrompt: params.systemPrompt,
-            userPrompt: params.userPrompt,
-          }),
-          output: {},
-          modelUsed: usage.model,
-          tokensIn: 0,
-          tokensOut: 0,
-          latencyMs,
-          success: false,
-          errorMessage: msg,
-        });
-        throw e2;
       }
+    } else {
+      const latencyMs = Date.now() - t0;
+      await logTrace({
+        sessionId: params.sessionId,
+        turnId: params.turnId,
+        stepName: params.stepName,
+        input: asRecord({
+          systemPrompt: params.systemPrompt,
+          userPrompt: params.userPrompt,
+        }),
+        output: {},
+        modelUsed: usage.model,
+        tokensIn: 0,
+        tokensOut: 0,
+        latencyMs,
+        success: false,
+        errorMessage: msg1,
+      });
+      throw e1;
     }
   }
 

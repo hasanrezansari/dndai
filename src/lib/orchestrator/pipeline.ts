@@ -280,6 +280,8 @@ export async function runTurnPipeline(params: {
     provider,
   });
 
+  const aiWasUsed = narr0.usage.model !== "fallback";
+
   let narration: NarratorOutput = {
     ...narr0.data,
     next_actor_id: expectedNextPlayerId,
@@ -303,24 +305,26 @@ export async function runTurnPipeline(params: {
   }
 
   let imageNeeded = false;
-  const shouldCheckImage =
-    ctx.roundAdvanced ||
-    ctx.session.currentRound <= 2 ||
-    diceRolls.some(
-      (r) =>
-        r.result === "critical_success" || r.result === "critical_failure",
-    );
-  if (shouldCheckImage) {
-    if (ctx.session.currentRound <= 2) {
-      imageNeeded = true;
-    } else {
-      const vis = await checkVisualDelta({
-        sessionId,
-        turnId,
-        narrativeText: narration.scene_text,
-        currentSceneDescription: ctx.currentSceneDescription,
-      });
-      imageNeeded = vis.data.image_needed;
+  if (aiWasUsed) {
+    const shouldCheckImage =
+      ctx.roundAdvanced ||
+      ctx.session.currentRound <= 2 ||
+      diceRolls.some(
+        (r) =>
+          r.result === "critical_success" || r.result === "critical_failure",
+      );
+    if (shouldCheckImage) {
+      if (ctx.session.currentRound <= 2) {
+        imageNeeded = true;
+      } else {
+        const vis = await checkVisualDelta({
+          sessionId,
+          turnId,
+          narrativeText: narration.scene_text,
+          currentSceneDescription: ctx.currentSceneDescription,
+        });
+        imageNeeded = vis.data.image_needed;
+      }
     }
   }
 

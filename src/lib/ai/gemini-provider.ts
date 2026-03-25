@@ -59,43 +59,26 @@ export class GeminiProvider implements AIProvider {
       };
     }
 
-    const jsonBody = JSON.stringify(body);
-    const maxRetries = 3;
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), DEFAULT_TIMEOUT_MS);
 
-    for (let attempt = 0; attempt < maxRetries; attempt++) {
-      const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), DEFAULT_TIMEOUT_MS);
+    try {
+      const res = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+        signal: controller.signal,
+      });
 
-      try {
-        const res = await fetch(url, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: jsonBody,
-          signal: controller.signal,
-        });
-
-        if (res.status === 429 && attempt < maxRetries - 1) {
-          clearTimeout(timeout);
-          const errBody = await res.text();
-          const retryMatch = /retry.*?(\d+)/i.exec(errBody);
-          const waitSec = retryMatch?.[1] ? Math.min(parseInt(retryMatch[1], 10), 60) : (attempt + 1) * 15;
-          console.warn(`[gemini] 429 rate limited, waiting ${waitSec}s before retry ${attempt + 1}/${maxRetries}`);
-          await new Promise((r) => setTimeout(r, waitSec * 1000));
-          continue;
-        }
-
-        if (!res.ok) {
-          const errText = await res.text();
-          throw new Error(`Gemini API ${res.status}: ${errText}`);
-        }
-
-        return (await res.json()) as GeminiResponse;
-      } finally {
-        clearTimeout(timeout);
+      if (!res.ok) {
+        const errText = await res.text();
+        throw new Error(`Gemini API ${res.status}: ${errText}`);
       }
-    }
 
-    throw new Error("Gemini API: max retries exhausted");
+      return (await res.json()) as GeminiResponse;
+    } finally {
+      clearTimeout(timeout);
+    }
   }
 
   private extractText(response: GeminiResponse): string {
