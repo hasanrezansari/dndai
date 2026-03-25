@@ -39,6 +39,14 @@ export class OpenRouterProvider implements AIProvider {
     };
   }
 
+  private extractResponseText(response: OpenRouterResponse): string {
+    const msg = response.choices?.[0]?.message;
+    if (!msg) return "";
+    // Some free models (reasoning models) put output in `reasoning`
+    // instead of `content` — check both fields.
+    return msg.content ?? msg.reasoning ?? "";
+  }
+
   async generateStructured<T>(params: {
     model: ModelTier;
     systemPrompt: string;
@@ -63,12 +71,12 @@ export class OpenRouterProvider implements AIProvider {
           temperature: params.temperature ?? 0.7,
         });
 
-        const text = response.choices?.[0]?.message?.content ?? "";
+        const text = this.extractResponseText(response);
         let parsed: unknown;
         try {
           parsed = JSON.parse(extractJsonObject(text));
         } catch {
-          throw new SyntaxError("Invalid JSON from model");
+          throw new SyntaxError(`Invalid JSON from model: ${text.slice(0, 100)}`);
         }
 
         const validated = params.schema.safeParse(parsed);
@@ -102,7 +110,7 @@ export class OpenRouterProvider implements AIProvider {
     });
 
     return {
-      text: response.choices?.[0]?.message?.content ?? "",
+      text: this.extractResponseText(response),
       usage: this.usageFrom(model, response.usage),
     };
   }
@@ -147,7 +155,10 @@ export class OpenRouterProvider implements AIProvider {
 
 interface OpenRouterResponse {
   choices?: Array<{
-    message?: { content?: string };
+    message?: {
+      content?: string | null;
+      reasoning?: string | null;
+    };
   }>;
   usage?: {
     prompt_tokens?: number;
