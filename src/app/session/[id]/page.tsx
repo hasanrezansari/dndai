@@ -24,6 +24,9 @@ import { TurnBanner } from "@/components/game/turn-banner";
 import { SceneTransition } from "@/components/game/scene-transition";
 import { StatPopupOverlay } from "@/components/game/stat-popup";
 import { FeedList } from "@/components/feed/feed-list";
+import { BeatStrip } from "@/components/game/beat-strip";
+import { SessionViewModeToggle } from "@/components/game/session-view-mode-toggle";
+import { useSessionUiMode } from "@/hooks/use-session-ui-mode";
 import { useSessionChannel } from "@/lib/socket/use-session-channel";
 import { useGameStore } from "@/lib/state/game-store";
 
@@ -145,6 +148,8 @@ export default function SessionGameplayPage() {
   const [chapterBusy, setChapterBusy] = useState(false);
   const [sceneTransitionTrigger, setSceneTransitionTrigger] = useState(false);
   const [prevSceneTitle, setPrevSceneTitle] = useState<string | null>(null);
+  const [chronicleOpen, setChronicleOpen] = useState(false);
+  const { mode: sessionUiMode, setMode: setSessionUiMode } = useSessionUiMode();
 
   useEffect(() => {
     setHydrated(false);
@@ -478,6 +483,15 @@ export default function SessionGameplayPage() {
           <JournalSheet />
         </BottomSheet>
       )}
+      <BottomSheet
+        isOpen={chronicleOpen}
+        onClose={() => setChronicleOpen(false)}
+        title="Chronicle"
+      >
+        <div className="flex h-[min(70vh,560px)] min-h-[240px] flex-col overflow-hidden">
+          <FeedList entries={feed} className="min-h-0 flex-1" />
+        </div>
+      </BottomSheet>
       <DiceOverlay />
       <StatPopupOverlay />
       <div className="relative z-[1] h-[42vh] w-full shrink-0 overflow-hidden">
@@ -489,6 +503,12 @@ export default function SessionGameplayPage() {
           <span className="material-symbols-outlined text-sm">arrow_back</span>
           Leave
         </button>
+        <div className="absolute right-3 top-3 z-30 w-[min(100%,11.5rem)] max-w-[calc(100%-5rem)]">
+          <SessionViewModeToggle
+            mode={sessionUiMode}
+            onChange={setSessionUiMode}
+          />
+        </div>
         <SceneHeader
           sceneImage={sceneImage}
           previousSceneImage={previousSceneImage}
@@ -603,7 +623,22 @@ export default function SessionGameplayPage() {
             ) : null}
           </div>
         ) : null}
-        <FeedList entries={feed} className="min-h-0 flex-1" />
+        {sessionUiMode === "spotlight" ? (
+          <div className="flex min-h-0 flex-1 flex-col gap-3">
+            <BeatStrip />
+            <button
+              type="button"
+              onClick={() => setChronicleOpen(true)}
+              className="flex min-h-[44px] shrink-0 items-center justify-center gap-2 rounded-[var(--radius-card)] border border-[rgba(77,70,53,0.25)] bg-[var(--surface-high)]/80 px-4 py-2 text-[10px] font-black uppercase tracking-[0.15em] text-[var(--color-gold-support)] transition-colors hover:border-[var(--color-gold-rare)]/35 hover:text-[var(--color-gold-rare)]"
+            >
+              <span className="material-symbols-outlined text-base">menu_book</span>
+              Open Chronicle
+            </button>
+            <div className="min-h-0 flex-1" aria-hidden />
+          </div>
+        ) : (
+          <FeedList entries={feed} className="min-h-0 flex-1" />
+        )}
         <PlayerStrip
           players={players}
           currentTurnPlayerId={currentTurnPlayerId}
