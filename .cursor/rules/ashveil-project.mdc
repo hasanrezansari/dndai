@@ -1,47 +1,112 @@
 ---
-description: Ashveil project context, delegation rules, and cost control
+description: Ashveil master context — stack, architecture, file map, patterns, constraints
 alwaysApply: true
 ---
 
-# Ashveil — Project Rules
-
-## Spec
-Read `docs/ASHVEIL_SPEC.md` for full architecture, design system, data model, AI pipeline, and build phases.
+# Ashveil — Master Project Rules
 
 ## What This Is
-Mobile-first multiplayer AI-powered tabletop RPG. 2-6 players, shared state, AI or Human DM, turn-based, real-time via Pusher.
+Mobile-first multiplayer AI-powered tabletop RPG. 2-6 players, shared canonical state, AI or Human DM, turn-based combat/exploration/social, real-time sync via Pusher. Dark fantasy "Liquid Obsidian" aesthetic.
 
-## Stack
-Next.js 15+ (App Router), TypeScript (strict), Tailwind v4, Framer Motion, Zustand, Neon Postgres + Drizzle, Upstash Redis, Pusher, NextAuth, fal.ai, Vercel.
+## Stack (exact versions matter)
+- Next.js **16.2.1** (App Router) — WARNING: this is NOT Next.js 14 or 15. Read `node_modules/next/dist/docs/` before using any Next.js API. `after()` imported from `next/server`, not `next/after`.
+- TypeScript strict (`noUncheckedIndexedAccess: true`)
+- React 19.2.4, Tailwind CSS v4 (`@tailwindcss/postcss`), Framer Motion 12.x
+- Zustand 5.x for client state (`src/lib/state/game-store.ts`)
+- Zod 4.x for all validation — use `z.iso.datetime()` not `z.string().datetime()`
+- Neon Postgres + Drizzle ORM 0.45.x (`src/lib/db/`)
+- Upstash Redis for rate limiting and locks (`src/lib/redis.ts`)
+- Pusher for realtime (`src/lib/socket/`)
+- NextAuth 5.0.0-beta.30 with Drizzle adapter + JWT strategy
+- AI: openai, @anthropic-ai/sdk, Gemini REST, OpenRouter REST — all behind `AIProvider` interface
+- Images: fal.ai, Freepik — async, never block gameplay
+- Tests: Vitest 4.x
+
+## Import Rules
+- Path alias: `@/*` maps to `./src/*` — ALWAYS use `@/` imports, never relative `../../`
+- Verify every import exists in the target file before using it
+
+## Directory Map
+```
+src/
+├── app/                          # Next.js App Router pages + API routes
+│   ├── api/                      # All API route handlers (route.ts files)
+│   │   ├── auth/[...nextauth]/   # NextAuth catch-all
+│   │   ├── characters/           # Character CRUD + stat rolling
+│   │   ├── pusher/auth/          # Pusher channel auth
+│   │   └── sessions/             # Session lifecycle + gameplay
+│   │       ├── join/             # POST join by code
+│   │       └── [id]/             # Session-scoped routes
+│   │           ├── actions/      # Player action submission (GOLD STANDARD route)
+│   │           ├── state/        # GET full session state
+│   │           ├── ready/        # Toggle ready
+│   │           ├── start/        # Start session
+│   │           ├── disconnect/   # Player disconnect
+│   │           ├── vote-end/     # Vote to end
+│   │           ├── final-chapter/# Trigger final chapter
+│   │           ├── image/        # Image generation endpoint
+│   │           ├── scene-image/  # Scene image serving
+│   │           └── dm/           # Human DM tools (narrate, advance-turn, event, roll, set-dc)
+│   ├── page.tsx                  # Home screen (session create/join)
+│   ├── lobby/[code]/page.tsx     # Pre-game lobby
+│   ├── character/[sessionId]/    # Character creation
+│   ├── session/[id]/page.tsx     # Main gameplay screen
+│   ├── layout.tsx                # Root layout (fonts, auth provider, metadata)
+│   ├── globals.css               # Design tokens + utility classes
+│   ├── manifest.ts               # PWA manifest
+│   ├── loading.tsx, error.tsx, not-found.tsx
+│
+├── components/
+│   ├── auth/       # auth-gate.tsx, session-provider.tsx
+│   ├── character/  # class-card.tsx, stat-pill.tsx
+│   ├── dice/       # dice-overlay.tsx
+│   ├── dm/         # dc-setter.tsx, dm-action-bar.tsx
+│   ├── feed/       # feed-entry.tsx, feed-list.tsx
+│   ├── game/       # action-bar, narrative-card, narrative-typewriter, player-strip,
+│   │               # scene-header, scene-transition, stat-popup, turn-banner
+│   ├── lobby/      # player-slot.tsx
+│   ├── sheets/     # bottom-sheet, character-sheet, journal-sheet, party-sheet
+│   └── ui/         # gold-button, ghost-button, glass-card, pill-select,
+│                   # loading-skeleton, connection-status, route-loading, toast
+│
+├── lib/
+│   ├── ai/             # AIProvider interface + adapters (openai, anthropic, gemini, openrouter, fallback, mock)
+│   ├── api/            # errors.ts (apiError, handleApiError)
+│   ├── auth/           # config.ts (NextAuth), guards.ts (requireUser, isPlayerForUser), session.ts
+│   ├── copy/           # ashveil.ts (static UI strings)
+│   ├── db/             # schema.ts (Drizzle tables), index.ts (Neon client)
+│   ├── memory/         # assembler.ts, summarizer.ts, types.ts, index.ts
+│   ├── orchestrator/   # pipeline.ts, step-runner.ts, context-builder.ts, apply-state.ts,
+│   │   │               # trace.ts, image-worker.ts
+│   │   └── workers/    # intent-parser, rules-interpreter, consequence-interpreter, visual-delta, narrator
+│   ├── rules/          # dice.ts, turn-logic.ts, character.ts
+│   ├── schemas/        # enums.ts, domain.ts, ai-io.ts, events.ts, state-patches.ts, fixtures.ts
+│   ├── socket/         # client.ts, server.ts (broadcastToSession), use-session-channel.ts
+│   ├── state/          # game-store.ts (Zustand)
+│   ├── redis.ts        # Upstash client
+│   └── copy/           # ashveil.ts
+│
+├── server/services/    # Business logic: session-service, character-service, turn-service,
+│                       # dice-service, quest-service, dm-auth
+│
+└── types/              # next-auth.d.ts (type augmentation)
+```
 
 ## Non-Negotiable Rules
-1. Canonical DB state is truth — AI never directly mutates it
-2. Every AI output validated with Zod before use
-3. Turn order enforced server-side with Redis locks
-4. Narration 60-140 words, structured JSON output
-5. Images async, never block gameplay
-6. Mobile-first — thumb zone, no clutter
+1. **DB is truth** — AI never directly mutates DB. AI proposes -> backend validates -> state commits -> AI narrates.
+2. **Zod everywhere** — every AI output, API body, event payload validated with Zod before use. Schemas live in `src/lib/schemas/`.
+3. **Turn order server-enforced** — Redis locks via `submitAction()`/`releaseTurnLock()` in `turn-service.ts`.
+4. **Narration 60-140 words** — strictly enforced in narrator system prompt.
+5. **Images async** — never block gameplay for image generation. Use `after()` from `next/server`.
+6. **Mobile-first** — thumb zone, no clutter, `min-h-dvh` not `min-h-screen`.
+7. **AIProvider abstraction** — never call OpenAI/Anthropic SDK directly in business logic. Always use `getAIProvider()` from `@/lib/ai`.
 
-## Delegation (CRITICAL for cost)
-- ALWAYS use Task tool with `model: "fast"` for: scaffolding, boilerplate, repetitive code, file creation, simple components, tests, migrations
-- Reserve Opus (yourself) for: architectural decisions, reviewing fast agent output, complex AI orchestration logic, debugging
-- Do NOT write large code blocks directly — delegate to fast agents with detailed instructions, then review
-- Do NOT create markdown docs, READMEs, or documentation files unless explicitly asked
-- Keep responses concise — no verbose explanations unless asked
+## Key Patterns to Follow
+- **New API route?** Follow `src/app/api/sessions/[id]/actions/route.ts` pattern: Zod body parse, requireUser(), isPlayerForUser(), try/catch with handleApiError.
+- **New component?** Follow existing component in same category. Client components: `"use client"` at top.
+- **New AI worker?** Follow `src/lib/orchestrator/workers/narrator.ts` pattern: system prompt, Zod output schema, fallback function, call `runOrchestrationStep()`.
+- **Broadcast event?** Use `broadcastToSession(sessionId, eventName, payload)` wrapped in try/catch.
+- **State management?** Add to Zustand store in `game-store.ts`. Never use React context for game state.
 
-## Phase Status
-- Phase 0: DONE (scaffold, design tokens, base components)
-- Phase 1: DONE (Zod schemas — enums, domain, AI I/O, events, state patches, fixtures)
-- Phase 2: DONE (Drizzle schema, Neon connection, migrations, db scripts)
-- Phase 3: DONE (session service, API routes, home screen, lobby screen, Pusher wiring)
-- Phase 4: DONE (character creation, stat rolling, class/race selection)
-- Phase 5: DONE (gameplay shell, Zustand store, Pusher hooks, 5-zone layout)
-- Phase 6: DONE (turn engine, dice service, Redis locks, state versioning, dice overlay, 20 tests)
-- Phase 7: DONE (action feed polish, turn banner, zone layout, entry animations)
-- Phase 8: DONE (AI orchestration pipeline, providers, step-runner, trace logging, narrator)
-- Phase 9: DONE (narration typewriter animation, fal.ai scene image gen, crossfade)
-- Phase 10: DONE (full AI workers — intent parser, rules interpreter, visual delta, narrator)
-- Phase 11: DONE (bottom sheets — character, party, journal)
-- Phase 12: DONE (human DM mode, DM tools, narrate/roll/set-dc/event/advance-turn)
-- Phase 13: DONE (NextAuth guest auth, Drizzle adapter, API auth guards, Pusher auth)
-- Phase 14: DONE (error boundaries, loading skeletons, toasts, connection status, PWA manifest)
+## Build Status
+Phases 0-14: ALL DONE (core game loop is working — scaffold, schemas, DB, sessions, lobby, character creation, gameplay shell, turn engine, dice, action feed, AI orchestration, narration, images, AI workers, bottom sheets, human DM mode, auth, error handling, PWA).

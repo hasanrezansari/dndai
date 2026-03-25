@@ -1,0 +1,135 @@
+---
+description: API route handler patterns, auth, validation, error handling, broadcast
+globs: "src/app/api/**"
+alwaysApply: false
+---
+
+# API Route Rules
+
+## Route Handler Pattern
+Every API route MUST follow this structure:
+
+```typescript
+import { NextRequest, NextResponse } from "next/server";
+import { z } from "zod";
+
+import { apiError, handleApiError } from "@/lib/api/errors";
+import { requireUser, unauthorizedResponse, isPlayerForUser } from "@/lib/auth/guards";
+import { db } from "@/lib/db";
+
+const BodySchema = z.object({
+  // define expected body shape
+});
+
+export async function POST(
+  request: NextRequest,
+  context: { params: Promise<{ id: string }> },  // Next.js 16 pattern: params is a Promise
+) {
+  const { id } = await context.params;  // MUST await params
+
+  // 1. Validate path params
+  if (!z.string().uuid().safeParse(id).success) {
+    return apiError("Invalid id", 400);
+  }
+
+  // 2. Auth
+  const user = await requireUser();
+  if (!user) return unauthorizedResponse();
+
+  // 3. Parse & validate body
+  let json: unknown;
+  try { json = await request.json(); } catch { return apiError("Invalid body", 400); }
+  const parsed = BodySchema.safeParse(json);
+  if (!parsed.success) return apiError("Invalid body", 400);
+
+  // 4. Authorization (if player-scoped)
+  if (!(await isPlayerForUser(parsed.data.playerId, id, user.id))) {
+    return apiError("Forbidden", 403);
+  }
+
+  try {
+    // 5. Business logic
+    // 6. Broadcast events (wrapped in try/catch)
+    // 7. Return response
+    return NextResponse.json({ ... }, { status: 200 });
+  } catch (e) {
+    return handleApiError(e);
+  }
+}
+```
+
+## Critical Next.js 16 Detail
+Route params are a **Promise** in Next.js 16. Always: `const { id } = await context.params;`
+
+## Auth Guards (`src/lib/auth/guards.ts`)
+- `requireUser()` — returns user object or null. Returns null if not authenticated.
+- `unauthorizedResponse()` — returns 401 NextResponse
+- `isPlayerForUser(playerId, sessionId, userId)` — verifies the player belongs to this user in this session
+
+## Error Handling (`src/lib/api/errors.ts`)
+- `apiError(message, status)` — returns `NextResponse.json({ error: message }, { status })`
+- `handleApiError(e)` — catches known errors (NotYourTurnError -> 403, TurnBeingProcessedError -> 409), returns 500 for unknown
+
+## Realtime Broadcasting (`src/lib/socket/server.ts`)
+```typescript
+import { broadcastToSession } from "@/lib/socket/server";
+
+// ALWAYS wrap in try/catch — broadcast failure must not crash the request
+try {
+  await broadcastToSession(sessionId, "event-name", { ...payload });
+} catch (err) {
+  console.error(err);
+}
+```
+
+## Existing Routes (DO NOT duplicate)
+| Method | Path | Purpose |
+|--------|------|---------|
+| * | `/api/auth/[...nextauth]` | NextAuth |
+| POST | `/api/pusher/auth` | Pusher channel auth |
+| POST | `/api/characters` | Create character |
+| POST | `/api/characters/roll-stats` | Roll ability scores |
+| POST | `/api/sessions` | Create session |
+| POST | `/api/sessions/join` | Join by code |
+| GET | `/api/sessions/[id]` | Get session details |
+| GET | `/api/sessions/[id]/state` | Get full game state |
+| POST | `/api/sessions/[id]/actions` | Submit player action (main gameplay) |
+| POST | `/api/sessions/[id]/ready` | Toggle ready |
+| POST | `/api/sessions/[id]/start` | Start session |
+| POST | `/api/sessions/[id]/disconnect` | Player disconnect |
+| POST | `/api/sessions/[id]/vote-end` | Vote to end session |
+| POST | `/api/sessions/[id]/final-chapter` | Trigger final chapter |
+| POST | `/api/sessions/[id]/image` | Generate image |
+| GET | `/api/sessions/[id]/scene-image/[snapshotId]` | Serve scene image |
+| POST | `/api/sessions/[id]/dm/narrate` | DM narration |
+| POST | `/api/sessions/[id]/dm/advance-turn` | DM advance turn |
+| POST | `/api/sessions/[id]/dm/event` | DM inject event |
+| POST | `/api/sessions/[id]/dm/roll` | DM force roll |
+| POST | `/api/sessions/[id]/dm/set-dc` | DM set difficulty class |
+
+## Pusher Event Names (existing)
+- `player-joined`, `player-ready`, `player-disconnected`
+- `session-started`, `turn-started`, `action-submitted`
+- `dice-rolling`, `dice-result`
+- `narration-update`, `awaiting-dm`, `dm-notice`
+- `state-update`, `stat-change`, `round-summary`
+- `scene-image-pending`, `scene-image-ready`, `scene-image-failed`
+
+## Redis Lock Pattern (turn actions)
+```typescript
+import { submitAction, releaseTurnLock } from "@/server/services/turn-service";
+
+let lockHeld = false;
+try {
+  const { actionId, turnId } = await submitAction({ sessionId, playerId, rawInput });
+  lockHeld = true;
+  // ... pipeline + broadcasts ...
+  await releaseTurnLock(sessionId);
+  lockHeld = false;
+} catch (e) {
+  if (lockHeld) {
+    try { await releaseTurnLock(sessionId); } catch (err) { console.error(err); }
+  }
+  // handle error
+}
+```

@@ -1,33 +1,118 @@
 ---
-description: Liquid Obsidian design system rules
+description: Liquid Obsidian design system — colors, typography, surfaces, components, animations
 globs: "**/*.tsx,**/*.css"
 alwaysApply: false
 ---
 
-# Liquid Obsidian Design Rules
+# Liquid Obsidian Design System
 
-## Gold Hierarchy
-- Tier 1 (#D4AF37): ONLY for current player, primary CTA, active turn, critical moments
-- Tier 2 (#B8860B): dimmed icons, hover states
-- Default: NO gold — silver/muted for most UI
+## Color Palette (CSS Variables — ALWAYS use these, never raw hex)
+### Backgrounds
+- `--color-obsidian: #131313` — page background
+- `--color-midnight: #1c1b1b` — card backgrounds (inactive)
+- `--color-deep-void: #0e0e0e` — input backgrounds, deepest surfaces
 
-## Layout
-- Void gaps between modules (Card → VOID → Card), not stacked tight
-- No tab navigation during active gameplay — use bottom sheets
-- Thumb-first: actions in bottom 30%
-- `min-h-dvh` not `min-h-screen`
+### Gold (use sparingly — reserved for importance)
+- `--color-gold-rare: #f2ca50` — ONLY for: current player, primary CTA, active turn, critical moments
+- `--color-gold-support: #d4af37` — dimmed icons, hover states, secondary gold
 
-## Surfaces
-- Cold (background): minimal glow, flat
-- Mid (cards): `glass` or `glass-heavy` class, backdrop-blur
-- Hot (interactive): glow, gold, animation
+### Surfaces
+- `--surface-container: #201f1f` — low-emphasis containers
+- `--surface-high: #2a2a2a` — elevated cards, active panels
+- `--surface-highest: #353534` — modal overlays, dropdowns
+- `--surface-bright: #3a3939` — highest emphasis surface
+- `--outline-variant: #4d4635` — subtle borders, dividers
+- `--outline: #99907c` — secondary text, labels, inactive elements
+
+### Atmosphere (phase-dependent accents)
+- `--atmosphere-exploration: #1b4d6e`
+- `--atmosphere-combat: #8b2500`
+- `--atmosphere-mystery: #7b2d8e`
+- `--atmosphere-social: #b8860b`
+
+### Text
+- `--color-silver-muted: #e5e2e1` — primary body text
+- `--color-silver-dim: #d0c5af` — secondary text, taglines
+
+### Status
+- `--color-success: #4ade80`
+- `--color-failure: #ffb3ad`
+- `--color-critical: #7b2d8e`
+- `--color-error: #ef4444`
+
+### Glass
+- `--glass-bg: rgba(28,27,27,0.7)` — standard glass
+- `--glass-bg-heavy: rgba(28,27,27,0.88)` — heavy glass (bottom sheets, overlays)
+- `--glass-blur: 12px`
+- `--glass-edge-glow: 0 0 20px rgba(242,202,80,0.15)`
 
 ## Typography
-- `.text-fantasy` (Noto Serif): lore, titles, character names
-- Default (Manrope): gameplay text
-- `.text-data` (Inter): HP, dice, stats
+| Class | Font | Use For |
+|-------|------|---------|
+| `.text-fantasy` | Noto Serif (serif) | Lore text, titles, character names, headings |
+| default (Manrope) | sans-serif | Gameplay text, UI labels, body copy |
+| `.text-data` | Inter (mono-like) | HP numbers, dice values, stats, numerical data |
 
-## Motion
+## Utility Classes (defined in `globals.css`)
+- `.glass` — standard glass surface (blur + border + shadow)
+- `.glass-heavy` — heavy glass (bottom sheets, overlays)
+- `.glow-gold` — gold edge glow
+- `.metallic-edge` — subtle metallic border
+- `.selected-glow` — active selection glow (gold pulsing border)
+- `.gradient-hp` — HP bar gradient (red)
+- `.gradient-mana` — mana bar gradient (gold)
+- `.scrollbar-hide` — hides scrollbar
+
+## Animation Classes
+- `.animate-breathe` — subtle scale pulse (3s)
+- `.animate-pulse-glow` — gold glow pulse (2s)
+- `.animate-gold-breathe-glow` — breathing gold box-shadow (2.6s)
+- `.animate-shimmer` — loading shimmer effect
+- `.animate-shake-once` — error shake (0.4s)
+- `.animate-fade-in` — opacity 0->1 (0.3s)
+- `.animate-slide-up` — slide up + fade in (0.4s)
+- `.animate-hp-flash-damage` — red HP flash
+- `.animate-hp-flash-heal` — green HP flash
+
+## Timing Variables
+- `--duration-fast: 150ms` — micro-interactions
+- `--duration-med: 300ms` — standard transitions
+- `--duration-slow: 800ms` — dramatic reveals
+- `--ease-out-soft: cubic-bezier(0.22,1,0.36,1)`
+- `--ease-spring: cubic-bezier(0.34,1.56,0.64,1)`
+
+## Spacing
+- `--void-gap: 1.5rem` — standard void gap between modules
+- `--void-gap-lg: 2.5rem` — large void gap between sections
+
+## Border Radius
+- `--radius-card: 4px` — cards, containers
+- `--radius-button: 4px` — buttons
+- `--radius-chip: 4px` — chips, tags
+- `--radius-pill: 9999px` — pills, badges
+
+## Component Catalog
+| Component | File | When to Use |
+|-----------|------|-------------|
+| `GoldButton` | `ui/gold-button.tsx` | Primary CTA, important actions |
+| `GhostButton` | `ui/ghost-button.tsx` | Secondary actions, cancel, back |
+| `GlassCard` | `ui/glass-card.tsx` | Card surfaces, info panels |
+| `PillSelect` | `ui/pill-select.tsx` | Enum/option selection (campaign mode, party size) |
+| `BottomSheet` | `sheets/bottom-sheet.tsx` | Slide-up panels (character sheet, journal, party) |
+| `LoadingSkeleton` | `ui/loading-skeleton.tsx` | Loading states |
+| `ConnectionStatus` | `ui/connection-status.tsx` | Pusher connection indicator |
+| `Toast` | `ui/toast.tsx` | Notifications, errors, success messages |
+
+## Layout Rules
+- Void gaps between modules: `gap-[var(--void-gap)]` or `gap-[var(--void-gap-lg)]`
+- No tab navigation during active gameplay — use bottom sheets
+- Thumb-first: interactive elements in bottom 30% of screen
+- `min-h-dvh` not `min-h-screen`
+- Max content width: `max-w-md` (448px) for main content area
+- Mobile-first: design for mobile, responsive up
+
+## Motion Rules
+- Use Framer Motion `<motion.div>` with `initial`/`animate`/`exit` for enter/exit
+- Respect `prefers-reduced-motion` — already handled in `globals.css`
 - Subtle, breathing, selective — no overanimation
-- Respect `prefers-reduced-motion`
-- Use CSS variables: `--duration-fast`, `--duration-med`, `--duration-slow`
+- Gold surfaces breathe; cold surfaces are static

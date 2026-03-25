@@ -1,0 +1,92 @@
+---
+description: Database schema reference, migration workflow, query patterns
+globs: "src/lib/db/**,drizzle/**,src/server/services/**"
+alwaysApply: false
+---
+
+# Database Rules
+
+## Schema Location
+`src/lib/db/schema.ts` — this is the SINGLE SOURCE OF TRUTH for all tables. Read it before any DB work.
+
+## DB Client
+```typescript
+import { db } from "@/lib/db";
+// Uses Neon HTTP driver + Drizzle ORM. Lazy singleton, safe for serverless.
+```
+
+## Migration Workflow
+1. Edit `src/lib/db/schema.ts`
+2. Run `npm run db:generate` (creates SQL migration in `drizzle/`)
+3. Run `npm run db:migrate` (applies to Neon)
+4. NEVER edit migration SQL files directly after they've been applied
+
+## Complete Table Reference
+
+### Auth Tables (NextAuth)
+| Table | Export | Columns |
+|-------|--------|---------|
+| `users` | `authUsers` | id (text PK), name, email (unique), emailVerified, image |
+| `accounts` | `authAccounts` | userId, type, provider, providerAccountId (compound PK: provider+providerAccountId), refresh_token, access_token, expires_at, token_type, scope, id_token, session_state |
+| `auth_sessions` | `authSessions` | sessionToken (PK), userId, expires |
+| `verification_tokens` | `authVerificationTokens` | identifier, token (compound PK), expires |
+
+### Game Tables
+| Table | Export | Key Columns |
+|-------|--------|-------------|
+| `sessions` | `sessions` | id (uuid PK), mode, campaign_mode, status, max_players, current_round, current_turn_index, current_player_id, phase, join_code (unique), host_user_id, state_version, adventure_prompt, module_key, campaign_title, world_summary, style_policy, tone, visual_bible_seed (jsonb), created_at, updated_at |
+| `players` | `players` | id (uuid PK), session_id (FK->sessions), user_id, character_id, seat_index, is_ready, is_connected, is_host, is_dm, joined_at |
+| `characters` | `characters` | id (uuid PK), player_id (FK->players, unique), name, class, race, level, stats (jsonb), hp, max_hp, ac, mana, max_mana, inventory (jsonb []), abilities (jsonb []), conditions (jsonb string[]), visual_profile (jsonb {}), created_at |
+| `turns` | `turns` | id (uuid PK), session_id (FK), round_number, player_id (FK), phase, status, started_at, resolved_at |
+| `actions` | `actions` | id (uuid PK), turn_id (FK), raw_input, parsed_intent (jsonb), resolution_status, created_at |
+| `dice_rolls` | `diceRolls` | id (uuid PK), action_id (FK), roll_type, context, roll_value, modifier, total, advantage_state, result, created_at |
+| `scene_snapshots` | `sceneSnapshots` | id (uuid PK), session_id (FK), round_number, state_version, summary, image_status, image_prompt, image_url, created_at |
+| `memory_summaries` | `memorySummaries` | id (uuid PK), session_id (FK), summary_type, content (jsonb), turn_range_start, turn_range_end, created_at |
+| `narrative_events` | `narrativeEvents` | id (uuid PK), session_id (FK), turn_id (FK nullable), scene_text, visible_changes (jsonb string[]), tone, next_actor_id, image_hint (jsonb), created_at |
+| `npc_states` | `npcStates` | id (uuid PK), session_id (FK), name, role, attitude, status, location, visual_profile (jsonb), notes, updated_at |
+| `image_jobs` | `imageJobs` | id (uuid PK), session_id (FK), scene_snapshot_id (FK nullable), prompt, status, provider, image_url, cost_cents, started_at, completed_at |
+| `orchestration_traces` | `orchestrationTraces` | id (uuid PK), session_id (FK), turn_id (FK nullable), step_name, input_summary (jsonb), output_summary (jsonb), model_used, tokens_in, tokens_out, latency_ms, success, error_message, created_at |
+
+## Existing Indexes (DO NOT duplicate)
+- `sessions_host_user_id_idx` on sessions(host_user_id)
+- `players_session_id_idx` on players(session_id)
+- `turns_session_round_started_idx` on turns(session_id, round_number, started_at)
+- `actions_turn_created_idx` on actions(turn_id, created_at)
+- `dice_rolls_action_id_idx` on dice_rolls(action_id)
+- `scene_snapshots_session_id_idx` on scene_snapshots(session_id)
+- `memory_summaries_session_id_idx` on memory_summaries(session_id)
+- `narrative_events_session_created_idx` on narrative_events(session_id, created_at DESC)
+- `npc_states_session_id_idx` on npc_states(session_id)
+- `image_jobs_session_status_created_idx` on image_jobs(session_id, status, started_at)
+- `orchestration_traces_session_created_idx` on orchestration_traces(session_id, created_at DESC)
+
+## JSON Column Shapes
+Always validate JSON data with Zod before inserting:
+- `characters.stats` -> `CharacterStatsSchema` from `schemas/domain.ts`: `{ str, dex, con, int, wis, cha }` (all numbers)
+- `characters.inventory` -> array of objects
+- `characters.conditions` -> string array
+- `characters.visual_profile` -> `Record<string, unknown>`
+- `sessions.visual_bible_seed` -> `Record<string, unknown>`
+- `narrative_events.visible_changes` -> string array
+- `narrative_events.image_hint` -> `NarrativeImageHintSchema`: `{ subjects: string[], environment?, mood?, avoid: string[] }`
+- `memory_summaries.content` -> `Record<string, unknown>`
+- `actions.parsed_intent` -> `ActionIntentSchema` shape from `schemas/ai-io.ts`
+
+## Query Patterns
+```typescript
+// SELECT with filter
+const [row] = await db.select().from(sessions).where(eq(sessions.id, id)).limit(1);
+
+// UPDATE
+await db.update(sessions).set({ status: "active" }).where(eq(sessions.id, id));
+
+// INSERT
+await db.insert(players).values({ session_id: id, user_id, seat_index: 0 });
+
+// JOIN
+const rows = await db.select().from(players)
+  .innerJoin(characters, eq(players.character_id, characters.id))
+  .where(eq(players.session_id, sessionId));
+```
+
+Import `eq`, `and`, `desc`, `sql` from `drizzle-orm`. Import table exports from `@/lib/db/schema`.

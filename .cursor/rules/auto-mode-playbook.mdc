@@ -1,0 +1,65 @@
+---
+description: Anti-hallucination protocol and operating rules for AI assistants working on this codebase
+alwaysApply: true
+---
+
+# Auto Mode Playbook — Anti-Hallucination Protocol
+
+You are working on a production codebase with established patterns. Your job is to extend it without breaking it. Follow these rules absolutely.
+
+## BEFORE You Do Anything
+1. **READ before EDIT** — always read a file before modifying it. Understand the existing pattern.
+2. **SEARCH before CREATE** — before creating any new file, search if a similar one exists. Follow its pattern.
+3. **VERIFY before IMPORT** — before adding an import, confirm the export exists in the target file. Do NOT invent function names, types, or modules.
+4. **CHECK SCHEMA before DB** — before referencing any DB column, read `src/lib/db/schema.ts`. Columns that don't exist there don't exist.
+5. **CHECK SCHEMAS before TYPES** — all domain types are in `src/lib/schemas/`. Read the relevant file before using any type.
+
+## NEVER Do These Things
+- NEVER invent API routes that don't exist — check `src/app/api/` first
+- NEVER invent DB columns or tables — check `src/lib/db/schema.ts`
+- NEVER invent Zod schemas or types — check `src/lib/schemas/`
+- NEVER invent component props — read the component file
+- NEVER invent utility functions — search the codebase first
+- NEVER call OpenAI/Anthropic SDK directly — use `AIProvider` via `getAIProvider()`
+- NEVER use `React.useContext` for game state — use Zustand store at `src/lib/state/game-store.ts`
+- NEVER use relative imports like `../../` — use `@/` path alias
+- NEVER use `min-h-screen` — use `min-h-dvh`
+- NEVER use raw hex colors in components — use CSS variables from `globals.css`
+- NEVER skip Zod validation on AI outputs or API request bodies
+- NEVER assume Next.js 14/15 APIs work — this is Next.js 16.2.1, check docs first
+
+## How to Work on Tasks
+1. **Understand the ask** — read the relevant spec/roadmap if the task references a phase
+2. **Find the pattern** — locate an existing file that does something similar
+3. **Make small changes** — one file at a time, verify each step
+4. **Follow existing conventions** — match the code style, naming, imports, error handling
+5. **Test your assumptions** — if unsure about an API, type, or function signature, read the source
+
+## Reference Files for Common Tasks
+| Task | Reference file |
+|------|---------------|
+| New API route | `src/app/api/sessions/[id]/actions/route.ts` |
+| New AI worker | `src/lib/orchestrator/workers/narrator.ts` |
+| New game component | `src/components/game/action-bar.tsx` |
+| New UI component | `src/components/ui/gold-button.tsx` |
+| New bottom sheet | `src/components/sheets/character-sheet.tsx` |
+| New Pusher event | `src/lib/schemas/events.ts` + `src/lib/socket/server.ts` |
+| New Zod schema | `src/lib/schemas/domain.ts` |
+| New DB table | `src/lib/db/schema.ts` (add table, run `npm run db:generate && npm run db:migrate`) |
+| New server service | `src/server/services/session-service.ts` |
+| New test | `tests/unit/dice.test.ts` |
+
+## When You Are Stuck
+- Read `docs/ASHVEIL_SPEC.md` for the full architecture spec
+- Read `PRODUCTION_ROADMAP.md` for upcoming features and phase details
+- Read the specific `.cursor/rules/*.mdc` file relevant to your area
+- If a function signature is unclear, read the source file — do NOT guess
+
+## Quality Checks Before Finishing
+- All imports resolve to real exports
+- All DB queries reference real columns from `schema.ts`
+- All Zod schemas match the data they validate
+- All API routes follow the auth + validation + error handling pattern
+- All components use CSS variables, not hardcoded colors
+- No `any` types unless absolutely necessary (and eslint-disable commented)
+- Narration stays 60-140 words if touching narrator

@@ -1,0 +1,61 @@
+---
+description: Testing patterns — Vitest, mock providers, test structure
+globs: "tests/**,**/*.test.ts"
+alwaysApply: false
+---
+
+# Testing Rules
+
+## Framework
+Vitest 4.x — config in `vitest.config.ts`, path aliases configured to match `tsconfig.json`.
+
+## Commands
+- `npm run test` — run all tests once
+- `npm run test:watch` — run in watch mode
+
+## Test Location
+All tests in `tests/unit/`. Mirror source structure where useful.
+
+## Existing Tests
+- `tests/unit/dice.test.ts` — dice rolling, modifiers, advantage, result determination
+- `tests/unit/quest-service.test.ts` — quest progression logic
+- `tests/unit/turn-engine.test.ts` — turn advancement, round cycling
+- `tests/unit/workers.test.ts` — AI worker fallbacks and output validation
+
+## Test Structure Pattern
+```typescript
+import { describe, expect, it } from "vitest";
+
+import { functionUnderTest } from "@/lib/path/to/module";
+
+describe("functionUnderTest", () => {
+  it("does specific thing when given specific input", () => {
+    const result = functionUnderTest(input);
+    expect(result).toBe(expected);
+  });
+
+  it("handles edge case", () => {
+    expect(() => functionUnderTest(bad)).toThrow();
+  });
+});
+```
+
+## Mocking AI
+Use `MockProvider` from `@/lib/ai/mock-provider` for tests that involve AI calls. It returns deterministic canned responses that conform to the expected Zod schemas.
+
+```typescript
+import { MockProvider } from "@/lib/ai/mock-provider";
+
+const provider = new MockProvider();
+```
+
+## What to Test
+- Pure logic functions (dice, turn order, stat calculations, HP clamping)
+- AI worker fallback paths (call with broken input, verify fallback returns valid schema data)
+- Zod schema validation (parse valid data, reject invalid data)
+- Service functions with mocked DB (if feasible)
+
+## What NOT to Test (for now)
+- API route handlers directly (test via the services they call)
+- React components (no component test setup yet)
+- Pusher broadcast calls (side effect, mock in integration tests later)

@@ -1,31 +1,116 @@
 ---
-description: AI orchestration pipeline rules
-globs: "src/lib/orchestrator/**,src/lib/ai/**,src/server/services/**"
+description: AI orchestration pipeline, worker patterns, provider abstraction, model routing
+globs: "src/lib/orchestrator/**,src/lib/ai/**,src/server/services/**,src/lib/memory/**"
 alwaysApply: false
 ---
 
 # AI Orchestration Rules
 
-## Pipeline is Deterministic
-The orchestrator is CODE that calls AI workers in explicit order — not autonomous agents. Each step: typed input → AI call → Zod validate → fallback if invalid.
+## Pipeline Architecture
+The orchestrator is DETERMINISTIC CODE that calls AI workers in explicit order — not autonomous agents. Each step: typed input -> AI call -> Zod validate -> fallback if invalid -> trace log.
+
+### Turn Pipeline Flow (`src/lib/orchestrator/pipeline.ts`)
+```
+Player submits action
+  -> buildTurnContext()        # assembles session/character/memory/NPC context
+  -> parseIntent()             # AI: raw text -> ActionIntent (light model)
+  -> interpretRules()          # AI: intent -> dice specs, legality check (light model)
+  -> performRoll()             # CODE: dice rolling, no AI
+  -> interpretConsequences()   # AI: roll results -> HP/mana/condition effects (light model)
+  -> generateNarration()       # AI: everything -> cinematic scene_text (heavy model)
+  -> checkVisualDelta()        # AI: should we generate a new scene image? (light model)
+  -> commitStatePatches()      # CODE: apply HP/mana/condition changes to DB
+  -> logTrace()                # CODE: record orchestration metrics
+```
+
+## The `runOrchestrationStep()` Pattern
+Every AI worker MUST use `runOrchestrationStep()` from `src/lib/orchestrator/step-runner.ts`:
+```typescript
+return runOrchestrationStep({
+  stepName: "worker_name",     // for trace logging
+  sessionId,
+  turnId,
+  provider,                    // AIProvider instance from getAIProvider()
+  model: "heavy" | "light",   // model tier
+  systemPrompt,                // system instructions
+  userPrompt,                  // JSON.stringify'd context
+  schema: ZodOutputSchema,     // Zod schema for structured output
+  maxTokens: 900,              // reasonable limit
+  temperature: 0.75,           // 0.3-0.5 for rules/intent, 0.7-0.8 for narration
+  fallback: () => fallbackData, // REQUIRED: returns valid data if AI fails
+  timeoutMs: 20_000,           // default 20s
+});
+```
+
+### What `runOrchestrationStep` Does
+1. Calls `waitForAIRateLimit(sessionId)` — Upstash rate limiter
+2. Calls `provider.generateStructured()` with timeout race
+3. If fails: retries once with "respond ONLY with valid JSON" appended
+4. If still fails: calls `fallback()` function
+5. If unretryable error (timeout, 429, quota): skips retry, goes straight to fallback
+6. Always calls `logTrace()` to write `orchestration_traces` row
 
 ## Model Routing
-- HEAVY (GPT-4o): narration, campaign seeding, memory compression, complex intent
-- LIGHT (GPT-4o-mini): simple intent, rules interpret, visual delta, image prompts
-- NONE: dice, turn advance, state validation, HP calc
+| Tier | Models | Used For |
+|------|--------|----------|
+| `"heavy"` | GPT-4o, Claude Sonnet, Gemini Pro | Narration, campaign seeding, memory compression |
+| `"light"` | GPT-4o-mini, Gemini Flash | Intent parsing, rules interpretation, visual delta, consequence interpretation |
+| No AI | — | Dice rolls, turn advance, state validation, HP calculations |
 
-## Every Worker Must Have
-1. Zod schema for input AND output
-2. Fallback behavior if AI fails
-3. OrchestrationTrace logging (model, tokens, latency, success)
-4. Timeout (10s default, configurable)
+## AIProvider Interface (`src/lib/ai/types.ts`)
+```typescript
+interface AIProvider {
+  generateStructured<T>(params: {
+    model: ModelTier;            // "heavy" | "light"
+    systemPrompt: string;
+    userPrompt: string;
+    schema: ZodSchema<T>;
+    maxTokens?: number;
+    temperature?: number;
+  }): Promise<{ data: T; usage: TokenUsage }>;
 
-## Fallbacks
-- Intent parser fails → ask player to rephrase
-- Rules interpreter fails → default d20 check
-- Narrator fails → template: "{player} {action}. {result}. {next}, your turn."
-- Memory fails → skip, use raw recent turns
-- Image fails → keep old image, continue
+  generateText(params: { ... }): Promise<{ text: string; usage: TokenUsage }>;
+}
+```
 
-## Provider Adapter
-Use `AIProvider` interface — never call OpenAI/Anthropic directly in business logic. MockProvider for tests.
+## Provider Resolution (`src/lib/ai/index.ts`)
+`getAIProvider()` builds a fallback chain:
+1. OpenRouter first (if `OPENROUTER_API_KEY` set) — auto-routes across 27+ models
+2. Primary provider from `AI_PROVIDER` env var
+3. All other providers with API keys set (Gemini, OpenAI, Anthropic)
+4. Wraps in `FallbackProvider` if multiple available
+
+NEVER instantiate providers directly in business logic. Always: `const provider = getAIProvider();`
+
+## Existing Workers (DO NOT duplicate)
+| Worker | File | Zod Schema | Model |
+|--------|------|------------|-------|
+| Intent Parser | `workers/intent-parser.ts` | `ActionIntentSchema` | light |
+| Rules Interpreter | `workers/rules-interpreter.ts` | `RulesInterpreterOutputSchema` | light |
+| Consequence Interpreter | `workers/consequence-interpreter.ts` | `ConsequenceOutputSchema` | light |
+| Narrator | `workers/narrator.ts` | `NarratorOutputSchema` | heavy |
+| Visual Delta | `workers/visual-delta.ts` | `VisualDeltaOutputSchema` | light |
+
+## Fallback Requirements
+Every worker MUST have a fallback that returns valid schema-conforming data:
+- Intent parser fails -> ask player to rephrase (default "other" action type)
+- Rules interpreter fails -> default d20 check with +0 modifier
+- Consequence interpreter fails -> no effects (empty array)
+- Narrator fails -> template narration from `buildNarratorFallback()` in narrator.ts
+- Visual delta fails -> `{ image_needed: false, reasons: [], priority: "low" }`
+- Memory fails -> skip, use raw recent turns
+
+## Adding a New Worker
+1. Create file in `src/lib/orchestrator/workers/`
+2. Define Zod output schema in `src/lib/schemas/ai-io.ts`
+3. Write system prompt as exported const
+4. Write fallback function
+5. Use `runOrchestrationStep()` — never call provider directly
+6. Wire into `pipeline.ts` at the correct step
+7. Add test in `tests/unit/workers.test.ts`
+
+## Memory System (`src/lib/memory/`)
+- `assembler.ts` — builds memory bundle from DB (recent turns, rolling summary, NPC states)
+- `summarizer.ts` — compresses older turns into rolling summary (heavy model)
+- `shouldSummarize()` — checks if enough new turns to trigger summarization
+- Memory is injected into narrator context as `canonical_state` and `rolling_summary`
