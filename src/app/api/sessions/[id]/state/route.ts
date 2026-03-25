@@ -177,9 +177,11 @@ export async function GET(
       rawSceneImage?.startsWith("data:") && latestScene
         ? `/api/sessions/${sessionId}/scene-image/${latestScene.id}`
         : rawSceneImage;
-    const scenePending =
+    /** If a URL exists, the scene is visible — don’t keep “painting” UX on reload. */
+    const sceneStatusPending =
       latestScene?.image_status === "pending" ||
       latestScene?.image_status === "generating";
+    const scenePending = Boolean(rawSceneImage) ? false : sceneStatusPending;
     const sceneTitle =
       latestScene?.summary.split("\n")[0]?.trim() ??
       sessionRow.campaign_title ??

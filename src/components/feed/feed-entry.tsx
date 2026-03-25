@@ -406,7 +406,7 @@ export function FeedEntryRow({ entry }: FeedEntryRowProps) {
               auto_stories
             </span>
             <span className="text-[9px] font-black uppercase tracking-[0.22em] text-[var(--color-gold-support)]">
-              Chronicle
+              Narration
             </span>
             <span className="h-px flex-1 max-w-[3rem] bg-gradient-to-l from-transparent to-[var(--color-gold-support)]/45" />
           </div>
