@@ -95,44 +95,40 @@ export async function createCharacter(params: {
   const inventory = getStartingEquipment(params.characterClass);
   const abilities = getStartingAbilities(params.characterClass);
 
-  const result = await db.transaction(async (tx) => {
-    const [created] = await tx
-      .insert(characters)
-      .values({
-        player_id: params.playerId,
-        name: params.name.trim(),
-        class: params.characterClass.trim().toLowerCase(),
-        race: params.race.trim().toLowerCase(),
-        level: 1,
-        stats: params.stats,
-        hp,
-        max_hp: maxHp,
-        ac,
-        mana,
-        max_mana: maxMana,
-        inventory,
-        abilities,
-        conditions: [],
-        visual_profile: {},
-      })
-      .returning({ id: characters.id });
+  const [created] = await db
+    .insert(characters)
+    .values({
+      player_id: params.playerId,
+      name: params.name.trim(),
+      class: params.characterClass.trim().toLowerCase(),
+      race: params.race.trim().toLowerCase(),
+      level: 1,
+      stats: params.stats,
+      hp,
+      max_hp: maxHp,
+      ac,
+      mana,
+      max_mana: maxMana,
+      inventory,
+      abilities,
+      conditions: [],
+      visual_profile: {},
+    })
+    .returning({ id: characters.id });
 
-    if (!created) {
-      throw new Error("Failed to create character");
-    }
+  if (!created) {
+    throw new Error("Failed to create character");
+  }
 
-    await tx
-      .update(players)
-      .set({
-        character_id: created.id,
-        is_ready: true,
-      })
-      .where(eq(players.id, params.playerId));
+  await db
+    .update(players)
+    .set({
+      character_id: created.id,
+      is_ready: true,
+    })
+    .where(eq(players.id, params.playerId));
 
-    return created.id;
-  });
-
-  return { characterId: result };
+  return { characterId: created.id };
 }
 
 export async function getCharacter(characterId: string): Promise<Character | null> {
