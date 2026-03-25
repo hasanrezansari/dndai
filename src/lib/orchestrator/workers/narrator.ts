@@ -28,7 +28,12 @@ RULES:
 - Maintain consistency with the scene and recent events
 - DO NOT repeat the player's exact words verbatim — rephrase their action cinematically
 - Advance the story forward based on what the player did
-- Output JSON matching the provided schema`;
+- Output JSON with these fields:
+  - "scene_text": your narration (60-140 words)
+  - "visible_changes": array of brief world changes (can be empty [])
+  - "tone": mood of the scene (e.g. "tense", "triumphant", "ominous")
+  - "next_actor_id": always set to null
+  - "image_hint": {"subjects": [], "avoid": []} (optional scene hints)`;
 
 export function wordCount(s: string): number {
   return s.trim().split(/\s+/).filter(Boolean).length;

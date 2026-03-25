@@ -55,10 +55,10 @@ export const NarratorImageHintSchema = z.object({
 
 export const NarratorOutputSchema = z.object({
   scene_text: z.string().min(20).max(4000),
-  visible_changes: z.array(z.string()),
-  tone: z.string(),
-  next_actor_id: z.string().uuid().nullable(),
-  image_hint: NarratorImageHintSchema,
+  visible_changes: z.array(z.string()).default([]),
+  tone: z.string().default("neutral"),
+  next_actor_id: z.string().nullable().default(null),
+  image_hint: NarratorImageHintSchema.default({ subjects: [], avoid: [] }),
 });
 export type NarratorOutput = output<typeof NarratorOutputSchema>;
 
