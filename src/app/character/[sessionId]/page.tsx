@@ -193,6 +193,16 @@ export default function CharacterCreationPage() {
         <p className="text-sm text-[var(--color-silver-dim)]">
           {selectedMeta?.label ?? ""}
         </p>
+        {selectedMeta?.role ? (
+          <p className="text-[10px] uppercase tracking-wider text-[var(--color-gold-support)]">
+            {selectedMeta.role}
+          </p>
+        ) : null}
+        {selectedMeta?.fantasy ? (
+          <p className="text-xs text-center text-[var(--color-silver-dim)] max-w-[28ch] px-3">
+            {selectedMeta.fantasy}
+          </p>
+        ) : null}
       </GlassCard>
 
       <section className="flex flex-col gap-2">
@@ -222,6 +232,7 @@ export default function CharacterCreationPage() {
                 key={c.value}
                 icon={c.icon}
                 label={c.label}
+                role={c.role}
                 selected={characterClass === c.value}
                 onClick={() => setCharacterClass(c.value)}
               />

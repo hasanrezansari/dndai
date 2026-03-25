@@ -24,11 +24,30 @@ export interface GameSessionView {
   currentPlayerId: string | null;
   campaignTitle: string | null;
   stateVersion: number;
+  finalChapterPublished?: boolean;
+}
+
+export interface QuestProgressView {
+  objective: string;
+  progress: number;
+  risk: number;
+  status: "active" | "ready_to_end" | "failed";
+  endingVote?: {
+    open: boolean;
+    reason: "objective_complete" | "party_defeated";
+    initiatedRound: number;
+    cooldownUntilRound: number;
+    failedAttempts: number;
+    requiredYes: number;
+    eligibleVoterIds: string[];
+    votes: Record<string, "end_now" | "continue">;
+  } | null;
 }
 
 export interface GamePlayerView {
   id: string;
   userId: string;
+  displayName?: string;
   characterId: string | null;
   seatIndex: number;
   isReady: boolean;
@@ -79,6 +98,7 @@ interface GameState {
   waitingForDm: boolean;
   dmAwaiting: { turnId: string; actingPlayerId: string } | null;
   dmDc: number | null;
+  quest: QuestProgressView | null;
 
   setSessionId: (id: string) => void;
   setSession: (session: GameState["session"]) => void;
@@ -110,6 +130,7 @@ interface GameState {
     narrativeText?: string | null;
     scenePending?: boolean;
     dmAwaiting?: { turnId: string; actingPlayerId: string } | null;
+    quest?: QuestProgressView | null;
   }) => void;
   reset: () => void;
   openSheet: (sheet: ActiveSheet) => void;
@@ -120,6 +141,7 @@ interface GameState {
     value: { turnId: string; actingPlayerId: string } | null,
   ) => void;
   setDmDc: (dc: number | null) => void;
+  setQuest: (quest: QuestProgressView | null) => void;
 }
 
 const emptyState = {
@@ -140,6 +162,7 @@ const emptyState = {
   waitingForDm: false,
   dmAwaiting: null as { turnId: string; actingPlayerId: string } | null,
   dmDc: null as number | null,
+  quest: null as QuestProgressView | null,
 };
 
 export const useGameStore = create<GameState>((set) => ({
@@ -207,6 +230,8 @@ export const useGameStore = create<GameState>((set) => ({
 
   setDmDc: (dc) => set({ dmDc: dc }),
 
+  setQuest: (quest) => set({ quest }),
+
   updateSessionField: (field, value) =>
     set((s) => {
       if (!s.session) return s;
@@ -225,6 +250,7 @@ export const useGameStore = create<GameState>((set) => ({
       scenePending: data.scenePending ?? false,
       waitingForDm: Boolean(data.dmAwaiting),
       dmAwaiting: data.dmAwaiting ?? null,
+      quest: data.quest ?? null,
     }),
 
   reset: () => set({ ...emptyState }),

@@ -44,6 +44,7 @@ export const PlayerSchema = z.object({
   id: z.string().uuid(),
   session_id: z.string().uuid(),
   user_id: z.string(),
+  name: z.string().nullable().optional(),
   character_id: z.string().uuid().nullable(),
   seat_index: z.number().int().min(0).max(5),
   is_ready: z.boolean(),

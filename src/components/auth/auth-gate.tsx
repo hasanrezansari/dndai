@@ -10,6 +10,7 @@ import { GoldButton } from "@/components/ui/gold-button";
 import { RouteLoadingUI } from "@/components/ui/route-loading";
 
 const GUEST_STORAGE_KEY = "ashveil.guest_id";
+const DISPLAY_NAME_STORAGE_KEY = "ashveil.display_name";
 
 export function AuthGate({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -18,6 +19,7 @@ export function AuthGate({ children }: { children: React.ReactNode }) {
   const [displayName, setDisplayName] = useState("Adventurer");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [autoAttempted, setAutoAttempted] = useState(false);
 
   useEffect(() => {
     try {
@@ -26,6 +28,8 @@ export function AuthGate({ children }: { children: React.ReactNode }) {
         id = crypto.randomUUID();
         localStorage.setItem(GUEST_STORAGE_KEY, id);
       }
+      const savedName = localStorage.getItem(DISPLAY_NAME_STORAGE_KEY)?.trim();
+      if (savedName) setDisplayName(savedName);
       setGuestId(id);
     } catch {
       setGuestId(crypto.randomUUID());
@@ -44,11 +48,36 @@ export function AuthGate({ children }: { children: React.ReactNode }) {
     setBusy(false);
     if (res?.error) {
       setError("Could not sign in");
+      return;
+    }
+    try {
+      localStorage.setItem(
+        DISPLAY_NAME_STORAGE_KEY,
+        displayName.trim() || "Adventurer",
+      );
+    } catch {
+      /* ignore */
     }
   }
 
   const loading = status === "loading" || !guestId;
   const isHome = pathname === "/" || pathname === "";
+
+  useEffect(() => {
+    if (
+      loading ||
+      session?.user?.id ||
+      !guestId ||
+      busy ||
+      autoAttempted ||
+      !displayName.trim()
+    ) {
+      return;
+    }
+    setAutoAttempted(true);
+    void handleGuest();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loading, session?.user?.id, guestId, busy, autoAttempted, displayName]);
 
   return (
     <AnimatePresence mode="wait">
@@ -84,6 +113,9 @@ export function AuthGate({ children }: { children: React.ReactNode }) {
           className="min-h-dvh flex flex-col items-center justify-center px-6 bg-[var(--color-obsidian)] gap-[var(--void-gap)]"
         >
           <GlassCard className="p-6 w-full max-w-sm border-[rgba(212,175,55,0.12)]">
+            <p className="text-sm text-[var(--color-silver-dim)] mb-3">
+              Choose how your name appears in party seats and the shared journal.
+            </p>
             <label
               htmlFor="guest-name"
               className="text-xs uppercase tracking-wider text-[var(--color-silver-dim)] mb-2 block"
@@ -105,7 +137,7 @@ export function AuthGate({ children }: { children: React.ReactNode }) {
               disabled={busy}
               onClick={() => void handleGuest()}
             >
-              {busy ? "Entering…" : "Enter as Guest"}
+              {busy ? "Entering…" : "Continue"}
             </GoldButton>
             {error ? (
               <p className="mt-3 text-sm text-[var(--color-failure)] text-center">

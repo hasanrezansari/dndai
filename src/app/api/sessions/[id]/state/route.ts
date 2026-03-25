@@ -10,6 +10,7 @@ import {
 } from "@/lib/auth/guards";
 import { db } from "@/lib/db";
 import {
+  authUsers,
   characters,
   narrativeEvents,
   players,
@@ -19,6 +20,7 @@ import {
 } from "@/lib/db/schema";
 import { CharacterStatsSchema } from "@/lib/schemas/domain";
 import type { FeedEntry, GamePlayerView, GameSessionView } from "@/lib/state/game-store";
+import { getQuestState } from "@/server/services/quest-service";
 
 const DEFAULT_STATS = {
   str: 10,
@@ -39,16 +41,19 @@ function mapSession(row: typeof sessions.$inferSelect): GameSessionView {
     currentPlayerId: row.current_player_id,
     campaignTitle: row.campaign_title,
     stateVersion: row.state_version,
+    finalChapterPublished: false,
   };
 }
 
 function mapPlayerRow(
   p: typeof players.$inferSelect,
   c: typeof characters.$inferSelect | null,
+  displayName: string | null,
 ): GamePlayerView {
   const base: GamePlayerView = {
     id: p.id,
     userId: p.user_id,
+    displayName: displayName?.trim() || undefined,
     characterId: p.character_id,
     seatIndex: p.seat_index,
     isReady: p.is_ready,
@@ -113,13 +118,15 @@ export async function GET(
       .select({
         player: players,
         character: characters,
+        userName: authUsers.name,
       })
       .from(players)
       .leftJoin(characters, eq(characters.player_id, players.id))
+      .leftJoin(authUsers, eq(authUsers.id, players.user_id))
       .where(eq(players.session_id, sessionId));
 
     const mappedPlayers = playerRows
-      .map((r) => mapPlayerRow(r.player, r.character))
+      .map((r) => mapPlayerRow(r.player, r.character, r.userName))
       .sort((a, b) => a.seatIndex - b.seatIndex);
 
     const narrativeRows = await db
@@ -183,8 +190,24 @@ export async function GET(
         }
       : null;
 
+    const [finalChapterRow] = await db
+      .select({ id: narrativeEvents.id })
+      .from(narrativeEvents)
+      .where(
+        and(
+          eq(narrativeEvents.session_id, sessionId),
+          eq(narrativeEvents.tone, "epilogue"),
+        ),
+      )
+      .orderBy(desc(narrativeEvents.created_at))
+      .limit(1);
+
+    const quest = await getQuestState(sessionId);
+    const mappedSession = mapSession(sessionRow);
+    mappedSession.finalChapterPublished = Boolean(finalChapterRow);
+
     return NextResponse.json({
-      session: mapSession(sessionRow),
+      session: mappedSession,
       players: mappedPlayers,
       feed,
       sceneImage,
@@ -192,6 +215,7 @@ export async function GET(
       narrativeText,
       scenePending,
       dmAwaiting,
+      quest,
     });
   } catch (e) {
     return handleApiError(e);

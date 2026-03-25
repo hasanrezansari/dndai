@@ -25,6 +25,7 @@ import {
   SessionNotFoundError,
   startSession,
 } from "@/server/services/session-service";
+import { initializeQuestState } from "@/server/services/quest-service";
 import { createFirstTurn } from "@/server/services/turn-service";
 
 const BodySchema = z.object({
@@ -191,6 +192,12 @@ export async function POST(
         updated_at: new Date(),
       })
       .where(eq(sessions.id, sessionId));
+
+    await initializeQuestState({
+      sessionId,
+      objective: `Complete the mission: ${adventurePrompt}`,
+      round: activeSession?.current_round ?? 1,
+    });
 
     await db.insert(narrativeEvents).values({
       session_id: sessionId,

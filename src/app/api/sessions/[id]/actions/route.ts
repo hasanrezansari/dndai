@@ -19,9 +19,11 @@ import { sessions } from "@/lib/db/schema";
 import { runTurnPipeline } from "@/lib/orchestrator/pipeline";
 import { runImagePipeline } from "@/lib/orchestrator/image-worker";
 import { broadcastToSession } from "@/lib/socket/server";
+import { finalizeSessionEnd } from "@/server/services/quest-service";
 import {
   advanceTurn,
   NotYourTurnError,
+  resolveCurrentProcessingTurn,
   releaseTurnLock,
   submitAction,
   TurnBeingProcessedError,
@@ -105,6 +107,40 @@ export async function POST(
         await broadcastToSession(sessionId, "state-update", {
           changes: pipelineResult.statePatches,
           state_version: sessionRow?.state_version ?? 0,
+        });
+      } catch (err) {
+        console.error(err);
+      }
+      await releaseTurnLock(sessionId);
+      lockHeld = false;
+      return NextResponse.json({ actionId, turnId }, { status: 202 });
+    }
+
+    const shouldEndSession =
+      "shouldEndSession" in pipelineResult && pipelineResult.shouldEndSession;
+    if (shouldEndSession) {
+      await resolveCurrentProcessingTurn(sessionId);
+      const stateVersion = await finalizeSessionEnd(sessionId);
+      try {
+        await broadcastToSession(sessionId, "narration-update", {
+          scene_text: pipelineResult.narrativeEvent.scene_text,
+          visible_changes: pipelineResult.narrativeEvent.visible_changes,
+          next_actor: { player_id: parsed.data.playerId },
+        });
+      } catch (err) {
+        console.error(err);
+      }
+      try {
+        await broadcastToSession(sessionId, "dm-notice", {
+          message: "The campaign reaches its conclusion.",
+        });
+      } catch (err) {
+        console.error(err);
+      }
+      try {
+        await broadcastToSession(sessionId, "state-update", {
+          changes: pipelineResult.statePatches,
+          state_version: stateVersion,
         });
       } catch (err) {
         console.error(err);

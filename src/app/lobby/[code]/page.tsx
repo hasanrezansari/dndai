@@ -16,6 +16,7 @@ type SessionWithPlayers = Session & { players: Player[] };
 function mapToSlotPlayer(p: Player): PlayerSlotPlayer {
   return {
     id: p.id,
+    name: p.name ?? undefined,
     seatIndex: p.seat_index,
     isReady: p.is_ready,
     isHost: p.is_host,

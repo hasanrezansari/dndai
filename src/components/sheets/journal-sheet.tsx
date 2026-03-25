@@ -1,9 +1,10 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 
 import type { FeedEntry } from "@/lib/state/game-store";
 import { useGameStore } from "@/lib/state/game-store";
+import { GhostButton } from "@/components/ui/ghost-button";
 
 function formatTime(iso: string) {
   try {
@@ -53,6 +54,10 @@ function assignRounds(entries: FeedEntry[]): Map<number, FeedEntry[]> {
 
 export function JournalSheet() {
   const feed = useGameStore((s) => s.feed);
+  const campaignTitle =
+    useGameStore((s) => s.session?.campaignTitle) ?? "Ashveil Chronicle";
+  const [publishedStory, setPublishedStory] = useState<string | null>(null);
+  const [copyHint, setCopyHint] = useState<string | null>(null);
 
   const groups = useMemo(() => {
     const m = assignRounds(feed);
@@ -67,8 +72,76 @@ export function JournalSheet() {
     );
   }
 
+  function buildPublishedStory(): string {
+    const lines: string[] = [];
+    lines.push(`# ${campaignTitle}`);
+    lines.push("");
+    lines.push("A shared chronicle from the adventuring party.");
+    lines.push("");
+    for (const [round, entries] of groups) {
+      lines.push(`## Round ${round}`);
+      for (const entry of entries) {
+        const who =
+          entry.playerName ??
+          (entry.type === "narration"
+            ? "Narrator"
+            : entry.type === "system"
+              ? "System"
+              : "Party");
+        lines.push(`- ${who}: ${entry.text}`);
+        if (entry.detail) {
+          lines.push(`  - ${entry.detail}`);
+        }
+      }
+      lines.push("");
+    }
+    return lines.join("\n").trim();
+  }
+
+  async function handleCopyStory() {
+    if (!publishedStory) return;
+    try {
+      await navigator.clipboard.writeText(publishedStory);
+      setCopyHint("Story copied");
+    } catch {
+      setCopyHint("Copy failed");
+    }
+    setTimeout(() => setCopyHint(null), 1800);
+  }
+
   return (
     <div className="space-y-[var(--void-gap)] pb-6">
+      <section className="rounded-[var(--radius-card)] border border-white/[0.08] bg-[var(--glass-bg)]/30 p-3">
+        <div className="flex flex-wrap items-center gap-2">
+          <GhostButton
+            type="button"
+            size="sm"
+            className="min-h-[40px]"
+            onClick={() => setPublishedStory(buildPublishedStory())}
+          >
+            Publish Story Draft
+          </GhostButton>
+          <GhostButton
+            type="button"
+            size="sm"
+            className="min-h-[40px]"
+            onClick={() => void handleCopyStory()}
+            disabled={!publishedStory}
+          >
+            Copy Draft
+          </GhostButton>
+          {copyHint ? (
+            <span className="text-data text-[11px] text-[var(--color-silver-dim)]">
+              {copyHint}
+            </span>
+          ) : null}
+        </div>
+        {publishedStory ? (
+          <pre className="mt-3 max-h-56 overflow-auto whitespace-pre-wrap rounded-[var(--radius-chip)] border border-white/[0.08] bg-black/25 p-3 text-xs leading-relaxed text-[var(--color-silver-muted)]">
+            {publishedStory}
+          </pre>
+        ) : null}
+      </section>
       {groups.map(([round, entries]) => (
         <section key={round}>
           <div className="sticky top-0 z-[1] -mx-1 mb-3 border-b border-white/[0.06] bg-[var(--color-obsidian)]/95 px-1 py-2 backdrop-blur-md">

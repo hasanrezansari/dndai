@@ -22,16 +22,22 @@ export function evaluateTurnOwnership(params: {
   return { valid: true };
 }
 
-export type SeatPlayer = { id: string; is_dm: boolean; seat_index: number };
+export type SeatPlayer = {
+  id: string;
+  is_dm: boolean;
+  seat_index: number;
+  is_incapacitated?: boolean;
+};
 
 export function playablePlayersInSeatOrder(
   orderedBySeat: SeatPlayer[],
   sessionMode: string,
 ): SeatPlayer[] {
-  if (sessionMode === "human_dm") {
-    return orderedBySeat.filter((p) => !p.is_dm);
-  }
-  return orderedBySeat;
+  return orderedBySeat.filter((p) => {
+    if (p.is_incapacitated) return false;
+    if (sessionMode === "human_dm" && p.is_dm) return false;
+    return true;
+  });
 }
 
 export function computeNextPlayableTurnState(params: {

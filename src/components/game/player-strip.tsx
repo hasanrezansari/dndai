@@ -27,7 +27,9 @@ export function PlayerStrip({ players, currentTurnPlayerId }: PlayerStripProps) 
                 )
               : 0;
           const displayName =
-            p.character?.name?.trim() || `Seat ${p.seatIndex + 1}`;
+            p.character?.name?.trim() ||
+            p.displayName?.trim() ||
+            `Seat ${p.seatIndex + 1}`;
           const dim = !p.isConnected;
 
           return (

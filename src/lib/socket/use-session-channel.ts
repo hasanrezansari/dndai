@@ -20,7 +20,7 @@ import {
   StateUpdateEventSchema,
   TurnStartedEventSchema,
 } from "@/lib/schemas/events";
-import type { GamePlayerView } from "@/lib/state/game-store";
+import type { GamePlayerView, GameSessionView } from "@/lib/state/game-store";
 import { useGameStore } from "@/lib/state/game-store";
 
 import { getPusherClient, getSessionChannel } from "./client";
@@ -38,15 +38,41 @@ function playerDisplayName(
   playerId: string,
 ): string {
   const p = players.find((x) => x.id === playerId);
-  return p?.character?.name ?? p?.userId.slice(0, 8) ?? "Player";
+  if (!p) return "Player";
+  return p.character?.name ?? p.displayName ?? `Seat ${p.seatIndex + 1}`;
 }
 
 async function refetchPlayersFromState(sessionId: string) {
   const res = await fetch(`/api/sessions/${sessionId}/state`);
   if (!res.ok) return;
-  const data = (await res.json()) as { players: GamePlayerView[] };
+  const data = (await res.json()) as {
+    session?: GameSessionView;
+    players: GamePlayerView[];
+    quest?: {
+      objective: string;
+      progress: number;
+      risk: number;
+      status: "active" | "ready_to_end" | "failed";
+      endingVote?: {
+        open: boolean;
+        reason: "objective_complete" | "party_defeated";
+        initiatedRound: number;
+        cooldownUntilRound: number;
+        failedAttempts: number;
+        requiredYes: number;
+        eligibleVoterIds: string[];
+        votes: Record<string, "end_now" | "continue">;
+      } | null;
+    } | null;
+  };
   if (Array.isArray(data.players)) {
     useGameStore.getState().setPlayers(data.players);
+  }
+  if (data.session) {
+    useGameStore.getState().setSession(data.session);
+  }
+  if ("quest" in data) {
+    useGameStore.getState().setQuest(data.quest ?? null);
   }
 }
 
@@ -231,6 +257,7 @@ export function useSessionChannel(sessionId: string | null) {
     const onStateUpdate = (raw: unknown) => {
       const parsed = StateUpdateEventSchema.safeParse(raw);
       if (!parsed.success) return;
+      void refetchPlayersFromState(sessionId);
       if (parsed.data.dismiss_scene_pending) {
         useGameStore.getState().setScenePending(false);
       }

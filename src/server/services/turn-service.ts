@@ -3,6 +3,7 @@ import { and, asc, desc, eq } from "drizzle-orm";
 import { db } from "@/lib/db";
 import {
   actions,
+  characters,
   narrativeEvents,
   players,
   sessions,
@@ -12,6 +13,7 @@ import { redis } from "@/lib/redis";
 import {
   computeNextPlayableTurnState,
   evaluateTurnOwnership,
+  playablePlayersInSeatOrder,
 } from "@/lib/rules/turn-logic";
 import { broadcastToSession } from "@/lib/socket/server";
 import type { Turn } from "@/lib/schemas/domain";
@@ -60,6 +62,42 @@ function mapTurnRow(row: typeof turns.$inferSelect): Turn {
   };
 }
 
+function isCharacterIncapacitated(
+  row: typeof characters.$inferSelect | null,
+): boolean {
+  if (!row) return false;
+  if (row.hp <= 0) return true;
+  const conditions = Array.isArray(row.conditions) ? row.conditions : [];
+  const lowered = conditions.map((c) => c.toLowerCase());
+  return (
+    lowered.includes("dead") ||
+    lowered.includes("unconscious") ||
+    lowered.includes("incapacitated")
+  );
+}
+
+async function buildSeatOrderWithStatus(sessionId: string) {
+  const rows = await db
+    .select({
+      player: players,
+      character: characters,
+    })
+    .from(players)
+    .leftJoin(characters, eq(characters.player_id, players.id))
+    .where(eq(players.session_id, sessionId))
+    .orderBy(asc(players.seat_index));
+
+  const orderedPlayers = rows.map((r) => r.player);
+  const seatOrder = rows.map((r) => ({
+    id: r.player.id,
+    is_dm: r.player.is_dm,
+    seat_index: r.player.seat_index,
+    is_incapacitated: isCharacterIncapacitated(r.character),
+  }));
+
+  return { orderedPlayers, seatOrder };
+}
+
 export async function createFirstTurn(sessionId: string): Promise<string> {
   const [sessionRow] = await db
     .select()
@@ -73,23 +111,10 @@ export async function createFirstTurn(sessionId: string): Promise<string> {
     throw new Error("Session is not active");
   }
 
-  const orderedPlayers = await db
-    .select()
-    .from(players)
-    .where(eq(players.session_id, sessionId))
-    .orderBy(asc(players.seat_index));
-
-  const seatOrder = orderedPlayers.map((p) => ({
-    id: p.id,
-    is_dm: p.is_dm,
-    seat_index: p.seat_index,
-  }));
-  const playable =
-    sessionRow.mode === "human_dm"
-      ? seatOrder.filter((p) => !p.is_dm)
-      : seatOrder;
-  const firstId = playable[0]?.id;
-  const first = orderedPlayers.find((p) => p.id === firstId);
+  const { orderedPlayers, seatOrder } = await buildSeatOrderWithStatus(sessionId);
+  const playable = playablePlayersInSeatOrder(seatOrder, sessionRow.mode);
+  const firstPlayable = playable[0];
+  const first = orderedPlayers.find((p) => p.id === firstPlayable?.id);
   if (!first) {
     throw new Error("No players in session");
   }
@@ -279,11 +304,7 @@ export async function advanceTurn(
     throw new SessionNotFoundError();
   }
 
-  const orderedPlayers = await db
-    .select()
-    .from(players)
-    .where(eq(players.session_id, sessionId))
-    .orderBy(asc(players.seat_index));
+  const { orderedPlayers, seatOrder } = await buildSeatOrderWithStatus(sessionId);
 
   if (orderedPlayers.length === 0) {
     throw new Error("No players in session");
@@ -301,11 +322,6 @@ export async function advanceTurn(
   }
 
   const version = sessionRow.state_version;
-  const seatOrder = orderedPlayers.map((p) => ({
-    id: p.id,
-    is_dm: p.is_dm,
-    seat_index: p.seat_index,
-  }));
   const { nextPlayerId, nextTurnIndex, nextRound, roundAdvanced } =
     computeNextPlayableTurnState({
       orderedBySeat: seatOrder,
@@ -378,6 +394,36 @@ export async function advanceTurn(
   return { nextPlayerId: nextPlayer.id, roundAdvanced };
 }
 
+export async function resolveCurrentProcessingTurn(
+  sessionId: string,
+): Promise<void> {
+  const [processingTurn] = await db
+    .select()
+    .from(turns)
+    .where(and(eq(turns.session_id, sessionId), eq(turns.status, "processing")))
+    .orderBy(desc(turns.started_at))
+    .limit(1);
+
+  if (!processingTurn) {
+    throw new Error("No processing turn to resolve");
+  }
+
+  const resolved = await db
+    .update(turns)
+    .set({
+      status: "resolved",
+      resolved_at: new Date(),
+    })
+    .where(
+      and(eq(turns.id, processingTurn.id), eq(turns.status, "processing")),
+    )
+    .returning({ id: turns.id });
+
+  if (resolved.length === 0) {
+    throw new Error("Failed to resolve turn");
+  }
+}
+
 export async function resolveHumanDmTurn(params: {
   sessionId: string;
   turnId: string;
@@ -413,21 +459,12 @@ export async function resolveHumanDmTurn(params: {
     throw new Error("No turn awaiting DM");
   }
 
-  const orderedPlayers = await db
-    .select()
-    .from(players)
-    .where(eq(players.session_id, params.sessionId))
-    .orderBy(asc(players.seat_index));
+  const { orderedPlayers, seatOrder } = await buildSeatOrderWithStatus(params.sessionId);
 
   if (orderedPlayers.length === 0) {
     throw new Error("No players in session");
   }
 
-  const seatOrder = orderedPlayers.map((p) => ({
-    id: p.id,
-    is_dm: p.is_dm,
-    seat_index: p.seat_index,
-  }));
   const { nextPlayerId, nextTurnIndex, nextRound } =
     computeNextPlayableTurnState({
       orderedBySeat: seatOrder,

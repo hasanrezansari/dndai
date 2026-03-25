@@ -28,7 +28,7 @@ export function PartySheet() {
       {ordered.map((p) => {
         const c = p.character;
         const name =
-          c?.name?.trim() || `Seat ${p.seatIndex + 1}`;
+          c?.name?.trim() || p.displayName?.trim() || `Seat ${p.seatIndex + 1}`;
         const subtitle = c
           ? `${c.class} · ${c.race}`
           : "No character";

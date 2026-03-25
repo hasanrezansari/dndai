@@ -40,7 +40,19 @@ function displayNameForPlayerRow(row: {
   player: typeof players.$inferSelect;
   character: typeof characters.$inferSelect | null;
 }): string {
-  return row.character?.name ?? row.player.user_id.slice(0, 8);
+  return row.character?.name ?? `Seat ${row.player.seat_index + 1}`;
+}
+
+function isCharacterIncapacitated(row: typeof characters.$inferSelect | null): boolean {
+  if (!row) return false;
+  if (row.hp <= 0) return true;
+  const conditions = Array.isArray(row.conditions) ? row.conditions : [];
+  const lowered = conditions.map((c) => c.toLowerCase());
+  return (
+    lowered.includes("dead") ||
+    lowered.includes("unconscious") ||
+    lowered.includes("incapacitated")
+  );
 }
 
 export async function buildTurnContext({
@@ -117,10 +129,11 @@ export async function buildTurnContext({
     displayNameForPlayerRow(row),
   );
 
-  const seatOrder = orderedPlayers.map((p) => ({
-    id: p.id,
-    is_dm: p.is_dm,
-    seat_index: p.seat_index,
+  const seatOrder = playerCharacterPairs.map((pair) => ({
+    id: pair.player.id,
+    is_dm: pair.player.is_dm,
+    seat_index: pair.player.seat_index,
+    is_incapacitated: isCharacterIncapacitated(pair.character),
   }));
   const { nextPlayerId, roundAdvanced } = computeNextPlayableTurnState({
     orderedBySeat: seatOrder,

@@ -132,6 +132,42 @@ describe("computeNextPlayableTurnState", () => {
       roundAdvanced: false,
     });
   });
+
+  it("skips incapacitated players in turn order", () => {
+    const ordered = [
+      {
+        id: "a-00000000-0000-4000-8000-000000000001",
+        is_dm: false,
+        seat_index: 0,
+        is_incapacitated: false,
+      },
+      {
+        id: "b-00000000-0000-4000-8000-000000000002",
+        is_dm: false,
+        seat_index: 1,
+        is_incapacitated: true,
+      },
+      {
+        id: "c-00000000-0000-4000-8000-000000000003",
+        is_dm: false,
+        seat_index: 2,
+        is_incapacitated: false,
+      },
+    ];
+    expect(
+      computeNextPlayableTurnState({
+        orderedBySeat: ordered,
+        sessionMode: "ai_dm",
+        currentPlayerId: "a-00000000-0000-4000-8000-000000000001",
+        currentRound: 4,
+      }),
+    ).toMatchObject({
+      nextPlayerId: "c-00000000-0000-4000-8000-000000000003",
+      nextTurnIndex: 1,
+      nextRound: 4,
+      roundAdvanced: false,
+    });
+  });
 });
 
 describe("acquireTurnLock", () => {

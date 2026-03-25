@@ -3,7 +3,7 @@ import { randomInt } from "node:crypto";
 import { and, count, eq, max, sql } from "drizzle-orm";
 
 import { db } from "@/lib/db";
-import { players, sessions } from "@/lib/db/schema";
+import { authUsers, players, sessions } from "@/lib/db/schema";
 import type { Player, Session } from "@/lib/schemas/domain";
 import type { CampaignMode, SessionMode } from "@/lib/schemas/enums";
 
@@ -25,9 +25,13 @@ function mapSessionRow(row: typeof sessions.$inferSelect): Session {
   } as Session;
 }
 
-function mapPlayerRow(row: typeof players.$inferSelect): Player {
+function mapPlayerRow(
+  row: typeof players.$inferSelect,
+  name?: string | null,
+): Player {
   return {
     ...row,
+    name: name ?? null,
     joined_at: row.joined_at.toISOString(),
   } as Player;
 }
@@ -176,12 +180,16 @@ export async function getSession(
     throw new SessionNotFoundError();
   }
   const playerRows = await db
-    .select()
+    .select({
+      player: players,
+      userName: authUsers.name,
+    })
     .from(players)
+    .leftJoin(authUsers, eq(authUsers.id, players.user_id))
     .where(eq(players.session_id, sessionId));
   return {
     ...mapSessionRow(sessionRow),
-    players: playerRows.map(mapPlayerRow),
+    players: playerRows.map((r) => mapPlayerRow(r.player, r.userName)),
   };
 }
 

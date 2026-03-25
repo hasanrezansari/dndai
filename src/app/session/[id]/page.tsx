@@ -91,6 +91,7 @@ export default function SessionGameplayPage() {
   const closeSheet = useGameStore((s) => s.closeSheet);
   const isDm = useGameStore((s) => s.isDm);
   const waitingForDm = useGameStore((s) => s.waitingForDm);
+  const quest = useGameStore((s) => s.quest);
   const setIsDm = useGameStore((s) => s.setIsDm);
   const setDmDc = useGameStore((s) => s.setDmDc);
 
@@ -101,6 +102,8 @@ export default function SessionGameplayPage() {
 
   const { data: authSession, status: authStatus } = useSession();
   const [hydrated, setHydrated] = useState(false);
+  const [voteBusy, setVoteBusy] = useState(false);
+  const [chapterBusy, setChapterBusy] = useState(false);
 
   useEffect(() => {
     setHydrated(false);
@@ -301,6 +304,49 @@ export default function SessionGameplayPage() {
     }
   }, [router]);
 
+  const handleEndingVote = useCallback(
+    async (choice: "end_now" | "continue") => {
+      if (!sessionId || !currentPlayerId || voteBusy) return;
+      setVoteBusy(true);
+      try {
+        const res = await fetch(`/api/sessions/${sessionId}/vote-end`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ playerId: currentPlayerId, choice }),
+        });
+        const body = (await res.json().catch(() => ({}))) as { error?: string };
+        if (!res.ok) {
+          window.alert(body.error ?? "Could not submit vote");
+        }
+      } catch {
+        window.alert("Could not submit vote");
+      } finally {
+        setVoteBusy(false);
+      }
+    },
+    [sessionId, currentPlayerId, voteBusy],
+  );
+
+  const handleGenerateFinalChapter = useCallback(async () => {
+    if (!sessionId || !currentPlayerId || chapterBusy) return;
+    setChapterBusy(true);
+    try {
+      const res = await fetch(`/api/sessions/${sessionId}/final-chapter`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ playerId: currentPlayerId }),
+      });
+      const body = (await res.json().catch(() => ({}))) as { error?: string };
+      if (!res.ok) {
+        window.alert(body.error ?? "Could not generate final chapter");
+      }
+    } catch {
+      window.alert("Could not generate final chapter");
+    } finally {
+      setChapterBusy(false);
+    }
+  }, [sessionId, currentPlayerId, chapterBusy]);
+
   if (!sessionId) {
     return (
       <div className="flex min-h-dvh items-center justify-center bg-[var(--color-obsidian)] px-4 text-[var(--color-silver-dim)]">
@@ -365,6 +411,76 @@ export default function SessionGameplayPage() {
             <span className="h-px w-8 bg-[var(--color-gold-rare)]/45" />
             DM view
             <span className="h-px w-8 bg-[var(--color-gold-rare)]/45" />
+          </div>
+        ) : null}
+        {quest ? (
+          <div className="shrink-0 rounded-[var(--radius-card)] border border-white/[0.08] bg-[var(--glass-bg)]/35 px-3 py-2 backdrop-blur-sm">
+            <div className="mb-1.5 flex items-center justify-between gap-3">
+              <p className="line-clamp-1 text-fantasy text-xs tracking-wide text-[var(--color-silver-muted)]">
+                Objective: {quest.objective}
+              </p>
+              <span className="text-data shrink-0 text-[10px] uppercase tracking-wider text-[var(--color-silver-dim)]">
+                {quest.status === "ready_to_end"
+                  ? "Ready to conclude"
+                  : quest.status === "failed"
+                    ? "Failed"
+                    : "Active"}
+              </span>
+            </div>
+            <div className="mb-1 h-2 w-full overflow-hidden rounded-full bg-black/40">
+              <div
+                className="h-full rounded-full bg-[var(--color-gold-rare)] transition-[width] duration-300"
+                style={{ width: `${Math.max(0, Math.min(100, quest.progress))}%` }}
+              />
+            </div>
+            <div className="flex items-center justify-between text-data text-[10px] text-[var(--color-silver-dim)]">
+              <span>Progress {quest.progress}%</span>
+              <span>Danger {quest.risk}%</span>
+            </div>
+            {session?.mode === "ai_dm" && quest.endingVote?.open && currentPlayerId ? (
+              <div className="mt-2 rounded-[var(--radius-chip)] border border-[var(--color-gold-rare)]/25 bg-black/20 p-2">
+                <p className="mb-2 text-data text-[10px] uppercase tracking-wider text-[var(--color-gold-support)]">
+                  End vote: {quest.endingVote.reason === "party_defeated" ? "Party Defeated" : "Objective Complete"}
+                </p>
+                <div className="mb-1 text-data text-[10px] text-[var(--color-silver-dim)]">
+                  {Object.values(quest.endingVote.votes).filter((v) => v === "end_now").length}/{quest.endingVote.requiredYes} votes needed
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    disabled={voteBusy}
+                    onClick={() => void handleEndingVote("end_now")}
+                    className="min-h-[36px] flex-1 rounded-[var(--radius-chip)] border border-[var(--color-gold-rare)]/35 bg-[var(--color-gold-rare)]/15 px-2 text-data text-[11px] font-medium text-[var(--color-silver-muted)] disabled:opacity-50"
+                  >
+                    End Now
+                  </button>
+                  <button
+                    type="button"
+                    disabled={voteBusy}
+                    onClick={() => void handleEndingVote("continue")}
+                    className="min-h-[36px] flex-1 rounded-[var(--radius-chip)] border border-white/15 bg-black/20 px-2 text-data text-[11px] font-medium text-[var(--color-silver-muted)] disabled:opacity-50"
+                  >
+                    Continue
+                  </button>
+                </div>
+              </div>
+            ) : null}
+            {session?.status === "ended" ? (
+              <div className="mt-2">
+                <button
+                  type="button"
+                  disabled={chapterBusy || session.finalChapterPublished}
+                  onClick={() => void handleGenerateFinalChapter()}
+                  className="min-h-[36px] w-full rounded-[var(--radius-chip)] border border-[var(--color-gold-rare)]/35 bg-[var(--color-gold-rare)]/10 px-2 text-data text-[11px] font-medium text-[var(--color-silver-muted)] disabled:opacity-50"
+                >
+                  {session.finalChapterPublished
+                    ? "Final Chapter Published"
+                    : chapterBusy
+                      ? "Publishing..."
+                      : "Generate Final Chapter"}
+                </button>
+              </div>
+            ) : null}
           </div>
         ) : null}
         <FeedList entries={feed} className="min-h-0 flex-1" />

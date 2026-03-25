@@ -1,10 +1,46 @@
 export const CLASSES = [
-  { value: "warrior", label: "Warrior", icon: "⚔" },
-  { value: "ranger", label: "Ranger", icon: "🏹" },
-  { value: "mage", label: "Mage", icon: "✦" },
-  { value: "rogue", label: "Rogue", icon: "◆" },
-  { value: "cleric", label: "Cleric", icon: "✚" },
-  { value: "paladin", label: "Paladin", icon: "☀" },
+  {
+    value: "warrior",
+    label: "Warrior",
+    icon: "⚔",
+    role: "Frontline",
+    fantasy: "Steel-clad vanguard who breaks enemy lines.",
+  },
+  {
+    value: "ranger",
+    label: "Ranger",
+    icon: "🏹",
+    role: "Skirmisher",
+    fantasy: "Tracker and archer who controls distance.",
+  },
+  {
+    value: "mage",
+    label: "Mage",
+    icon: "✦",
+    role: "Arcane",
+    fantasy: "Spellcaster shaping the battlefield with magic.",
+  },
+  {
+    value: "rogue",
+    label: "Rogue",
+    icon: "◆",
+    role: "Stealth",
+    fantasy: "Shadow operative striking where defenses are weak.",
+  },
+  {
+    value: "cleric",
+    label: "Cleric",
+    icon: "✚",
+    role: "Support",
+    fantasy: "Divine guide who protects and restores allies.",
+  },
+  {
+    value: "paladin",
+    label: "Paladin",
+    icon: "☀",
+    role: "Guardian",
+    fantasy: "Holy champion blending defense and judgment.",
+  },
 ] as const;
 
 export const RACES = [

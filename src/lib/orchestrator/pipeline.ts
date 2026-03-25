@@ -15,6 +15,7 @@ import type { ActionIntent, NarratorOutput } from "@/lib/schemas/ai-io";
 import type { DiceRoll, NarrativeEvent } from "@/lib/schemas/domain";
 import type { StatePatch } from "@/lib/schemas/state-patches";
 import { performRoll } from "@/server/services/dice-service";
+import { applyTurnQuestProgress } from "@/server/services/quest-service";
 
 export type SessionImageJobPayload = {
   turnId: string;
@@ -96,6 +97,7 @@ export type TurnPipelineResult =
       narrativeEvent: NarrativeEvent;
       diceRolls: DiceRoll[];
       statePatches: StatePatch[];
+      shouldEndSession: boolean;
       imageNeeded: boolean;
       imageJobPayload: SessionImageJobPayload | undefined;
     }
@@ -103,6 +105,7 @@ export type TurnPipelineResult =
       kind: "human_dm";
       diceRolls: DiceRoll[];
       statePatches: StatePatch[];
+      shouldEndSession: boolean;
       expectedNextPlayerId: string;
     };
 
@@ -201,12 +204,22 @@ export async function runTurnPipeline(params: {
 
   const s0 = Date.now();
   const statePatches = computeStatePatches(intent, diceRolls);
+  const questUpdate = await applyTurnQuestProgress({
+    sessionId,
+    round: ctx.session.currentRound,
+    objectiveFallback:
+      ctx.session.adventurePrompt?.trim() ||
+      ctx.session.campaignTitle?.trim() ||
+      "Complete the mission and survive.",
+    actionType: intent.action_type,
+    diceRolls,
+  });
   await logTrace({
     sessionId,
     turnId,
     stepName: "state_delta",
     input: { intent_summary: intent.action_type },
-    output: { patches: statePatches },
+    output: { patches: statePatches, quest_state: questUpdate.state },
     modelUsed: "deterministic",
     tokensIn: 0,
     tokensOut: 0,
@@ -255,6 +268,7 @@ export async function runTurnPipeline(params: {
       kind: "human_dm",
       diceRolls,
       statePatches,
+      shouldEndSession: false,
       expectedNextPlayerId: ctx.nextPlayerId,
     };
   }
@@ -290,6 +304,10 @@ export async function runTurnPipeline(params: {
   let narration: NarratorOutput = {
     ...narr0.data,
     next_actor_id: expectedNextPlayerId,
+  };
+  narration = {
+    ...narration,
+    visible_changes: [...narration.visible_changes, ...questUpdate.visibleChanges],
   };
 
   const [inserted] = await db
@@ -330,6 +348,7 @@ export async function runTurnPipeline(params: {
     narrativeEvent: mapNarrativeRow(inserted),
     diceRolls,
     statePatches,
+    shouldEndSession: questUpdate.shouldEndSession,
     imageNeeded,
     imageJobPayload,
   };

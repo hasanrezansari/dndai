@@ -3,11 +3,18 @@ import { GlassCard } from "@/components/ui/glass-card";
 interface ClassCardProps {
   icon: string;
   label: string;
+  role: string;
   selected: boolean;
   onClick: () => void;
 }
 
-export function ClassCard({ icon, label, selected, onClick }: ClassCardProps) {
+export function ClassCard({
+  icon,
+  label,
+  role,
+  selected,
+  onClick,
+}: ClassCardProps) {
   return (
     <button
       type="button"
@@ -22,7 +29,7 @@ export function ClassCard({ icon, label, selected, onClick }: ClassCardProps) {
     >
       <GlassCard
         className={`
-          flex flex-col items-center justify-center gap-1 px-2 py-3 h-[100px] w-[88px]
+          flex flex-col items-center justify-center gap-1 px-2 py-3 h-[112px] w-[96px]
           ${selected ? "glow-gold" : ""}
         `.trim()}
       >
@@ -31,6 +38,9 @@ export function ClassCard({ icon, label, selected, onClick }: ClassCardProps) {
         </span>
         <span className="text-xs font-medium text-center text-[var(--color-silver-muted)] leading-tight px-0.5">
           {label}
+        </span>
+        <span className="text-[10px] uppercase tracking-wider text-[var(--color-silver-dim)] text-center">
+          {role}
         </span>
       </GlassCard>
     </button>

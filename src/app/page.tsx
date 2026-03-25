@@ -22,7 +22,7 @@ const PARTY_SIZES = [2, 3, 4, 5, 6] as const;
 
 export default function Home() {
   const router = useRouter();
-  const { status: authStatus } = useSession();
+  const { data: authSession, status: authStatus } = useSession();
   const [mode, setMode] = useState<SessionMode | null>(null);
   const [campaignMode, setCampaignMode] = useState<CampaignMode>("user_prompt");
   const [maxPlayers, setMaxPlayers] = useState<(typeof PARTY_SIZES)[number]>(4);
@@ -195,6 +195,11 @@ export default function Home() {
           <p className="text-[var(--color-silver-muted)] text-base tracking-wide">
             {COPY.tagline}
           </p>
+          {authSession?.user?.name ? (
+            <p className="text-xs text-[var(--color-silver-dim)]">
+              Signed in as {authSession.user.name}
+            </p>
+          ) : null}
         </header>
 
         <div className="flex flex-col gap-[var(--void-gap)] w-full">
@@ -255,6 +260,12 @@ export default function Home() {
 
         {mode ? (
           <section className="w-full flex flex-col gap-[var(--void-gap)]">
+            <GlassCard className="px-4 py-3 border-[rgba(255,255,255,0.06)]">
+              <p className="text-xs text-[var(--color-silver-dim)] leading-relaxed">
+                Choose a mode, set a campaign style, then create a session.
+                Friends can join anytime with the six-character join code.
+              </p>
+            </GlassCard>
             <div>
               <p className="text-xs uppercase tracking-wider text-[var(--color-silver-dim)] mb-2">
                 Campaign
@@ -350,6 +361,9 @@ export default function Home() {
                 autoCapitalize="characters"
                 className={`w-full min-h-[44px] rounded-[var(--radius-button)] bg-[var(--color-deep-void)] border border-[rgba(255,255,255,0.1)] px-4 text-[var(--color-silver-muted)] placeholder:text-[var(--color-silver-dim)] text-center text-data tracking-widest uppercase focus:outline-none focus:border-[rgba(212,175,55,0.3)] ${joinShakeKey > 0 ? "animate-shake-once" : ""}`}
               />
+              <p className="text-[10px] text-[var(--color-silver-dim)] text-center">
+                Example: 7G4K2M
+              </p>
               {joinError ? (
                 <p className="text-sm text-[var(--color-failure)] text-center">
                   {joinError}
