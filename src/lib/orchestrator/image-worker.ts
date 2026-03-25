@@ -57,7 +57,7 @@ function buildPrompt(params: {
     mood?: string;
     avoid?: string[];
   };
-}): string {
+}): { prompt: string; negativePrompt: string } {
   const { narrativeText, sceneContext, partyDescription, previousPrompt, imageHint } = params;
 
   const scene = sceneContext.trim().slice(0, 300) || narrativeText.slice(0, 300);
@@ -76,7 +76,7 @@ function buildPrompt(params: {
     : "";
   const moodLine = imageHint?.mood ? `Mood: ${imageHint.mood}.` : "";
 
-  return [
+  const prompt = [
     `Art style: ${ART_STYLE}.`,
     `Scene: ${scene}`,
     `Current moment: ${action}`,
@@ -87,6 +87,13 @@ function buildPrompt(params: {
     continuityHint,
     `Keep character appearances consistent. Wide cinematic composition, 16:9 aspect ratio, no text or UI overlays.`,
   ].filter(Boolean).join("\n");
+
+  const avoidItems = imageHint?.avoid?.filter(Boolean) ?? [];
+  const negativePrompt = avoidItems.length > 0
+    ? `${NEGATIVE}, ${avoidItems.join(", ")}`
+    : NEGATIVE;
+
+  return { prompt, negativePrompt };
 }
 
 export async function runImagePipeline(params: {
@@ -116,7 +123,7 @@ export async function runImagePipeline(params: {
     .orderBy(desc(sceneSnapshots.created_at))
     .limit(1);
 
-  const composedPrompt = buildPrompt({
+  const { prompt: composedPrompt, negativePrompt: composedNegative } = buildPrompt({
     narrativeText,
     sceneContext,
     partyDescription,
@@ -129,7 +136,7 @@ export async function runImagePipeline(params: {
   try {
     const out = await generateSceneImageOpenRouter({
       prompt: composedPrompt,
-      negativePrompt: NEGATIVE,
+      negativePrompt: composedNegative,
     });
     base64 = out.base64;
   } catch (e) {

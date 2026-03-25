@@ -223,8 +223,9 @@ export async function generateNarration(params: {
     fallback: () =>
       buildNarratorFallback(
         params.characterName,
-        params.intent.suggested_roll_context ??
-          params.intent.action_type.replace(/_/g, " "),
+        params.rawInput ||
+          (params.intent.suggested_roll_context ??
+          params.intent.action_type.replace(/_/g, " ")),
         rollResult,
         params.nextPlayerName,
         null,

@@ -44,6 +44,7 @@ export default function CharacterCreationPage() {
   const [characterClass, setCharacterClass] = useState<CharacterClass>("warrior");
   const [race, setRace] = useState<CharacterRace>("human");
   const [pronouns, setPronouns] = useState("they/them");
+  const [traits, setTraits] = useState("");
   const [backstory, setBackstory] = useState("");
   const [stats, setStats] = useState<CharacterStats | null>(null);
   const [statsShakeKey, setStatsShakeKey] = useState(0);
@@ -150,6 +151,9 @@ export default function CharacterCreationPage() {
           race,
           stats,
           pronouns: pronouns.trim() || "they/them",
+          traits: traits.trim()
+            ? traits.split(",").map((t) => t.trim()).filter(Boolean)
+            : undefined,
           backstory: backstory.trim() || undefined,
         }),
       });
@@ -256,6 +260,22 @@ export default function CharacterCreationPage() {
           rows={2}
           className="w-full rounded-[var(--radius-button)] bg-[var(--color-deep-void)] border border-[rgba(255,255,255,0.08)] px-4 py-3 text-sm text-[var(--color-silver-muted)] placeholder:text-[var(--color-silver-dim)] focus:outline-none focus:border-[var(--color-gold-support)] resize-none"
           placeholder="A brief origin story — the AI weaves it into narration"
+        />
+      </section>
+
+      <section className="flex flex-col gap-2">
+        <label htmlFor="hero-traits" className="text-xs uppercase tracking-wider text-[var(--color-silver-dim)]">
+          Traits <span className="normal-case tracking-normal text-[var(--color-silver-dim)]/60">(optional, comma-separated)</span>
+        </label>
+        <input
+          id="hero-traits"
+          type="text"
+          value={traits}
+          onChange={(e) => setTraits(e.target.value)}
+          autoComplete="off"
+          maxLength={200}
+          className="w-full min-h-[44px] rounded-[var(--radius-button)] bg-[var(--color-deep-void)] border border-[rgba(255,255,255,0.08)] px-4 text-sm text-[var(--color-silver-muted)] placeholder:text-[var(--color-silver-dim)] focus:outline-none focus:border-[var(--color-gold-support)]"
+          placeholder="e.g. cautious, scarred, short-tempered"
         />
       </section>
 

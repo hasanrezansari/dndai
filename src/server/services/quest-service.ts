@@ -24,6 +24,7 @@ export type EndingVoteState = {
 
 export type QuestState = {
   objective: string;
+  subObjectives?: string[];
   progress: number;
   risk: number;
   status: QuestStatus;
@@ -59,9 +60,17 @@ function normalizeObjective(objective: string): string {
   return `${o.slice(0, 137)}...`;
 }
 
+function extractSubObjectives(raw: string): string[] {
+  const lines = raw.split(/\n/).map((l) => l.replace(/^[-•*]\s*/, "").trim()).filter(Boolean);
+  if (lines.length <= 1) return [];
+  return lines.slice(1, 6);
+}
+
 export function defaultQuestState(objective: string): QuestState {
+  const subs = extractSubObjectives(objective);
   return {
     objective: normalizeObjective(objective),
+    subObjectives: subs.length > 0 ? subs : undefined,
     progress: 0,
     risk: 0,
     status: "active",

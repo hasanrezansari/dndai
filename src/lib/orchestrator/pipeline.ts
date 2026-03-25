@@ -71,6 +71,11 @@ export async function scheduleSessionImageGeneration(
   }
 }
 
+function scaleDelta(base: number, rollTotal: number): number {
+  const scale = Math.max(1, Math.ceil(rollTotal / 5));
+  return base > 0 ? base * scale : base * scale;
+}
+
 function computeStatePatches(
   intent: ActionIntent,
   rolls: DiceRoll[],
@@ -80,21 +85,42 @@ function computeStatePatches(
   const roll = rolls[0];
   if (!roll) return patches;
 
-  if (intent.action_type === "attack" || intent.action_type === "cast_spell") {
-    if (roll.result === "critical_failure") {
-      patches.push({ op: "player_hp", playerId: actingPlayerId, delta: -2 });
-    }
-    if (roll.result === "failure") {
-      patches.push({ op: "player_hp", playerId: actingPlayerId, delta: -1 });
-    }
-    if (roll.result === "critical_success") {
-      patches.push({ op: "player_hp", playerId: actingPlayerId, delta: 2 });
-    }
-  }
+  const t = roll.total;
+  const type = intent.action_type;
 
-  if (intent.action_type === "move" || intent.action_type === "use_item") {
+  if (type === "attack" || type === "cast_spell") {
+    switch (roll.result) {
+      case "critical_success":
+        patches.push({ op: "player_hp", playerId: actingPlayerId, delta: scaleDelta(2, t) });
+        break;
+      case "success":
+        patches.push({ op: "player_hp", playerId: actingPlayerId, delta: 1 });
+        break;
+      case "failure":
+        patches.push({ op: "player_hp", playerId: actingPlayerId, delta: scaleDelta(-1, t) });
+        break;
+      case "critical_failure":
+        patches.push({ op: "player_hp", playerId: actingPlayerId, delta: scaleDelta(-2, t) });
+        patches.push({ op: "condition_add", targetId: actingPlayerId, condition: "staggered" });
+        break;
+    }
+  } else if (type === "use_item") {
+    const isHealItem = intent.suggested_roll_context?.toLowerCase().includes("heal") ||
+      intent.suggested_roll_context?.toLowerCase().includes("potion");
+    if (isHealItem && (roll.result === "success" || roll.result === "critical_success")) {
+      patches.push({ op: "player_hp", playerId: actingPlayerId, delta: scaleDelta(2, t) });
+    } else if (roll.result === "critical_failure") {
+      patches.push({ op: "player_hp", playerId: actingPlayerId, delta: scaleDelta(-2, t) });
+    }
+  } else if (type === "move" || type === "inspect") {
     if (roll.result === "critical_failure") {
-      patches.push({ op: "player_hp", playerId: actingPlayerId, delta: -3 });
+      patches.push({ op: "player_hp", playerId: actingPlayerId, delta: scaleDelta(-1, t) });
+    }
+  } else if (type === "other") {
+    if (roll.result === "critical_success") {
+      patches.push({ op: "player_hp", playerId: actingPlayerId, delta: scaleDelta(1, t) });
+    } else if (roll.result === "critical_failure") {
+      patches.push({ op: "player_hp", playerId: actingPlayerId, delta: scaleDelta(-1, t) });
     }
   }
 

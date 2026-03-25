@@ -29,6 +29,7 @@ export interface GameSessionView {
 
 export interface QuestProgressView {
   objective: string;
+  subObjectives?: string[];
   progress: number;
   risk: number;
   status: "active" | "ready_to_end" | "failed";

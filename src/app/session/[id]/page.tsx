@@ -25,6 +25,13 @@ import { FeedList } from "@/components/feed/feed-list";
 import { useSessionChannel } from "@/lib/socket/use-session-channel";
 import { useGameStore } from "@/lib/state/game-store";
 
+function dangerLabel(risk: number): { label: string; color: string } {
+  if (risk >= 86) return { label: "Critical", color: "var(--gradient-hp-end)" };
+  if (risk >= 61) return { label: "Perilous", color: "#e07c3a" };
+  if (risk >= 31) return { label: "Uneasy", color: "var(--color-gold-rare)" };
+  return { label: "Calm", color: "var(--color-silver-dim)" };
+}
+
 function SessionPlaySkeleton() {
   return (
     <div className="flex min-h-dvh flex-col bg-[var(--color-obsidian)] animate-fade-in">
@@ -427,6 +434,21 @@ export default function SessionGameplayPage() {
                     : "Active"}
               </span>
             </div>
+            {quest.subObjectives?.length ? (
+              <details className="mb-1.5">
+                <summary className="cursor-pointer text-[10px] text-[var(--color-silver-dim)] hover:text-[var(--color-silver-muted)] select-none">
+                  Sub-objectives ({quest.subObjectives.length})
+                </summary>
+                <ul className="mt-1 ml-2 space-y-0.5 text-[10px] text-[var(--color-silver-dim)]">
+                  {quest.subObjectives.map((sub, i) => (
+                    <li key={i} className="flex gap-1.5">
+                      <span className="shrink-0 text-[var(--color-gold-support)]">·</span>
+                      <span className="line-clamp-1">{sub}</span>
+                    </li>
+                  ))}
+                </ul>
+              </details>
+            ) : null}
             <div className="mb-1 h-2 w-full overflow-hidden rounded-full bg-black/40">
               <div
                 className="h-full rounded-full bg-[var(--color-gold-rare)] transition-[width] duration-300"
@@ -435,7 +457,9 @@ export default function SessionGameplayPage() {
             </div>
             <div className="flex items-center justify-between text-data text-[10px] text-[var(--color-silver-dim)]">
               <span>Progress {quest.progress}%</span>
-              <span>Danger {quest.risk}%</span>
+              <span style={{ color: dangerLabel(quest.risk).color }}>
+                {dangerLabel(quest.risk).label} ({quest.risk}%)
+              </span>
             </div>
             {session?.mode === "ai_dm" && quest.endingVote?.open && currentPlayerId ? (
               <div className="mt-2 rounded-[var(--radius-chip)] border border-[var(--color-gold-rare)]/25 bg-black/20 p-2">

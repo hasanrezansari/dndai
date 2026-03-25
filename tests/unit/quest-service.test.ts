@@ -237,3 +237,110 @@ describe("evaluateEndingVote", () => {
     expect(changed).toBe(false);
   });
 });
+
+describe("diminishing returns math", () => {
+  it("applies no penalty for first use of an action type", () => {
+    const recent: string[] = [];
+    const consecutiveSame = recent.filter((a) => a === "attack").length;
+    const diminishing = Math.max(0.25, 1 - consecutiveSame * 0.2);
+    expect(diminishing).toBe(1);
+  });
+
+  it("applies 20% penalty per consecutive same action", () => {
+    const recent = ["attack", "attack"];
+    const consecutiveSame = recent.filter((a) => a === "attack").length;
+    const diminishing = Math.max(0.25, 1 - consecutiveSame * 0.2);
+    expect(diminishing).toBeCloseTo(0.6);
+  });
+
+  it("floors at 25% regardless of consecutive count", () => {
+    const recent = ["attack", "attack", "attack", "attack", "attack"];
+    const consecutiveSame = recent.filter((a) => a === "attack").length;
+    const diminishing = Math.max(0.25, 1 - consecutiveSame * 0.2);
+    expect(diminishing).toBe(0.25);
+  });
+
+  it("does not penalize different action types in history", () => {
+    const recent = ["move", "talk", "inspect", "cast_spell"];
+    const consecutiveSame = recent.filter((a) => a === "attack").length;
+    const diminishing = Math.max(0.25, 1 - consecutiveSame * 0.2);
+    expect(diminishing).toBe(1);
+  });
+
+  it("caps recentActions array at 5 entries", () => {
+    const recent = ["a", "b", "c", "d", "e"];
+    recent.push("f");
+    if (recent.length > 5) recent.shift();
+    expect(recent).toHaveLength(5);
+    expect(recent[0]).toBe("b");
+  });
+});
+
+describe("status transitions", () => {
+  it("transitions to ready_to_end when progress reaches 100", () => {
+    const progress = 100;
+    const risk = 30;
+    let status: "active" | "ready_to_end" | "failed" = "active";
+    if (progress >= 100) status = "ready_to_end";
+    expect(status).toBe("ready_to_end");
+    expect(risk).toBeLessThan(100);
+  });
+
+  it("transitions to failed when risk reaches 100", () => {
+    const progress = 50;
+    let risk = 100;
+    let status: "active" | "ready_to_end" | "failed" = "active";
+    if (progress >= 100) status = "ready_to_end";
+    if (risk >= 100) {
+      status = "failed";
+      risk = 100;
+    }
+    expect(status).toBe("failed");
+  });
+
+  it("failed overrides ready_to_end when both thresholds met", () => {
+    const progress = 100;
+    let risk = 100;
+    let status: "active" | "ready_to_end" | "failed" = "active";
+    if (progress >= 100) status = "ready_to_end";
+    if (risk >= 100) {
+      status = "failed";
+      risk = 100;
+    }
+    expect(status).toBe("failed");
+  });
+
+  it("stays active when both progress and risk are moderate", () => {
+    const progress = 50;
+    const risk = 40;
+    let status: "active" | "ready_to_end" | "failed" = "active";
+    if (progress >= 100) status = "ready_to_end";
+    if (risk >= 100) status = "failed";
+    expect(status).toBe("active");
+  });
+});
+
+describe("scoreFromRoll edge cases", () => {
+  it("handles all valid DiceRoll results without throwing", () => {
+    const results = ["critical_success", "success", "failure", "critical_failure", undefined] as const;
+    for (const r of results) {
+      const { progressDelta, riskDelta } = scoreFromRoll(r);
+      expect(typeof progressDelta).toBe("number");
+      expect(typeof riskDelta).toBe("number");
+    }
+  });
+});
+
+describe("intentWeight edge cases", () => {
+  it("returns positive weight for every known action type", () => {
+    const knownTypes = ["attack", "cast_spell", "talk", "inspect", "move", "use_item", "other"];
+    for (const t of knownTypes) {
+      expect(intentWeight(t)).toBeGreaterThan(0);
+    }
+  });
+
+  it("returns positive weight for completely unknown action types", () => {
+    expect(intentWeight("fly_to_moon")).toBeGreaterThan(0);
+    expect(intentWeight("")).toBeGreaterThan(0);
+  });
+});

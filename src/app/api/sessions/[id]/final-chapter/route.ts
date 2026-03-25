@@ -16,6 +16,7 @@ import {
   sessions,
 } from "@/lib/db/schema";
 import { broadcastToSession } from "@/lib/socket/server";
+import { getQuestState } from "@/server/services/quest-service";
 
 const BodySchema = z.object({
   playerId: z.string().uuid(),
@@ -147,12 +148,13 @@ export async function POST(
       ? firstSentence(narrativeTexts[narrativeTexts.length - 1]!)
       : "In the final hours, every choice weighed like steel.";
 
+    const quest = await getQuestState(sessionId);
     const chapter = buildFinalChapter({
       campaignTitle: sessionRow.campaignTitle?.trim() || "Ashveil Chronicle",
       party: partyNames,
       earlyBeat,
       lateBeat,
-      questStatus: "active",
+      questStatus: quest?.status ?? "active",
     });
 
     const [inserted] = await db

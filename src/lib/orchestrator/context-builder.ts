@@ -2,6 +2,7 @@ import { asc, desc, eq } from "drizzle-orm";
 
 import { db } from "@/lib/db";
 import {
+  authUsers,
   characters,
   narrativeEvents,
   players,
@@ -45,8 +46,9 @@ export interface TurnContext {
 function displayNameForPlayerRow(row: {
   player: typeof players.$inferSelect;
   character: typeof characters.$inferSelect | null;
+  userName?: string | null;
 }): string {
-  return row.character?.name ?? `Seat ${row.player.seat_index + 1}`;
+  return row.character?.name ?? row.userName ?? `Seat ${row.player.seat_index + 1}`;
 }
 
 function isCharacterIncapacitated(row: typeof characters.$inferSelect | null): boolean {
@@ -127,7 +129,12 @@ export async function buildTurnContext({
         .from(characters)
         .where(eq(characters.player_id, p.id))
         .limit(1);
-      return { player: p, character: c ?? null };
+      const [u] = await db
+        .select({ name: authUsers.name })
+        .from(authUsers)
+        .where(eq(authUsers.id, p.user_id))
+        .limit(1);
+      return { player: p, character: c ?? null, userName: u?.name ?? null };
     }),
   );
 
@@ -159,7 +166,8 @@ export async function buildTurnContext({
 
   const allCharacterSummaries = playerCharacterPairs.map((row) => {
     const c = row.character;
-    if (!c) return `${displayNameForPlayerRow(row)} (no character)`;
+    const label = displayNameForPlayerRow(row);
+    if (!c) return `${label} (no character)`;
     const cvp = (c.visual_profile ?? {}) as Record<string, unknown>;
     const cpro = typeof cvp.pronouns === "string" ? cvp.pronouns : "they/them";
     return `${c.name} (${c.race} ${c.class}, HP ${c.hp}/${c.max_hp}, ${cpro})`;
