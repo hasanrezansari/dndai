@@ -24,7 +24,9 @@ export function wordCount(s: string): number {
   return s.trim().split(/\s+/).filter(Boolean).length;
 }
 
-export function outcomeFromRoll(roll: DiceRoll | undefined): string {
+export function outcomeFromRoll(
+  roll: { result: DiceRoll["result"] } | undefined,
+): string {
   if (!roll) return "The outcome hangs in the balance.";
   if (roll.result === "critical_success")
     return "Fortune delivers a shining success.";
@@ -42,12 +44,23 @@ export function buildNarratorFallback(
   nextPlayerName: string,
   nextActorId: string | null,
 ): NarratorOutput {
-  const opener = `${playerName} attempts ${actionSummary}. ${outcomeSentence} ${nextPlayerName}, your turn.`;
-  const atmosphere =
-    "Cold air threads the stone; distant water ticks against silence. Torchlight shivers along mail and knuckles, painting slow shadows that seem to listen. The weight of the moment settles, peaty and metallic, until the table's focus slides toward what must happen next.";
-  let scene_text = `${opener} ${atmosphere}`;
+  const outcomes = {
+    success: [
+      `${playerName}'s effort pays off — ${actionSummary}. The air shifts as the moment settles. ${nextPlayerName} steps forward, ready.`,
+      `With determination, ${playerName} ${actionSummary}. A brief silence follows the success. ${nextPlayerName}, the table turns to you.`,
+    ],
+    failure: [
+      `${playerName} tries to ${actionSummary}, but the moment slips away. The shadows seem to deepen. ${nextPlayerName}, it falls to you now.`,
+      `Despite ${playerName}'s effort, ${actionSummary} doesn't go as planned. A tense pause. ${nextPlayerName}, your move.`,
+    ],
+  };
+  const isSuccess = outcomeSentence.toLowerCase().includes("success");
+  const pool = isSuccess ? outcomes.success : outcomes.failure;
+  const base = pool[Math.floor(Math.random() * pool.length)]!;
+  let scene_text = base;
   if (wordCount(scene_text) < 60) {
-    scene_text = `${scene_text} A draft hums through the passageway, carrying ash and old rain; boots scrape softly as everyone waits on the turning of the tale.`;
+    scene_text +=
+      " Torchlight flickers against weathered stone. The passage ahead holds its breath, ancient and watchful, as the party gathers resolve for what comes next.";
   }
   if (wordCount(scene_text) > 140) {
     scene_text = scene_text
@@ -101,9 +114,14 @@ export async function generateNarration(params: {
         params.characterName,
         params.intent.suggested_roll_context ??
           params.intent.action_type.replace(/_/g, " "),
-        outcomeFromRoll(undefined),
+        outcomeFromRoll(
+          params.diceResults[0]
+            ? { result: params.diceResults[0].result as DiceRoll["result"] }
+            : undefined,
+        ),
         params.nextPlayerName,
         null,
       ),
+    timeoutMs: 60_000,
   });
 }

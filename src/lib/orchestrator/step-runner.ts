@@ -22,7 +22,7 @@ export async function runOrchestrationStep<T>(params: {
   fallback?: () => T;
   timeoutMs?: number;
 }): Promise<OrchestrationStepResult<T>> {
-  const timeoutMs = params.timeoutMs ?? 30_000;
+  const timeoutMs = params.timeoutMs ?? 60_000;
   const t0 = Date.now();
 
   const emptyUsage = (model: string): TokenUsage => ({
@@ -57,7 +57,14 @@ export async function runOrchestrationStep<T>(params: {
     const r1 = await runWithTimeout(params.userPrompt);
     data = r1.data;
     usage = r1.usage;
-  } catch {
+  } catch (e1) {
+    const msg1 = e1 instanceof Error ? e1.message : String(e1);
+    console.error(
+      `[orchestration:${params.stepName}] attempt 1 failed`,
+      params.sessionId,
+      msg1,
+      e1,
+    );
     try {
       const r2 = await runWithTimeout(
         `${params.userPrompt}\n\nRespond ONLY with valid JSON matching the schema exactly.`,
@@ -65,6 +72,13 @@ export async function runOrchestrationStep<T>(params: {
       data = r2.data;
       usage = r2.usage;
     } catch (e2) {
+      const msg2 = e2 instanceof Error ? e2.message : String(e2);
+      console.error(
+        `[orchestration:${params.stepName}] attempt 2 failed`,
+        params.sessionId,
+        msg2,
+        e2,
+      );
       if (params.fallback) {
         data = params.fallback();
         usage = emptyUsage("fallback");

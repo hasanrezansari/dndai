@@ -4,7 +4,7 @@ import type { AIProvider, ModelTier, TokenUsage, ZodSchema } from "@/lib/ai/type
 
 const MODEL_MAP = { heavy: "gpt-4o", light: "gpt-4o-mini" } as const;
 
-const DEFAULT_TIMEOUT_MS = 30_000;
+const DEFAULT_TIMEOUT_MS = 60_000;
 
 function extractJsonObject(raw: string): string {
   const t = raw.trim();

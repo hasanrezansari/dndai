@@ -52,7 +52,6 @@ export interface GamePlayerView {
 }
 
 export interface DiceOverlayData {
-  visible: boolean;
   context: string;
   diceType: string;
   rollValue: number;
@@ -94,7 +93,7 @@ interface GameState {
   setScenePending: (pending: boolean) => void;
   setNarrativeText: (text: string | null) => void;
   setIsThinking: (thinking: boolean) => void;
-  showDiceOverlay: (data: Omit<DiceOverlayData, "visible">) => void;
+  showDiceOverlay: (data: DiceOverlayData) => void;
   hideDiceOverlay: () => void;
   updateSessionField: <K extends keyof GameSessionView>(
     field: K,
@@ -178,18 +177,7 @@ export const useGameStore = create<GameState>((set) => ({
 
   setIsThinking: (thinking) => set({ isThinking: thinking }),
 
-  showDiceOverlay: (data) =>
-    set({
-      diceOverlay: {
-        visible: true,
-        context: data.context,
-        diceType: data.diceType,
-        rollValue: data.rollValue,
-        modifier: data.modifier,
-        total: data.total,
-        result: data.result,
-      },
-    }),
+  showDiceOverlay: (data) => set({ diceOverlay: data }),
 
   hideDiceOverlay: () => set({ diceOverlay: null }),
 

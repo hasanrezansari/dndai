@@ -7,18 +7,10 @@ import { broadcastToSession } from "@/lib/socket/server";
 import { buildTurnContext } from "@/lib/orchestrator/context-builder";
 import { commitStatePatches } from "@/lib/orchestrator/apply-state";
 import { logTrace } from "@/lib/orchestrator/trace";
-import { runOrchestrationStep } from "@/lib/orchestrator/step-runner";
 import { parseIntent } from "@/lib/orchestrator/workers/intent-parser";
 import { interpretRules } from "@/lib/orchestrator/workers/rules-interpreter";
-import {
-  NARRATOR_SYSTEM,
-  buildNarratorFallback,
-  generateNarration,
-  outcomeFromRoll,
-  wordCount,
-} from "@/lib/orchestrator/workers/narrator";
+import { generateNarration } from "@/lib/orchestrator/workers/narrator";
 import { checkVisualDelta } from "@/lib/orchestrator/workers/visual-delta";
-import { NarratorOutputSchema } from "@/lib/schemas/ai-io";
 import type { ActionIntent, NarratorOutput } from "@/lib/schemas/ai-io";
 import type { DiceRoll, NarrativeEvent } from "@/lib/schemas/domain";
 import type { StatePatch } from "@/lib/schemas/state-patches";
@@ -295,57 +287,6 @@ export async function runTurnPipeline(params: {
     next_actor_id: expectedNextPlayerId,
   };
 
-  const narratorPayload = {
-    actor_name: actorName,
-    raw_action: rawInput,
-    intent,
-    dice_summary: diceRolls.map((r) => ({
-      context: r.context,
-      total: r.total,
-      result: r.result,
-    })),
-    next_actor_id: expectedNextPlayerId,
-    next_actor_name: nextActorName,
-    recent_narrative: recentNarrative,
-    scene_context: sceneContext,
-  };
-
-  const wc1 = wordCount(narration.scene_text);
-  if (wc1 < 60 || wc1 > 140) {
-    const narr1 = await runOrchestrationStep({
-      stepName: "narrator_word_bounds_retry",
-      sessionId,
-      turnId,
-      provider,
-      model: "heavy",
-      systemPrompt: NARRATOR_SYSTEM,
-      userPrompt: JSON.stringify({
-        ...narratorPayload,
-        prior_scene_text: narration.scene_text,
-        instruction: `Rewrite scene_text to be between 60 and 140 words inclusive. Current word count: ${wc1}.`,
-      }),
-      schema: NarratorOutputSchema,
-      maxTokens: 900,
-      temperature: 0.6,
-      fallback: () => narration,
-    });
-    narration = {
-      ...narr1.data,
-      next_actor_id: expectedNextPlayerId,
-    };
-  }
-
-  const wc2 = wordCount(narration.scene_text);
-  if (wc2 < 60 || wc2 > 140) {
-    narration = buildNarratorFallback(
-      actorName,
-      rawInput.slice(0, 120),
-      outcomeFromRoll(diceRolls[0]),
-      nextActorName,
-      expectedNextPlayerId,
-    );
-  }
-
   const [inserted] = await db
     .insert(narrativeEvents)
     .values({
@@ -364,15 +305,26 @@ export async function runTurnPipeline(params: {
   }
 
   let imageNeeded = false;
-  if (ctx.roundAdvanced) {
-    const vis = await checkVisualDelta({
-      sessionId,
-      turnId,
-      narrativeText: narration.scene_text,
-      currentSceneDescription: ctx.currentSceneDescription,
-      provider,
-    });
-    imageNeeded = vis.data.image_needed;
+  const shouldCheckImage =
+    ctx.roundAdvanced ||
+    ctx.session.currentRound <= 2 ||
+    diceRolls.some(
+      (r) =>
+        r.result === "critical_success" || r.result === "critical_failure",
+    );
+  if (shouldCheckImage) {
+    if (ctx.session.currentRound <= 2) {
+      imageNeeded = true;
+    } else {
+      const vis = await checkVisualDelta({
+        sessionId,
+        turnId,
+        narrativeText: narration.scene_text,
+        currentSceneDescription: ctx.currentSceneDescription,
+        provider,
+      });
+      imageNeeded = vis.data.image_needed;
+    }
   }
 
   let imageJobPayload: SessionImageJobPayload | undefined;

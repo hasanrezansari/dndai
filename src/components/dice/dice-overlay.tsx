@@ -43,7 +43,7 @@ export function DiceOverlay() {
   const hideDiceOverlay = useGameStore((s) => s.hideDiceOverlay);
 
   useEffect(() => {
-    if (!diceOverlay?.visible) return;
+    if (diceOverlay === null) return;
     const t = window.setTimeout(() => {
       hideDiceOverlay();
     }, 2500);
@@ -54,7 +54,7 @@ export function DiceOverlay() {
 
   return (
     <AnimatePresence>
-      {diceOverlay?.visible && accent ? (
+      {diceOverlay !== null && accent ? (
         <motion.div
           key="dice-overlay"
           role="dialog"
@@ -64,7 +64,7 @@ export function DiceOverlay() {
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
           transition={{ duration: 0.22 }}
-          className="fixed inset-0 z-[100] flex flex-col items-center justify-center px-6"
+          className="fixed inset-0 z-50 flex flex-col items-center justify-center px-6"
           style={{
             backdropFilter: "blur(14px)",
             WebkitBackdropFilter: "blur(14px)",
