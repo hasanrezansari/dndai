@@ -28,6 +28,20 @@ const BodySchema = z.object({
   playerId: z.string().uuid(),
 });
 
+const OPENINGS = [
+  (chars: string, theme: string) =>
+    `The wind carries the scent of ash and iron as ${chars} gather at the threshold of the unknown. ${theme ? `Whispers speak of ${theme} —` : "Ancient forces stir —"} a darkness that has festered beneath the surface for far too long. Torches gutter in an unnatural breeze. The path ahead is uncertain, the shadows deep, but the call of adventure is undeniable. Steel your nerves. Your legend begins now.`,
+  (chars: string, theme: string) =>
+    `A heavy fog clings to the cobblestones as ${chars} arrive at the crossroads of fate. ${theme ? `The promise of ${theme} hangs in the air,` : "Something ancient and hungry waits,"} patient as stone, old as the mountains themselves. The tavern behind you grows distant. Ahead, only darkness and the faint echo of something stirring. Draw your weapons. Light your torches. The world will remember what happens next.`,
+  (chars: string, theme: string) =>
+    `Thunder rolls across a bruised sky as ${chars} stand before the gates of destiny. ${theme ? `Tales of ${theme} have drawn you here,` : "An unseen force has drawn you together,"} each carrying your own scars, your own reasons. The road behind is gone — there is only forward now. Somewhere in the deep dark, something waits. It has been waiting for a very long time. Your story begins.`,
+];
+
+function buildTemplateFallback(charNames: string, adventurePrompt: string): string {
+  const fn = OPENINGS[Math.floor(Math.random() * OPENINGS.length)]!;
+  return fn(charNames || "the adventurers", adventurePrompt);
+}
+
 const OpeningSchema = z.object({
   scene_text: z.string(),
   campaign_title: z.string(),
@@ -141,7 +155,7 @@ export async function POST(
 
     try {
       const provider = getAIProvider();
-      const openingResult = await provider.generateStructured({
+      const aiCall = provider.generateStructured({
         model: "light",
         systemPrompt: `You are the Dungeon Master of Ashveil, a dark fantasy RPG. Generate a cinematic opening scene that sets the world, atmosphere, and initial situation for the players. 80-120 words. Output JSON: { "scene_text": "...", "campaign_title": "..." }`,
         userPrompt: JSON.stringify({
@@ -153,11 +167,18 @@ export async function POST(
         maxTokens: 500,
         temperature: 0.8,
       });
+      const openingResult = await Promise.race([
+        aiCall,
+        new Promise<never>((_, reject) =>
+          setTimeout(() => reject(new Error("opening timeout")), 8_000),
+        ),
+      ]);
       openingScene = openingResult.data.scene_text;
       campaignTitle =
         openingResult.data.campaign_title.trim() || campaignTitle;
     } catch (err) {
-      console.error(err);
+      console.error("[start] AI opening failed, using template:", err instanceof Error ? err.message : err);
+      openingScene = buildTemplateFallback(charNames, adventurePrompt);
     }
 
     await db
