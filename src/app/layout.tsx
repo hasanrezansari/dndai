@@ -28,7 +28,18 @@ const inter = Inter({
 
 export const metadata: Metadata = {
   title: "Ashveil — A Living World Awaits",
-  description: "Mobile-first multiplayer AI-powered tabletop RPG",
+  description:
+    "Mobile-first multiplayer AI-powered tabletop RPG. Play with friends online — AI or Human DM.",
+  metadataBase: new URL(
+    process.env.NEXTAUTH_URL ?? "https://playdndai.com",
+  ),
+  openGraph: {
+    title: "Ashveil — A Living World Awaits",
+    description:
+      "Mobile-first multiplayer AI-powered tabletop RPG. Play with friends online.",
+    siteName: "Ashveil",
+    type: "website",
+  },
 };
 
 export const viewport: Viewport = {
