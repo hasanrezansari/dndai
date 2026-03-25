@@ -268,6 +268,7 @@ export async function runTurnPipeline(params: {
   const narr0 = await generateNarration({
     sessionId,
     turnId,
+    rawInput,
     intent,
     diceResults: diceRolls.map((r) => ({
       context: r.context,

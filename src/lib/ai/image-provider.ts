@@ -19,6 +19,7 @@ export async function generateSceneImage(params: {
   height?: number;
 }): Promise<{ imageUrl: string; seed: number }> {
   if (!process.env.FAL_KEY) {
+    console.error("[image-provider] FAL_KEY is not set — cannot generate scene image. Add FAL_KEY to your Vercel environment variables.");
     throw new Error("FAL_KEY is not set");
   }
   const width = params.width ?? 768;

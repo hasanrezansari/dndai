@@ -13,6 +13,7 @@ import {
   PlayerJoinedEventSchema,
   PlayerReadyEventSchema,
   RoundSummaryEventSchema,
+  SceneImageFailedEventSchema,
   SceneImagePendingEventSchema,
   SceneImageReadyEventSchema,
   SessionStartedEventSchema,
@@ -265,6 +266,12 @@ export function useSessionChannel(sessionId: string | null) {
       useGameStore.getState().setScenePending(false);
     };
 
+    const onSceneImageFailed = (raw: unknown) => {
+      const parsed = SceneImageFailedEventSchema.safeParse(raw);
+      if (!parsed.success) return;
+      useGameStore.getState().setScenePending(false);
+    };
+
     const onAwaitingDm = (raw: unknown) => {
       const parsed = AwaitingDmEventSchema.safeParse(raw);
       if (!parsed.success) return;
@@ -311,6 +318,7 @@ export function useSessionChannel(sessionId: string | null) {
     channel.bind("state-update", onStateUpdate);
     channel.bind("scene-image-pending", onSceneImagePending);
     channel.bind("scene-image-ready", onSceneImageReady);
+    channel.bind("scene-image-failed", onSceneImageFailed);
     channel.bind("round-summary", onRoundSummary);
     channel.bind("awaiting-dm", onAwaitingDm);
     channel.bind("dm-notice", onDmNotice);
@@ -328,6 +336,7 @@ export function useSessionChannel(sessionId: string | null) {
       channel.unbind("state-update", onStateUpdate);
       channel.unbind("scene-image-pending", onSceneImagePending);
       channel.unbind("scene-image-ready", onSceneImageReady);
+      channel.unbind("scene-image-failed", onSceneImageFailed);
       channel.unbind("round-summary", onRoundSummary);
       channel.unbind("awaiting-dm", onAwaitingDm);
       channel.unbind("dm-notice", onDmNotice);

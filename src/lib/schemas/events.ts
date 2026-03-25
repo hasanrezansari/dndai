@@ -99,6 +99,11 @@ export const SceneImageReadyEventSchema = z.object({
 });
 export type SceneImageReadyEvent = output<typeof SceneImageReadyEventSchema>;
 
+export const SceneImageFailedEventSchema = z.object({
+  scene_id: z.string().uuid(),
+});
+export type SceneImageFailedEvent = output<typeof SceneImageFailedEventSchema>;
+
 export const RoundSummaryEventSchema = z.object({
   summary_text: z.string(),
   round_number: z.number().int().min(1),

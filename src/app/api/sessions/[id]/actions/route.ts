@@ -7,6 +7,8 @@ import { z } from "zod";
 
 import { apiError, handleApiError } from "@/lib/api/errors";
 import { COPY } from "@/lib/copy/ashveil";
+
+export const maxDuration = 60;
 import {
   isPlayerForUser,
   requireUser,
@@ -167,9 +169,18 @@ export async function POST(
               scene_id: sceneImageId,
               image_url: result.imageUrl,
             });
+          } else {
+            await broadcastToSession(sessionId, "scene-image-failed", {
+              scene_id: sceneImageId,
+            });
           }
         } catch (err) {
           console.error("[image-after] action image failed:", err);
+          try {
+            await broadcastToSession(sessionId, "scene-image-failed", {
+              scene_id: sceneImageId,
+            });
+          } catch { /* best effort */ }
         }
       });
     }

@@ -7,6 +7,8 @@ import { z } from "zod";
 
 import { apiError, handleApiError } from "@/lib/api/errors";
 import { requireUser, unauthorizedResponse } from "@/lib/auth/guards";
+
+export const maxDuration = 60;
 import { getAIProvider } from "@/lib/ai";
 import { COPY } from "@/lib/copy/ashveil";
 import { db } from "@/lib/db";
@@ -171,7 +173,7 @@ export async function POST(
       const openingResult = await Promise.race([
         aiCall,
         new Promise<never>((_, reject) =>
-          setTimeout(() => reject(new Error("opening timeout")), 8_000),
+          setTimeout(() => reject(new Error("opening timeout")), 20_000),
         ),
       ]);
       openingScene = openingResult.data.scene_text;
@@ -228,9 +230,18 @@ export async function POST(
             scene_id: sceneImageId,
             image_url: result.imageUrl,
           });
+        } else {
+          await broadcastToSession(sessionId, "scene-image-failed", {
+            scene_id: sceneImageId,
+          });
         }
       } catch (err) {
         console.error("[image-after] start image failed:", err);
+        try {
+          await broadcastToSession(sessionId, "scene-image-failed", {
+            scene_id: sceneImageId,
+          });
+        } catch { /* best effort */ }
       }
     });
 

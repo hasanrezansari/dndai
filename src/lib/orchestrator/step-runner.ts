@@ -36,7 +36,7 @@ export async function runOrchestrationStep<T>(params: {
   fallback?: () => T;
   timeoutMs?: number;
 }): Promise<OrchestrationStepResult<T>> {
-  const timeoutMs = params.timeoutMs ?? 8_000;
+  const timeoutMs = params.timeoutMs ?? 20_000;
   const t0 = Date.now();
 
   const emptyUsage = (model: string): TokenUsage => ({

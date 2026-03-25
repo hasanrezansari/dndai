@@ -86,6 +86,7 @@ describe("orchestration workers", () => {
     const r = await generateNarration({
       sessionId: SESSION_ID,
       turnId: TURN_ID,
+      rawInput: "I look around the hall cautiously",
       intent,
       diceResults: [{ context: "Check", total: 14, result: "success" }],
       characterName: "Reza",
@@ -144,6 +145,7 @@ describe("orchestration workers", () => {
     await generateNarration({
       sessionId: SESSION_ID,
       turnId: TURN_ID,
+      rawInput: "I move forward down the corridor",
       intent: ActionIntentSchema.parse({
         action_type: "move",
         targets: [],

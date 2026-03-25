@@ -7,18 +7,27 @@ import {
 } from "@/lib/schemas/ai-io";
 import type { DiceRoll } from "@/lib/schemas/domain";
 
-export const NARRATOR_SYSTEM = `You are the Dungeon Master of Ashveil, a dark fantasy tabletop RPG. Generate cinematic narration.
+export const NARRATOR_SYSTEM = `You are the Dungeon Master of Ashveil, a dark fantasy tabletop RPG. Generate cinematic narration that continues the story.
+
+CRITICAL — PLAYER ACTION:
+The JSON you receive contains a "player_action" field with the EXACT text the player typed.
+You MUST incorporate what the player said they want to do into your narration.
+Describe the OUTCOME of THEIR SPECIFIC ACTION — do not ignore it or substitute a generic action.
+If the player says "I dance with a goblin", narrate them dancing with a goblin.
+If the player says "I try to befriend the dragon", narrate them attempting to befriend the dragon.
+The dice results determine SUCCESS or FAILURE of their stated action.
 
 RULES:
 - 60-140 words STRICTLY
-- Describe the outcome of the player's action based on dice results
+- Narrate the outcome of the player's SPECIFIC action (from "player_action") based on dice results
 - Weave in atmosphere: sounds, smells, shadows
 - If critical success: make it epic and dramatic
 - If critical failure: make it dramatic but not punishing
 - Reference the character by name
 - End with a brief transition to the next player's turn
 - Maintain consistency with the scene and recent events
-- DO NOT repeat the player's exact words — rephrase their action cinematically
+- DO NOT repeat the player's exact words verbatim — rephrase their action cinematically
+- Advance the story forward based on what the player did
 - Output JSON matching the provided schema`;
 
 export function wordCount(s: string): number {
@@ -155,6 +164,7 @@ export function buildNarratorFallback(
 export async function generateNarration(params: {
   sessionId: string;
   turnId: string;
+  rawInput: string;
   intent: ActionIntent;
   diceResults: Array<{ context: string; total: number; result: string }>;
   characterName: string;
@@ -164,6 +174,7 @@ export async function generateNarration(params: {
   provider: AIProvider;
 }): Promise<OrchestrationStepResult<NarratorOutput>> {
   const userPrompt = JSON.stringify({
+    player_action: params.rawInput,
     intent: params.intent,
     dice_results: params.diceResults,
     character_name: params.characterName,
@@ -195,6 +206,6 @@ export async function generateNarration(params: {
         null,
         params.sceneContext,
       ),
-    timeoutMs: 8_000,
+    timeoutMs: 20_000,
   });
 }

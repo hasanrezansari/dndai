@@ -1,11 +1,11 @@
 import type { AIProvider, ModelTier, TokenUsage, ZodSchema } from "@/lib/ai/types";
 
 const MODEL_MAP = {
-  heavy: "openrouter/free",
-  light: "openrouter/free",
+  heavy: "google/gemini-2.0-flash-exp:free",
+  light: "google/gemini-2.0-flash-exp:free",
 } as const;
 
-const DEFAULT_TIMEOUT_MS = 20_000;
+const DEFAULT_TIMEOUT_MS = 30_000;
 const BASE_URL = "https://openrouter.ai/api/v1/chat/completions";
 
 function extractJsonObject(raw: string): string {

@@ -2,7 +2,7 @@ import type { AIProvider, ModelTier, TokenUsage, ZodSchema } from "@/lib/ai/type
 
 const MODEL_MAP = {
   heavy: "gemini-2.0-flash",
-  light: "gemini-2.0-flash-lite",
+  light: "gemini-2.0-flash",
 } as const;
 
 const DEFAULT_TIMEOUT_MS = 60_000;
