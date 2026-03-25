@@ -271,6 +271,7 @@ export function useSessionChannel(sessionId: string | null) {
         if (data.sceneImage && !useGameStore.getState().scenePending) return;
         if (data.sceneImage) {
           useGameStore.getState().setSceneImage(data.sceneImage);
+          useGameStore.getState().attachImageToLatestNarration(data.sceneImage);
         }
         if (!data.scenePending) {
           useGameStore.getState().setScenePending(false);
@@ -301,6 +302,7 @@ export function useSessionChannel(sessionId: string | null) {
       const parsed = SceneImageReadyEventSchema.safeParse(raw);
       if (!parsed.success) return;
       useGameStore.getState().setSceneImage(parsed.data.image_url);
+      useGameStore.getState().attachImageToLatestNarration(parsed.data.image_url);
       useGameStore.getState().setScenePending(false);
       stopScenePoll();
     };

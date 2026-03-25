@@ -12,6 +12,7 @@ export interface FeedEntry {
   detail?: string;
   timestamp: string;
   highlight?: boolean;
+  imageUrl?: string;
 }
 
 export interface GameSessionView {
@@ -88,6 +89,7 @@ interface GameState {
     updates: Partial<GamePlayerView>,
   ) => void;
   addFeedEntry: (entry: FeedEntry) => void;
+  attachImageToLatestNarration: (imageUrl: string) => void;
   setSceneImage: (url: string) => void;
   setSceneTitle: (title: string) => void;
   setScenePending: (pending: boolean) => void;
@@ -162,6 +164,18 @@ export const useGameStore = create<GameState>((set) => ({
     set((s) => ({
       feed: [...s.feed, entry],
     })),
+
+  attachImageToLatestNarration: (imageUrl) =>
+    set((s) => {
+      const feed = [...s.feed];
+      for (let i = feed.length - 1; i >= 0; i--) {
+        if (feed[i]!.type === "narration" && !feed[i]!.imageUrl) {
+          feed[i] = { ...feed[i]!, imageUrl };
+          return { feed };
+        }
+      }
+      return s;
+    }),
 
   setSceneImage: (url) =>
     set((s) => ({

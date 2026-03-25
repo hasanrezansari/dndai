@@ -206,6 +206,18 @@ export function FeedEntryRow({ entry }: FeedEntryRowProps) {
         transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
         className={`${borderBase} border-l-[var(--atmosphere-mystery)] bg-[var(--color-deep-void)]/25 py-3.5 pl-3.5 pr-2.5`}
       >
+        {entry.imageUrl && (
+          <div className="mb-3 overflow-hidden rounded-lg">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={entry.imageUrl}
+              alt=""
+              loading="eager"
+              className="h-auto w-full object-cover"
+              style={{ aspectRatio: "16/9" }}
+            />
+          </div>
+        )}
         <div className="flex gap-2">
           <div className="min-w-0 flex-1">
             <p className="text-fantasy text-[15px] italic leading-relaxed text-[var(--color-silver-muted)]">
