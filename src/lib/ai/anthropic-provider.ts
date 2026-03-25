@@ -7,7 +7,7 @@ const MODEL_MAP = {
   light: "claude-haiku-4-20250414",
 } as const;
 
-const DEFAULT_TIMEOUT_MS = 30_000;
+const DEFAULT_TIMEOUT_MS = 60_000;
 
 function extractJsonObject(raw: string): string {
   const t = raw.trim();
