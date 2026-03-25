@@ -5,10 +5,10 @@ import { after } from "next/server";
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 
+export const maxDuration = 60;
+
 import { apiError, handleApiError } from "@/lib/api/errors";
 import { COPY } from "@/lib/copy/ashveil";
-
-export const maxDuration = 60;
 import {
   isPlayerForUser,
   requireUser,
@@ -16,10 +16,8 @@ import {
 } from "@/lib/auth/guards";
 import { db } from "@/lib/db";
 import { sessions } from "@/lib/db/schema";
-import {
-  runTurnPipeline,
-  scheduleSessionImageGeneration,
-} from "@/lib/orchestrator/pipeline";
+import { runTurnPipeline } from "@/lib/orchestrator/pipeline";
+import { runImagePipeline } from "@/lib/orchestrator/image-worker";
 import { broadcastToSession } from "@/lib/socket/server";
 import {
   advanceTurn,
@@ -155,7 +153,34 @@ export async function POST(
       }
       const imgPayload = pipelineResult.imageJobPayload;
       after(async () => {
-        await scheduleSessionImageGeneration(sessionId, sceneImageId, imgPayload);
+        try {
+          console.log("[image-after] starting image generation for action turn");
+          const result = await runImagePipeline({
+            sessionId,
+            turnId: imgPayload.turnId,
+            narrativeText: imgPayload.narrativeText,
+            sceneContext: imgPayload.sceneContext,
+            characterNames: imgPayload.characterNames,
+          });
+          console.log("[image-after] pipeline done, imageUrl:", !!result.imageUrl);
+          if (result.imageUrl) {
+            await broadcastToSession(sessionId, "scene-image-ready", {
+              scene_id: sceneImageId,
+              image_url: result.imageUrl,
+            });
+          } else {
+            await broadcastToSession(sessionId, "scene-image-failed", {
+              scene_id: sceneImageId,
+            });
+          }
+        } catch (err) {
+          console.error("[image-after] action image failed:", err);
+          try {
+            await broadcastToSession(sessionId, "scene-image-failed", {
+              scene_id: sceneImageId,
+            });
+          } catch { /* best effort */ }
+        }
       });
     }
 

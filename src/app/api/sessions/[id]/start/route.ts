@@ -5,10 +5,10 @@ import { after } from "next/server";
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 
+export const maxDuration = 60;
+
 import { apiError, handleApiError } from "@/lib/api/errors";
 import { requireUser, unauthorizedResponse } from "@/lib/auth/guards";
-
-export const maxDuration = 60;
 import { getAIProvider } from "@/lib/ai";
 import { COPY } from "@/lib/copy/ashveil";
 import { db } from "@/lib/db";
@@ -18,7 +18,7 @@ import {
   players,
   sessions,
 } from "@/lib/db/schema";
-import { scheduleSessionImageGeneration } from "@/lib/orchestrator/pipeline";
+import { runImagePipeline } from "@/lib/orchestrator/image-worker";
 import { broadcastToSession } from "@/lib/socket/server";
 import {
   canStartSession,
@@ -217,12 +217,34 @@ export async function POST(
         : allPlayers.map((p) => p.user_id.slice(0, 8));
     const imgSceneCtx = [campaignTitle, adventurePrompt].filter(Boolean).join(" ");
     after(async () => {
-      await scheduleSessionImageGeneration(sessionId, sceneImageId, {
-        turnId: firstTurnId,
-        narrativeText: openingScene,
-        sceneContext: imgSceneCtx,
-        characterNames: imgCharNames,
-      });
+      try {
+        console.log("[image-after] starting image generation for opening scene");
+        const result = await runImagePipeline({
+          sessionId,
+          turnId: firstTurnId,
+          narrativeText: openingScene,
+          sceneContext: imgSceneCtx,
+          characterNames: imgCharNames,
+        });
+        console.log("[image-after] pipeline done, imageUrl:", !!result.imageUrl);
+        if (result.imageUrl) {
+          await broadcastToSession(sessionId, "scene-image-ready", {
+            scene_id: sceneImageId,
+            image_url: result.imageUrl,
+          });
+        } else {
+          await broadcastToSession(sessionId, "scene-image-failed", {
+            scene_id: sceneImageId,
+          });
+        }
+      } catch (err) {
+        console.error("[image-after] start image failed:", err);
+        try {
+          await broadcastToSession(sessionId, "scene-image-failed", {
+            scene_id: sceneImageId,
+          });
+        } catch { /* best effort */ }
+      }
     });
 
     try {
