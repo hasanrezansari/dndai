@@ -51,12 +51,12 @@ function parseDiceLine(text: string): {
 
 function diceBorderClass(detail?: string) {
   if (!detail || !ROLL_RESULTS.has(detail)) {
-    return "border-l-[var(--color-silver-muted)]";
+    return "border-l-[var(--color-silver-dim)]";
   }
   if (detail === "failure" || detail === "critical_failure") {
     return "border-l-[var(--color-failure)]";
   }
-  return "border-l-[var(--atmosphere-exploration)]";
+  return "border-l-[var(--color-gold-rare)]";
 }
 
 function diceResultColor(detail?: string) {
@@ -64,13 +64,28 @@ function diceResultColor(detail?: string) {
     return "text-[var(--color-silver-dim)]";
   }
   if (detail === "failure" || detail === "critical_failure") {
-    return "text-[var(--gradient-hp-end)]";
+    return "text-[var(--color-failure)]";
   }
-  return "text-[var(--atmosphere-exploration)]";
+  return "text-[var(--color-gold-rare)]";
+}
+
+function entryIcon(type: string): string {
+  switch (type) {
+    case "action":
+      return "swords";
+    case "narration":
+      return "auto_stories";
+    case "dice":
+      return "casino";
+    case "system":
+      return "info";
+    default:
+      return "notes";
+  }
 }
 
 const timeClass =
-  "text-data shrink-0 self-start text-right text-[10px] leading-none text-[var(--color-silver-dim)] tabular-nums";
+  "shrink-0 self-start text-right text-[9px] leading-none text-[var(--outline)] tabular-nums font-mono";
 
 export interface FeedEntryRowProps {
   entry: FeedEntry;
@@ -86,9 +101,10 @@ export function FeedEntryRow({ entry }: FeedEntryRowProps) {
         initial={{ opacity: 0, y: 8 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
-        className="relative flex min-h-[2rem] items-start justify-center px-2 py-1.5"
+        className="relative flex min-h-[2rem] items-center justify-center px-3 py-2"
       >
-        <p className="max-w-[min(100%,20rem)] text-center text-data text-[11px] leading-snug text-[var(--color-silver-dim)] opacity-60">
+        <p className="text-center text-[11px] text-[var(--outline)] flex items-center gap-2">
+          <span className="material-symbols-outlined text-xs">info</span>
           {entry.text}
         </p>
         <time className={`${timeClass} absolute right-1 top-1`} dateTime={entry.timestamp}>
@@ -99,7 +115,7 @@ export function FeedEntryRow({ entry }: FeedEntryRowProps) {
   }
 
   const borderBase =
-    "rounded-[var(--radius-chip)] border-l-[3px] pl-3 pr-2 py-2";
+    "rounded-[var(--radius-card)] border-l-[3px] pl-4 pr-3 py-3";
 
   if (entry.type === "action") {
     return (
@@ -108,24 +124,29 @@ export function FeedEntryRow({ entry }: FeedEntryRowProps) {
         initial={{ opacity: 0, y: 8 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
-        className={`${borderBase} border-l-[var(--color-gold-support)] bg-[rgba(184,134,11,0.06)] ${
+        className={`${borderBase} border-l-[var(--color-gold-support)] bg-[var(--surface-container)]/40 ${
           entry.highlight
-            ? "shadow-[inset_0_0_0_1px_rgba(212,175,55,0.12)]"
+            ? "bg-[var(--color-gold-rare)]/5"
             : ""
         }`}
       >
         <div className="flex gap-2">
           <div className="min-w-0 flex-1">
             {entry.playerName && (
-              <p className="mb-0.5 text-[14px] font-bold leading-snug text-[var(--color-silver-muted)]">
-                {entry.playerName}
-              </p>
+              <div className="flex items-center gap-2 mb-1">
+                <span className="material-symbols-outlined text-[var(--color-gold-support)] text-sm">
+                  {entryIcon(entry.type)}
+                </span>
+                <p className="text-[13px] font-bold text-[var(--color-silver-muted)]">
+                  {entry.playerName}
+                </p>
+              </div>
             )}
-            <p className="text-[14px] leading-snug text-[var(--color-silver-muted)]">
+            <p className="text-[14px] leading-relaxed text-[var(--color-silver-muted)]">
               {entry.text}
             </p>
             {entry.detail && (
-              <p className="text-data mt-1 text-xs text-[var(--color-silver-dim)]">
+              <p className="mt-1.5 text-[11px] text-[var(--outline)]">
                 {entry.detail}
               </p>
             )}
@@ -146,36 +167,50 @@ export function FeedEntryRow({ entry }: FeedEntryRowProps) {
     let body: ReactNode;
     if (isFinal && parsed) {
       body = (
-        <p className="text-data text-[14px] leading-snug text-[var(--color-silver-muted)]">
-          <span aria-hidden>🎲 </span>
-          {parsed.label}: {parsed.roll} + {parsed.mod} = {parsed.total}
-          <span className="text-[var(--color-silver-dim)]"> — </span>
-          <span className={`font-medium ${diceResultColor(entry.detail)}`}>
-            {humanizeResult(entry.detail!)}
+        <div className="flex items-center gap-2 flex-wrap">
+          <span className="material-symbols-outlined text-[var(--outline)] text-sm">
+            casino
           </span>
-        </p>
+          <p className="text-[14px] leading-snug text-[var(--color-silver-muted)] font-mono">
+            {parsed.label}: {parsed.roll} + {parsed.mod} ={" "}
+            <span className="font-black">{parsed.total}</span>
+            <span className="text-[var(--outline)]"> — </span>
+            <span className={`font-bold ${diceResultColor(entry.detail)}`}>
+              {humanizeResult(entry.detail!)}
+            </span>
+          </p>
+        </div>
       );
     } else if (parsed) {
       body = (
-        <p className="text-data text-[14px] leading-snug text-[var(--color-silver-muted)]">
-          <span aria-hidden>🎲 </span>
-          {parsed.label}: {parsed.roll} + {parsed.mod} = {parsed.total}
-        </p>
+        <div className="flex items-center gap-2">
+          <span className="material-symbols-outlined text-[var(--outline)] text-sm">
+            casino
+          </span>
+          <p className="text-[14px] leading-snug text-[var(--color-silver-muted)] font-mono">
+            {parsed.label}: {parsed.roll} + {parsed.mod} ={" "}
+            <span className="font-black">{parsed.total}</span>
+          </p>
+        </div>
       );
     } else {
       body = (
-        <p className="text-data text-[14px] leading-snug text-[var(--color-silver-muted)]">
-          <span aria-hidden>🎲 </span>
-          {entry.text}
-          {entry.detail && !ROLL_RESULTS.has(entry.detail) && (
-            <>
-              <span className="text-[var(--color-silver-dim)]"> · </span>
-              <span className="text-[var(--color-silver-dim)]">
-                {entry.detail}
-              </span>
-            </>
-          )}
-        </p>
+        <div className="flex items-center gap-2">
+          <span className="material-symbols-outlined text-[var(--outline)] text-sm">
+            casino
+          </span>
+          <p className="text-[14px] leading-snug text-[var(--color-silver-muted)]">
+            {entry.text}
+            {entry.detail && !ROLL_RESULTS.has(entry.detail) && (
+              <>
+                <span className="text-[var(--outline)]"> · </span>
+                <span className="text-[var(--outline)]">
+                  {entry.detail}
+                </span>
+              </>
+            )}
+          </p>
+        </div>
       );
     }
 
@@ -204,10 +239,10 @@ export function FeedEntryRow({ entry }: FeedEntryRowProps) {
         initial={{ opacity: 0, y: 8 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
-        className={`${borderBase} border-l-[var(--atmosphere-mystery)] bg-[var(--color-deep-void)]/25 py-3.5 pl-3.5 pr-2.5`}
+        className={`${borderBase} border-l-[var(--atmosphere-mystery)] bg-[var(--surface-container)]/20 py-4 pl-4 pr-3`}
       >
         {entry.imageUrl && (
-          <div className="mb-3 overflow-hidden rounded-lg">
+          <div className="mb-3 overflow-hidden rounded-[var(--radius-card)]">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src={entry.imageUrl}
@@ -224,7 +259,7 @@ export function FeedEntryRow({ entry }: FeedEntryRowProps) {
               {entry.text}
             </p>
             {entry.detail && (
-              <p className="text-data mt-2 text-xs text-[var(--color-silver-dim)]">
+              <p className="mt-2 text-[11px] text-[var(--outline)]">
                 {entry.detail}
               </p>
             )}
@@ -243,15 +278,15 @@ export function FeedEntryRow({ entry }: FeedEntryRowProps) {
       initial={{ opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
-      className={`${borderBase} border-l-[var(--color-silver-muted)] bg-transparent py-1.5 opacity-80`}
+      className={`${borderBase} border-l-[var(--outline-variant)] bg-transparent py-2 opacity-70`}
     >
       <div className="flex gap-2">
         <div className="min-w-0 flex-1">
-          <p className="text-data text-[12px] leading-snug text-[var(--color-silver-dim)]">
+          <p className="text-[12px] leading-snug text-[var(--outline)]">
             {entry.text}
           </p>
           {entry.detail && (
-            <p className="text-data mt-0.5 text-[11px] text-[var(--color-silver-dim)] opacity-80">
+            <p className="mt-0.5 text-[11px] text-[var(--outline)] opacity-60">
               {entry.detail}
             </p>
           )}

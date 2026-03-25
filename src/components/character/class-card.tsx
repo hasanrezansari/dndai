@@ -1,5 +1,3 @@
-import { GlassCard } from "@/components/ui/glass-card";
-
 interface ClassCardProps {
   icon: string;
   label: string;
@@ -20,29 +18,39 @@ export function ClassCard({
       type="button"
       onClick={onClick}
       className={`
-        shrink-0 min-w-[88px] min-h-[44px] rounded-[var(--radius-card)] text-left
-        transition-all duration-[var(--duration-med)] [transition-timing-function:var(--ease-out-soft)]
-        active:scale-[0.98]
-        focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-gold-rare)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--color-obsidian)]
-        ${selected ? "ring-2 ring-[var(--color-gold-rare)] shadow-[0_0_20px_rgba(212,175,55,0.35)]" : "ring-0 ring-transparent"}
+        shrink-0 min-w-[96px] min-h-[44px] text-center
+        transition-all duration-200
+        active:scale-[0.95]
+        focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-gold-rare)]
       `.trim()}
     >
-      <GlassCard
+      <div
         className={`
-          flex flex-col items-center justify-center gap-1 px-2 py-3 h-[112px] w-[96px]
-          ${selected ? "glow-gold" : ""}
+          flex flex-col items-center justify-center gap-2 px-3 py-4 h-[120px] w-[104px]
+          rounded-[var(--radius-card)] border transition-all duration-300
+          ${
+            selected
+              ? "bg-[var(--surface-high)] selected-glow border-[var(--color-gold-rare)]/40"
+              : "bg-[var(--color-midnight)] border-[rgba(77,70,53,0.15)] hover:bg-[var(--surface-container)] hover:border-[rgba(77,70,53,0.3)]"
+          }
         `.trim()}
       >
         <span className="text-3xl leading-none select-none" aria-hidden>
           {icon}
         </span>
-        <span className="text-xs font-medium text-center text-[var(--color-silver-muted)] leading-tight px-0.5">
+        <span
+          className={`text-xs font-bold text-center leading-tight ${
+            selected
+              ? "text-[var(--color-gold-rare)]"
+              : "text-[var(--color-silver-muted)]"
+          }`}
+        >
           {label}
         </span>
-        <span className="text-[10px] uppercase tracking-wider text-[var(--color-silver-dim)] text-center">
+        <span className="text-[9px] uppercase tracking-[0.15em] text-[var(--outline)] text-center font-bold">
           {role}
         </span>
-      </GlassCard>
+      </div>
     </button>
   );
 }

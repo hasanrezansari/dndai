@@ -21,7 +21,9 @@ export function PillSelect<T extends string>({
   ...rest
 }: PillSelectProps<T>) {
   const height =
-    size === "md" ? "min-h-[44px] px-4 py-2.5 text-base" : "min-h-9 px-3 py-1.5 text-sm";
+    size === "md"
+      ? "min-h-[44px] px-5 py-2.5 text-xs"
+      : "min-h-9 px-3 py-1.5 text-[11px]";
 
   return (
     <div
@@ -37,14 +39,15 @@ export function PillSelect<T extends string>({
             type="button"
             onClick={() => onChange(opt.value)}
             className={`
-              rounded-full font-medium transition-all duration-[var(--duration-med)]
+              rounded-[var(--radius-pill)] font-bold uppercase tracking-wider
+              transition-all duration-[var(--duration-med)]
               [transition-timing-function:var(--ease-out-soft)]
-              active:scale-[0.98]
+              active:scale-[0.95]
               ${height}
               ${
                 selected
-                  ? "bg-[var(--color-gold-rare)] text-[var(--color-obsidian)] shadow-[0_0_16px_rgba(212,175,55,0.25)]"
-                  : "bg-transparent text-[var(--color-silver-muted)] border border-[rgba(255,255,255,0.12)] hover:border-[var(--color-gold-support)] hover:text-[var(--color-gold-support)]"
+                  ? "bg-[var(--color-gold-rare)] text-[var(--color-obsidian)] shadow-lg shadow-[rgba(242,202,80,0.1)]"
+                  : "bg-[var(--surface-high)] text-[var(--color-silver-dim)] border border-[rgba(77,70,53,0.1)] hover:text-[var(--color-silver-muted)]"
               }
             `.trim()}
           >

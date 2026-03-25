@@ -15,8 +15,8 @@ function avatarLetter(p: GamePlayerView) {
 
 export function PlayerStrip({ players, currentTurnPlayerId }: PlayerStripProps) {
   return (
-    <div className="h-[5.75rem] shrink-0">
-      <div className="scrollbar-hide flex h-full gap-3 overflow-x-auto pb-1 pt-1">
+    <div className="h-[6rem] shrink-0">
+      <div className="scrollbar-hide flex h-full gap-4 overflow-x-auto pb-1 pt-1">
         {players.map((p) => {
           const active = p.id === currentTurnPlayerId;
           const hpPct =
@@ -35,29 +35,34 @@ export function PlayerStrip({ players, currentTurnPlayerId }: PlayerStripProps) 
           return (
             <div
               key={p.id}
-              className={`flex w-[3.35rem] shrink-0 flex-col items-center gap-1 ${dim ? "opacity-40" : ""}`}
+              className={`flex w-14 shrink-0 flex-col items-center gap-1.5 transition-opacity ${dim ? "opacity-30" : ""}`}
               title={displayName}
             >
               <div
-                className={`relative flex h-11 w-11 items-center justify-center rounded-full text-data text-sm font-semibold text-[var(--color-silver-muted)] ${
+                className={`relative flex h-12 w-12 items-center justify-center rounded-[var(--radius-avatar)] text-sm font-black transition-all ${
                   active
-                    ? "animate-pulse-glow ring-2 ring-[var(--color-gold-rare)] ring-offset-2 ring-offset-[var(--color-obsidian)]"
-                    : "ring-1 ring-white/10"
+                    ? "selected-glow bg-[var(--surface-high)] text-[var(--color-gold-rare)] border-2 border-[var(--color-gold-rare)]"
+                    : "bg-[var(--color-midnight)] text-[var(--color-silver-dim)] border border-[rgba(77,70,53,0.2)]"
                 }`}
-                style={{ background: "var(--color-midnight)" }}
               >
                 {p.isConnected ? avatarLetter(p) : "…"}
               </div>
               <div
-                className="h-[3px] w-full max-w-[2.75rem] overflow-hidden rounded-full bg-[var(--color-deep-void)]"
+                className="h-1 w-full max-w-[2.75rem] overflow-hidden rounded-sm bg-[var(--color-deep-void)]"
                 aria-hidden
               >
                 <div
-                  className="gradient-hp h-full min-w-0 rounded-full transition-[width] duration-300"
+                  className="gradient-hp h-full min-w-0 rounded-sm transition-[width] duration-300"
                   style={{ width: `${hpPct}%` }}
                 />
               </div>
-              <p className="line-clamp-1 max-w-[3.35rem] text-center text-[9px] leading-tight text-[var(--color-silver-dim)]">
+              <p
+                className={`line-clamp-1 max-w-[3.5rem] text-center text-[9px] font-bold leading-tight uppercase tracking-wider ${
+                  active
+                    ? "text-[var(--color-gold-rare)]"
+                    : "text-[var(--outline)]"
+                }`}
+              >
                 {displayName}
               </p>
             </div>

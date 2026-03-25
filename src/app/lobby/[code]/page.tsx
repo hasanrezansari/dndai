@@ -4,7 +4,6 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 
 import { PlayerSlot, type PlayerSlotPlayer } from "@/components/lobby/player-slot";
-import { GlassCard } from "@/components/ui/glass-card";
 import { GoldButton } from "@/components/ui/gold-button";
 import { GhostButton } from "@/components/ui/ghost-button";
 import { SkeletonCard } from "@/components/ui/loading-skeleton";
@@ -236,28 +235,16 @@ export default function LobbyPage() {
 
   if (loading) {
     return (
-      <main className="min-h-dvh flex flex-col px-5 pt-8 pb-10 relative overflow-hidden bg-[var(--color-obsidian)]">
-        <div
-          className="absolute inset-0 bg-gradient-to-b from-[var(--color-deep-void)] via-[var(--color-obsidian)] to-[var(--color-obsidian)]"
-          aria-hidden
-        />
-        <div
-          className="absolute inset-0 pointer-events-none opacity-90"
-          style={{
-            background:
-              "radial-gradient(ellipse 85% 50% at 50% 38%, rgba(212, 175, 55, 0.07) 0%, transparent 50%), radial-gradient(circle at 50% 42%, rgba(123, 45, 142, 0.1) 0%, transparent 45%)",
-          }}
-          aria-hidden
-        />
-        <div className="relative z-10 flex flex-col flex-1 w-full max-w-md mx-auto gap-[var(--void-gap-lg)]">
+      <main className="min-h-dvh flex flex-col px-6 pt-10 pb-10 bg-[var(--color-obsidian)]">
+        <div className="flex flex-col flex-1 w-full max-w-md mx-auto gap-[var(--void-gap-lg)]">
           <SkeletonCard className="min-h-[140px]" />
-          <div className="flex flex-col gap-[var(--void-gap)] flex-1">
+          <div className="flex flex-col gap-3 flex-1">
             <SkeletonCard className="min-h-[72px]" />
             {Array.from({ length: 5 }, (_, i) => (
               <SkeletonCard key={i} className="min-h-[72px]" />
             ))}
           </div>
-          <p className="text-center text-sm text-[var(--color-silver-dim)]">
+          <p className="text-center text-[10px] text-[var(--color-silver-dim)] uppercase tracking-[0.2em]">
             Entering the gathering circle…
           </p>
         </div>
@@ -268,91 +255,113 @@ export default function LobbyPage() {
   if (loadError || !session) {
     return (
       <main className="min-h-dvh flex flex-col items-center justify-center gap-[var(--void-gap)] px-6 bg-[var(--color-obsidian)]">
-        <p className="text-[var(--color-failure)] text-center text-base">
-          {loadError ?? "Session unavailable"}
-        </p>
-        <GhostButton
-          type="button"
-          size="lg"
-          className="min-h-[44px] flex items-center justify-center"
-          onClick={() => router.push("/")}
-        >
-          Return home
-        </GhostButton>
+        <div className="text-center space-y-4">
+          <span className="material-symbols-outlined text-5xl text-[var(--color-failure)]">
+            warning
+          </span>
+          <p className="text-[var(--color-silver-muted)] text-base">
+            {loadError ?? "Session unavailable"}
+          </p>
+          <GhostButton
+            type="button"
+            size="md"
+            className="min-h-[44px] flex items-center justify-center"
+            onClick={() => router.push("/")}
+          >
+            Return home
+          </GhostButton>
+        </div>
       </main>
     );
   }
 
-  return (
-    <main className="min-h-dvh flex flex-col px-5 pt-8 pb-10 relative overflow-hidden bg-[var(--color-obsidian)]">
-      <div
-        className="absolute inset-0 bg-gradient-to-b from-[var(--color-deep-void)] via-[var(--color-obsidian)] to-[var(--color-obsidian)]"
-        aria-hidden
-      />
-      <div
-        className="absolute inset-0 pointer-events-none opacity-90"
-        style={{
-          background:
-            "radial-gradient(ellipse 85% 50% at 50% 38%, rgba(212, 175, 55, 0.07) 0%, transparent 50%), radial-gradient(circle at 50% 42%, rgba(123, 45, 142, 0.1) 0%, transparent 45%)",
-        }}
-        aria-hidden
-      />
+  const readyCount = session.players.filter(
+    (p) => p.is_ready && p.is_connected,
+  ).length;
+  const totalSeats = session.max_players;
 
-      <div className="relative z-10 flex flex-col flex-1 w-full max-w-md mx-auto gap-[var(--void-gap-lg)]">
-        <header className="flex flex-col gap-[var(--void-gap)]">
-          <GlassCard className="p-5 glow-gold border-[rgba(212,175,55,0.15)]">
-            <p className="text-xs uppercase tracking-widest text-[var(--color-silver-dim)] mb-2">
-              Join code
+  return (
+    <main className="min-h-dvh flex flex-col px-6 pb-10 bg-[var(--color-obsidian)]">
+      <div className="flex flex-col flex-1 w-full max-w-md mx-auto pt-8">
+        {/* Header */}
+        <header className="mb-8 relative">
+          <div className="bg-gradient-to-b from-[var(--surface-container)] to-[var(--color-obsidian)] rounded-[var(--radius-card)] px-6 py-8 text-center border border-[rgba(77,70,53,0.15)]">
+            <p className="text-[10px] font-bold uppercase tracking-[0.25em] text-[var(--outline)]">
+              Invitation Glyph
             </p>
-            <p className="text-fantasy text-2xl sm:text-3xl text-gold-rare tracking-[0.2em] text-center">
-              {session.join_code}
-            </p>
-            <p className="text-fantasy text-base text-[var(--color-silver-muted)] text-center mt-4 tracking-wide">
+            <div className="mt-3 flex items-center justify-center gap-3">
+              <p className="text-fantasy text-4xl text-[var(--color-gold-rare)] tracking-[0.3em] font-black">
+                {session.join_code}
+              </p>
+              <button
+                type="button"
+                onClick={handleShare}
+                className="bg-[var(--surface-high)] p-2 rounded-[var(--radius-card)] border border-[rgba(77,70,53,0.2)] hover:border-[var(--color-gold-rare)]/30 transition-colors group"
+                aria-label="Copy join code"
+              >
+                <span className="material-symbols-outlined text-[var(--outline)] group-hover:text-[var(--color-gold-rare)] text-lg transition-colors">
+                  content_copy
+                </span>
+              </button>
+            </div>
+            {shareHint && (
+              <p className="text-[10px] text-[var(--color-gold-rare)] mt-2 animate-fade-in uppercase tracking-[0.15em]">
+                {shareHint}
+              </p>
+            )}
+            <h2 className="text-fantasy text-lg text-[var(--color-silver-muted)] mt-5 tracking-tight">
               {title}
+            </h2>
+            <p className="text-[10px] text-[var(--outline)] uppercase tracking-wider mt-1 flex items-center justify-center gap-2">
+              <span className="material-symbols-outlined text-xs">group</span>
+              {readyCount} / {totalSeats} ready
             </p>
-          </GlassCard>
+          </div>
         </header>
 
-        <section className="flex flex-col gap-[var(--void-gap)] flex-1">
+        {/* Party List */}
+        <section className="flex-1 space-y-0 overflow-hidden rounded-[var(--radius-card)] border border-[rgba(77,70,53,0.15)] divide-y divide-[rgba(77,70,53,0.1)]">
           {session.mode === "ai_dm" ? <PlayerSlot isAiDm /> : null}
 
-          <div className="flex flex-col gap-[var(--void-gap)]">
-            {slots.map(({ seat, player }) =>
-              player ? (
-                <PlayerSlot key={player.id} player={mapToSlotPlayer(player)} />
-              ) : (
-                <PlayerSlot key={`empty-${seat}`} isEmpty />
-              ),
-            )}
-          </div>
+          {slots.map(({ seat, player }) =>
+            player ? (
+              <PlayerSlot key={player.id} player={mapToSlotPlayer(player)} />
+            ) : (
+              <PlayerSlot key={`empty-${seat}`} isEmpty />
+            ),
+          )}
         </section>
 
-        <footer className="flex flex-col gap-3 mt-auto pt-4">
-          {shareHint ? (
-            <p className="text-center text-sm text-[var(--color-silver-muted)]">
-              {shareHint}
-            </p>
-          ) : null}
-
-          {iAmReady ? (
+        {/* Actions */}
+        <footer className="mt-8 flex flex-col gap-3">
+          {!iAmReady ? (
             <GoldButton
               type="button"
               size="lg"
-              className="w-full min-h-[44px] flex items-center justify-center"
+              className="w-full min-h-[56px] flex items-center justify-center gap-3"
               disabled={readyLoading}
               onClick={handleReady}
             >
-              {readyLoading ? "…" : "Ready"}
+              <span className="material-symbols-outlined text-lg">
+                how_to_reg
+              </span>
+              {readyLoading ? "…" : "Ready Up"}
             </GoldButton>
           ) : (
             <GhostButton
               type="button"
               size="lg"
-              className="w-full min-h-[44px] flex items-center justify-center border-[rgba(212,175,55,0.25)]"
+              className="w-full min-h-[56px] flex items-center justify-center gap-3 border-[var(--color-gold-rare)]/30 text-[var(--color-gold-rare)]"
               disabled={readyLoading}
               onClick={handleReady}
             >
-              {readyLoading ? "…" : "Ready"}
+              <span
+                className="material-symbols-outlined text-lg"
+                style={{ fontVariationSettings: "'FILL' 1" }}
+              >
+                check_circle
+              </span>
+              {readyLoading ? "…" : "Ready — Tap to Unready"}
             </GhostButton>
           )}
 
@@ -360,31 +369,23 @@ export default function LobbyPage() {
             <GoldButton
               type="button"
               size="lg"
-              className="w-full min-h-[44px] flex items-center justify-center"
+              className="w-full min-h-[56px] flex items-center justify-center gap-3"
               disabled={!canStart || startLoading}
               onClick={() => void handleStart()}
             >
-              {startLoading ? "…" : "Start Adventure"}
+              <span>{startLoading ? "Opening portal…" : "Begin Adventure"}</span>
+              <span className="material-symbols-outlined text-lg">swords</span>
             </GoldButton>
           ) : null}
 
-          <GhostButton
+          <button
             type="button"
-            size="lg"
-            className="w-full min-h-[44px] flex items-center justify-center"
-            onClick={handleShare}
-          >
-            Share Invite
-          </GhostButton>
-
-          <GhostButton
-            type="button"
-            size="lg"
-            className="w-full min-h-[44px] flex items-center justify-center"
+            className="w-full py-3 text-[var(--color-silver-dim)] hover:text-[var(--color-failure)] text-xs uppercase tracking-[0.15em] transition-colors flex items-center justify-center gap-2"
             onClick={handleLeave}
           >
-            Leave
-          </GhostButton>
+            <span className="material-symbols-outlined text-sm">logout</span>
+            Leave Lobby
+          </button>
         </footer>
       </div>
     </main>

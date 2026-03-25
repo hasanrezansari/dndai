@@ -70,7 +70,7 @@ function SessionPlaySkeleton() {
           className="absolute inset-0 animate-shimmer opacity-25 pointer-events-none"
           aria-hidden
         />
-        <div className="absolute bottom-4 left-4 right-4 h-9 rounded-md bg-[var(--color-midnight)]/70 overflow-hidden relative max-w-[65%]">
+        <div className="absolute bottom-5 left-5 right-4 h-9 rounded-sm bg-[var(--surface-high)] overflow-hidden relative max-w-[65%]">
           <span
             className="absolute inset-0 animate-shimmer opacity-35 pointer-events-none"
             aria-hidden
@@ -81,14 +81,14 @@ function SessionPlaySkeleton() {
         <SkeletonCard className="min-h-[104px]" />
       </div>
       <div className="flex min-h-0 flex-1 flex-col gap-[var(--void-gap)] px-4 pb-2 pt-[var(--void-gap)]">
-        <div className="min-h-0 flex-1 flex flex-col gap-3 rounded-[var(--radius-card)] border border-[rgba(255,255,255,0.06)] bg-[var(--glass-bg)]/40 p-3 backdrop-blur-sm">
+        <div className="min-h-0 flex-1 flex flex-col gap-3 rounded-[var(--radius-card)] border border-[rgba(77,70,53,0.15)] bg-[var(--surface-container)]/30 p-3">
           <SkeletonText lines={6} />
         </div>
-        <div className="flex gap-3 items-center overflow-x-auto pb-1">
+        <div className="flex gap-4 items-center overflow-x-auto pb-1">
           {Array.from({ length: 5 }, (_, i) => (
             <div key={i} className="flex flex-col items-center gap-2 shrink-0">
-              <SkeletonCircle size={44} />
-              <div className="h-2 w-11 rounded bg-[var(--color-midnight)]/80 overflow-hidden relative">
+              <SkeletonCircle size={48} />
+              <div className="h-1.5 w-12 rounded-sm bg-[var(--surface-high)] overflow-hidden relative">
                 <span
                   className="absolute inset-0 animate-shimmer opacity-30 pointer-events-none"
                   aria-hidden
@@ -482,8 +482,9 @@ export default function SessionGameplayPage() {
         <button
           type="button"
           onClick={handleLeaveSession}
-          className="absolute left-3 top-3 z-30 min-h-[36px] min-w-[36px] rounded-full border border-white/10 bg-black/50 px-3 py-1 text-xs font-medium text-[var(--color-silver-dim)] backdrop-blur-md transition-colors hover:bg-black/70 hover:text-[var(--color-silver-muted)]"
+          className="absolute left-3 top-3 z-30 min-h-[36px] min-w-[36px] rounded-[var(--radius-card)] border border-[rgba(77,70,53,0.2)] bg-[var(--color-obsidian)]/80 backdrop-blur-md px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.1em] text-[var(--outline)] transition-all hover:text-[var(--color-failure)] hover:border-[var(--color-failure)]/30 flex items-center gap-1.5"
         >
+          <span className="material-symbols-outlined text-sm">arrow_back</span>
           Leave
         </button>
         <SceneHeader
@@ -502,59 +503,64 @@ export default function SessionGameplayPage() {
 
       <div className="flex min-h-0 flex-1 flex-col gap-[var(--void-gap)] px-4 pb-2 pt-[var(--void-gap)]">
         {session?.mode === "human_dm" && isDm ? (
-          <div className="flex shrink-0 items-center justify-center gap-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--color-gold-support)]">
-            <span className="h-px w-8 bg-[var(--color-gold-rare)]/45" />
-            DM view
-            <span className="h-px w-8 bg-[var(--color-gold-rare)]/45" />
+          <div className="flex shrink-0 items-center justify-center gap-3 text-[9px] font-black uppercase tracking-[0.2em] text-[var(--color-gold-rare)]">
+            <span className="h-px w-8 bg-[var(--color-gold-rare)]/30" />
+            <span className="material-symbols-outlined text-xs">shield_person</span>
+            DM View
+            <span className="h-px w-8 bg-[var(--color-gold-rare)]/30" />
           </div>
         ) : null}
         {quest ? (
-          <div className="shrink-0 rounded-[var(--radius-card)] border border-white/[0.08] bg-[var(--glass-bg)]/35 px-3 py-2 backdrop-blur-sm">
-            <div className="mb-1.5 flex items-center justify-between gap-3">
-              <p className="line-clamp-1 text-fantasy text-xs tracking-wide text-[var(--color-silver-muted)]">
-                Objective: {quest.objective}
-              </p>
-              <span className="text-data shrink-0 text-[10px] uppercase tracking-wider text-[var(--color-silver-dim)]">
+          <div className="shrink-0 rounded-[var(--radius-card)] border border-[rgba(77,70,53,0.2)] bg-[var(--surface-container)]/50 px-4 py-3">
+            <div className="mb-2 flex items-center justify-between gap-3">
+              <div className="flex items-center gap-2 min-w-0">
+                <span className="material-symbols-outlined text-[var(--color-gold-rare)] text-sm">flag</span>
+                <p className="line-clamp-1 text-fantasy text-xs font-bold tracking-tight text-[var(--color-silver-muted)]">
+                  {quest.objective}
+                </p>
+              </div>
+              <span className="shrink-0 text-[9px] font-black uppercase tracking-[0.15em] text-[var(--outline)] bg-[var(--surface-high)] px-2 py-0.5 rounded-sm">
                 {quest.status === "ready_to_end"
-                  ? "Ready to conclude"
+                  ? "Concluding"
                   : quest.status === "failed"
                     ? "Failed"
                     : "Active"}
               </span>
             </div>
             {quest.subObjectives?.length ? (
-              <details className="mb-1.5">
-                <summary className="cursor-pointer text-[10px] text-[var(--color-silver-dim)] hover:text-[var(--color-silver-muted)] select-none">
+              <details className="mb-2">
+                <summary className="cursor-pointer text-[10px] font-bold text-[var(--outline)] hover:text-[var(--color-silver-muted)] select-none uppercase tracking-wider">
                   Sub-objectives ({quest.subObjectives.length})
                 </summary>
-                <ul className="mt-1 ml-2 space-y-0.5 text-[10px] text-[var(--color-silver-dim)]">
+                <ul className="mt-1.5 ml-2 space-y-1 text-[10px] text-[var(--outline)]">
                   {quest.subObjectives.map((sub, i) => (
-                    <li key={i} className="flex gap-1.5">
-                      <span className="shrink-0 text-[var(--color-gold-support)]">·</span>
+                    <li key={i} className="flex gap-2 items-start">
+                      <span className="material-symbols-outlined text-[var(--color-gold-rare)] text-[10px] mt-px shrink-0">check_circle</span>
                       <span className="line-clamp-1">{sub}</span>
                     </li>
                   ))}
                 </ul>
               </details>
             ) : null}
-            <div className="mb-1 h-2 w-full overflow-hidden rounded-full bg-black/40">
+            <div className="mb-1.5 h-1.5 w-full overflow-hidden rounded-sm bg-[var(--color-deep-void)]">
               <div
-                className="h-full rounded-full bg-[var(--color-gold-rare)] transition-[width] duration-300"
+                className="h-full rounded-sm bg-gradient-to-r from-[var(--color-gold-support)] to-[var(--color-gold-rare)] transition-[width] duration-300"
                 style={{ width: `${Math.max(0, Math.min(100, quest.progress))}%` }}
               />
             </div>
-            <div className="flex items-center justify-between text-data text-[10px] text-[var(--color-silver-dim)]">
-              <span>Progress {quest.progress}%</span>
+            <div className="flex items-center justify-between text-[9px] font-bold uppercase tracking-wider">
+              <span className="text-[var(--outline)]">Progress {quest.progress}%</span>
               <span style={{ color: dangerLabel(quest.risk).color }}>
                 {dangerLabel(quest.risk).label} ({quest.risk}%)
               </span>
             </div>
             {quest.endingVote?.open && currentPlayerId ? (
-              <div className="mt-2 rounded-[var(--radius-chip)] border border-[var(--color-gold-rare)]/25 bg-black/20 p-2">
-                <p className="mb-2 text-data text-[10px] uppercase tracking-wider text-[var(--color-gold-support)]">
-                  End vote: {quest.endingVote.reason === "party_defeated" ? "Party Defeated" : "Objective Complete"}
+              <div className="mt-3 rounded-[var(--radius-card)] border border-[var(--color-gold-rare)]/20 bg-[var(--surface-high)] p-3">
+                <p className="mb-2 text-[9px] font-black uppercase tracking-[0.15em] text-[var(--color-gold-rare)] flex items-center gap-2">
+                  <span className="material-symbols-outlined text-xs">how_to_vote</span>
+                  {quest.endingVote.reason === "party_defeated" ? "Party Defeated" : "Objective Complete"}
                 </p>
-                <div className="mb-1 text-data text-[10px] text-[var(--color-silver-dim)]">
+                <div className="mb-2 text-[10px] font-bold text-[var(--outline)]">
                   {Object.values(quest.endingVote.votes).filter((v) => v === "end_now").length}/{quest.endingVote.requiredYes} votes needed
                 </div>
                 <div className="flex gap-2">
@@ -562,7 +568,7 @@ export default function SessionGameplayPage() {
                     type="button"
                     disabled={voteBusy}
                     onClick={() => void handleEndingVote("end_now")}
-                    className="min-h-[36px] flex-1 rounded-[var(--radius-chip)] border border-[var(--color-gold-rare)]/35 bg-[var(--color-gold-rare)]/15 px-2 text-data text-[11px] font-medium text-[var(--color-silver-muted)] disabled:opacity-50"
+                    className="min-h-[40px] flex-1 rounded-[var(--radius-card)] bg-[var(--color-gold-rare)] text-[var(--color-obsidian)] text-[10px] font-black uppercase tracking-wider disabled:opacity-30"
                   >
                     End Now
                   </button>
@@ -570,7 +576,7 @@ export default function SessionGameplayPage() {
                     type="button"
                     disabled={voteBusy}
                     onClick={() => void handleEndingVote("continue")}
-                    className="min-h-[36px] flex-1 rounded-[var(--radius-chip)] border border-white/15 bg-black/20 px-2 text-data text-[11px] font-medium text-[var(--color-silver-muted)] disabled:opacity-50"
+                    className="min-h-[40px] flex-1 rounded-[var(--radius-card)] border border-[rgba(77,70,53,0.2)] bg-[var(--surface-high)] text-[10px] font-black uppercase tracking-wider text-[var(--color-silver-muted)] disabled:opacity-30"
                   >
                     Continue
                   </button>
@@ -578,12 +584,12 @@ export default function SessionGameplayPage() {
               </div>
             ) : null}
             {session?.status === "ended" ? (
-              <div className="mt-2">
+              <div className="mt-3">
                 <button
                   type="button"
                   disabled={chapterBusy || session.finalChapterPublished}
                   onClick={() => void handleGenerateFinalChapter()}
-                  className="min-h-[36px] w-full rounded-[var(--radius-chip)] border border-[var(--color-gold-rare)]/35 bg-[var(--color-gold-rare)]/10 px-2 text-data text-[11px] font-medium text-[var(--color-silver-muted)] disabled:opacity-50"
+                  className="min-h-[40px] w-full rounded-[var(--radius-card)] bg-gradient-to-b from-[var(--color-gold-rare)] to-[var(--color-gold-support)] text-[var(--color-obsidian)] text-[10px] font-black uppercase tracking-wider disabled:opacity-30 disabled:grayscale"
                 >
                   {session.finalChapterPublished
                     ? "Final Chapter Published"
@@ -600,7 +606,7 @@ export default function SessionGameplayPage() {
           players={players}
           currentTurnPlayerId={currentTurnPlayerId}
         />
-        <div className="sticky bottom-0 z-20 mt-auto shrink-0 bg-[var(--color-obsidian)]/75 pt-2 backdrop-blur-md supports-[backdrop-filter]:bg-[var(--color-obsidian)]/60">
+        <div className="sticky bottom-0 z-20 mt-auto shrink-0 pt-1">
           <TurnBanner visible={isMyTurn && !(session?.mode === "human_dm" && isDm)} />
           {session?.mode === "human_dm" && isDm && currentPlayerId ? (
             <DmActionBar

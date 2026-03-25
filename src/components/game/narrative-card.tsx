@@ -5,7 +5,6 @@ import { AnimatePresence, motion } from "framer-motion";
 
 import { NarrativeTypewriter } from "@/components/game/narrative-typewriter";
 import { COPY } from "@/lib/copy/ashveil";
-import { GlassCard } from "@/components/ui/glass-card";
 
 export interface NarrativeCardProps {
   text: string | null;
@@ -45,20 +44,26 @@ export function NarrativeCard({ text, isThinking }: NarrativeCardProps) {
   const thinkingLine = COPY.thinking[thinkingIdx % COPY.thinking.length]!;
 
   return (
-    <GlassCard
-      variant="heavy"
-      glow={isThinking}
-      className={`relative z-10 -mt-[20px] px-4 py-4 shadow-[0_12px_40px_rgba(0,0,0,0.35)] transition-[box-shadow,border-color] duration-500 ${
-        isThinking ? "animate-pulse-glow" : ""
+    <div
+      className={`relative z-10 -mt-[20px] bg-[var(--color-obsidian)]/90 backdrop-blur-lg rounded-[var(--radius-card)] border border-[rgba(77,70,53,0.2)] px-5 py-4 shadow-[0_8px_32px_rgba(0,0,0,0.4)] transition-all duration-500 ${
+        isThinking ? "border-[var(--color-gold-rare)]/30 shadow-[0_0_20px_rgba(242,202,80,0.1)]" : ""
       } ${
         accentNew
-          ? "border-l-[3px] border-l-[var(--color-gold-rare)] shadow-[inset_3px_0_0_rgba(212,175,55,0.4),0_12px_40px_rgba(0,0,0,0.35)]"
+          ? "border-l-[3px] border-l-[var(--color-gold-rare)]"
           : ""
       }`}
     >
-      <p className="text-fantasy mb-2 text-[10px] font-semibold uppercase tracking-wider text-[var(--color-gold-support)]">
-        NARRATIVE
-      </p>
+      <div className="flex items-center gap-2 mb-2">
+        <span
+          className="material-symbols-outlined text-[var(--color-gold-rare)] text-sm"
+          style={{ fontVariationSettings: "'FILL' 1" }}
+        >
+          auto_stories
+        </span>
+        <p className="text-[9px] font-black uppercase tracking-[0.2em] text-[var(--color-gold-rare)]">
+          Narrative
+        </p>
+      </div>
       {isThinking ? (
         <div className="min-h-[4.5rem]">
           <AnimatePresence mode="wait">
@@ -68,7 +73,7 @@ export function NarrativeCard({ text, isThinking }: NarrativeCardProps) {
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               transition={{ duration: 0.32, ease: [0.22, 1, 0.36, 1] }}
-              className="text-fantasy text-[15px] leading-relaxed text-[var(--color-silver-muted)]"
+              className="text-fantasy text-[15px] italic leading-relaxed text-[var(--color-silver-muted)]"
             >
               {thinkingLine}
             </motion.p>
@@ -84,6 +89,6 @@ export function NarrativeCard({ text, isThinking }: NarrativeCardProps) {
           />
         </div>
       )}
-    </GlassCard>
+    </div>
   );
 }

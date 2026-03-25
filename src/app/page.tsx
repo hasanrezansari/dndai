@@ -5,7 +5,6 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 
 import { COPY } from "@/lib/copy/ashveil";
-import { GlassCard } from "@/components/ui/glass-card";
 import { GoldButton } from "@/components/ui/gold-button";
 import { GhostButton } from "@/components/ui/ghost-button";
 import { ModeCardsSkeleton } from "@/components/ui/loading-skeleton";
@@ -121,41 +120,19 @@ export default function Home() {
 
   if (authStatus === "loading") {
     return (
-      <main className="min-h-dvh flex flex-col items-center px-5 pt-10 pb-8 relative overflow-hidden">
-        <div
-          className="absolute inset-0 bg-[var(--color-obsidian)]"
-          aria-hidden
-        />
-        <div
-          className="absolute inset-0 bg-gradient-to-b from-[var(--color-deep-void)] via-transparent to-[var(--color-obsidian)] opacity-90"
-          aria-hidden
-        />
-        <div
-          className="absolute inset-0 pointer-events-none"
-          style={{
-            background:
-              "radial-gradient(ellipse 80% 50% at 50% 20%, rgba(123, 45, 142, 0.12) 0%, transparent 55%), radial-gradient(ellipse 60% 40% at 50% 85%, rgba(212, 175, 55, 0.06) 0%, transparent 50%)",
-          }}
-          aria-hidden
-        />
-        <div className="relative z-10 flex flex-col items-center gap-[var(--void-gap-lg)] w-full max-w-md">
-          <header className="text-center flex flex-col gap-3">
-            <h1
-              className="text-fantasy text-4xl sm:text-5xl font-bold text-gold-rare tracking-[0.12em] uppercase animate-breathe"
-              style={{
-                textShadow:
-                  "0 0 40px rgba(212, 175, 55, 0.25), 0 0 80px rgba(123, 45, 142, 0.15)",
-              }}
-            >
+      <main className="min-h-dvh flex flex-col items-center px-6 pt-16 pb-8 bg-[var(--color-obsidian)]">
+        <div className="flex flex-col items-center gap-[var(--void-gap-lg)] w-full max-w-md">
+          <header className="text-center flex flex-col gap-3 mt-6">
+            <h1 className="text-fantasy text-4xl font-bold text-[var(--color-gold-rare)] tracking-[0.15em] uppercase">
               ASHVEIL
             </h1>
-            <p className="text-[var(--color-silver-muted)] text-base tracking-wide">
-              {COPY.tagline}
+            <p className="text-[var(--color-silver-dim)] text-sm italic tracking-wide font-serif">
+              &ldquo;{COPY.tagline}&rdquo;
             </p>
           </header>
           <ModeCardsSkeleton />
-          <p className="text-sm text-[var(--color-silver-dim)] text-center">
-            Entering the world…
+          <p className="text-[10px] text-[var(--color-silver-dim)] text-center uppercase tracking-[0.2em]">
+            Consulting the Archivist...
           </p>
         </div>
       </main>
@@ -163,113 +140,112 @@ export default function Home() {
   }
 
   return (
-    <main className="min-h-dvh flex flex-col items-center px-5 pt-10 pb-8 relative overflow-hidden">
-      <div
-        className="absolute inset-0 bg-[var(--color-obsidian)]"
-        aria-hidden
-      />
-      <div
-        className="absolute inset-0 bg-gradient-to-b from-[var(--color-deep-void)] via-transparent to-[var(--color-obsidian)] opacity-90"
-        aria-hidden
-      />
-      <div
-        className="absolute inset-0 pointer-events-none"
-        style={{
-          background:
-            "radial-gradient(ellipse 80% 50% at 50% 20%, rgba(123, 45, 142, 0.12) 0%, transparent 55%), radial-gradient(ellipse 60% 40% at 50% 85%, rgba(212, 175, 55, 0.06) 0%, transparent 50%)",
-        }}
-        aria-hidden
-      />
-
-      <div className="relative z-10 flex flex-col items-center gap-[var(--void-gap-lg)] w-full max-w-md">
-        <header className="text-center flex flex-col gap-3">
-          <h1
-            className="text-fantasy text-4xl sm:text-5xl font-bold text-gold-rare tracking-[0.12em] uppercase animate-breathe"
-            style={{
-              textShadow:
-                "0 0 40px rgba(212, 175, 55, 0.25), 0 0 80px rgba(123, 45, 142, 0.15)",
-            }}
-          >
+    <main className="min-h-dvh flex flex-col items-center px-6 pb-8 bg-[var(--color-obsidian)]">
+      <div className="flex flex-col gap-[var(--void-gap-lg)] w-full max-w-md pt-10">
+        {/* Brand */}
+        <header className="text-center flex flex-col gap-2">
+          <h1 className="text-fantasy text-4xl font-black text-[var(--color-gold-rare)] tracking-tight uppercase">
             ASHVEIL
           </h1>
-          <p className="text-[var(--color-silver-muted)] text-base tracking-wide">
-            {COPY.tagline}
+          <p className="text-[var(--color-silver-dim)] text-sm italic tracking-wide font-serif">
+            &ldquo;{COPY.tagline}&rdquo;
           </p>
           {authSession?.user?.name ? (
-            <p className="text-xs text-[var(--color-silver-dim)]">
+            <p className="text-[10px] text-[var(--outline)] uppercase tracking-[0.15em] mt-1">
               Signed in as {authSession.user.name}
             </p>
           ) : null}
         </header>
 
-        <div className="flex flex-col gap-[var(--void-gap)] w-full">
+        {/* Mode Selection */}
+        <section className="space-y-4">
+          <div className="flex items-center gap-3 mb-2">
+            <span className="w-1.5 h-6 bg-[var(--color-gold-rare)]" />
+            <h2 className="text-fantasy font-bold text-base uppercase tracking-[0.12em] text-[var(--color-silver-dim)]">
+              Select Master Presence
+            </h2>
+          </div>
+
+          {/* AI DM Card */}
           <button
             type="button"
             onClick={() => setMode("ai_dm")}
-            className="text-left w-full min-h-[44px] rounded-[var(--radius-card)] transition-all duration-[var(--duration-med)] [transition-timing-function:var(--ease-out-soft)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-gold-support)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--color-obsidian)]"
+            className="text-left w-full min-h-[44px] transition-all duration-200 active:scale-[0.98] focus:outline-none"
           >
-            <GlassCard
-              className={`p-5 w-full transition-all duration-[var(--duration-med)] hover:shadow-[0_0_32px_rgba(123,45,142,0.18)] ${
+            <div
+              className={`h-44 rounded-[var(--radius-card)] p-6 flex flex-col justify-end overflow-hidden transition-all duration-300 ${
                 mode === "ai_dm"
-                  ? "glow-gold border-[rgba(212,175,55,0.28)]"
-                  : "opacity-55 border-[rgba(255,255,255,0.04)]"
+                  ? "bg-[var(--surface-high)] selected-glow metallic-edge"
+                  : "bg-[var(--color-midnight)] border border-[rgba(77,70,53,0.2)] opacity-70 hover:opacity-100 hover:bg-[var(--surface-container)]"
               }`}
             >
-              <h2
-                className={`text-fantasy text-lg tracking-wide mb-2 ${
-                  mode === "ai_dm"
-                    ? "text-gold-rare"
-                    : "text-[var(--color-silver-muted)]"
-                }`}
-              >
+              {mode === "ai_dm" && (
+                <div className="flex items-center gap-2 mb-1">
+                  <span
+                    className="material-symbols-outlined text-[var(--color-gold-rare)] text-sm"
+                    style={{ fontVariationSettings: "'FILL' 1" }}
+                  >
+                    auto_awesome
+                  </span>
+                  <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-[var(--color-gold-rare)]">
+                    Active Selection
+                  </span>
+                </div>
+              )}
+              <h3 className="text-fantasy font-bold text-xl text-[var(--color-silver-muted)]">
                 AI Dungeon Master
-              </h2>
-              <p className="text-sm text-[var(--color-silver-muted)] leading-relaxed">
-                An intelligent narrator guides your journey
+              </h3>
+              <p className="text-xs text-[var(--color-silver-dim)] leading-relaxed mt-1">
+                Boundless worlds generated in real-time by the obsidian core.
               </p>
-            </GlassCard>
+            </div>
           </button>
 
+          {/* Human DM Card */}
           <button
             type="button"
             onClick={() => setMode("human_dm")}
-            className="text-left w-full min-h-[44px] rounded-[var(--radius-card)] transition-all duration-[var(--duration-med)] [transition-timing-function:var(--ease-out-soft)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[rgba(255,255,255,0.2)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--color-obsidian)]"
+            className="text-left w-full min-h-[44px] transition-all duration-200 active:scale-[0.98] focus:outline-none"
           >
-            <GlassCard
-              className={`p-5 w-full transition-all duration-[var(--duration-med)] hover:shadow-[0_0_24px_rgba(255,255,255,0.06)] ${
+            <div
+              className={`h-44 rounded-[var(--radius-card)] p-6 flex flex-col justify-end overflow-hidden transition-all duration-300 ${
                 mode === "human_dm"
-                  ? "glow-gold border-[rgba(212,175,55,0.28)]"
-                  : "opacity-55 border-[rgba(255,255,255,0.04)]"
+                  ? "bg-[var(--surface-high)] selected-glow metallic-edge"
+                  : "bg-[var(--color-midnight)] border border-[rgba(77,70,53,0.2)] opacity-70 hover:opacity-100 hover:bg-[var(--surface-container)]"
               }`}
             >
-              <h2
-                className={`text-fantasy text-lg tracking-wide mb-2 ${
-                  mode === "human_dm"
-                    ? "text-gold-rare"
-                    : "text-[var(--color-silver-muted)]"
-                }`}
-              >
+              {mode === "human_dm" && (
+                <div className="flex items-center gap-2 mb-1">
+                  <span
+                    className="material-symbols-outlined text-[var(--color-gold-rare)] text-sm"
+                    style={{ fontVariationSettings: "'FILL' 1" }}
+                  >
+                    auto_awesome
+                  </span>
+                  <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-[var(--color-gold-rare)]">
+                    Active Selection
+                  </span>
+                </div>
+              )}
+              <h3 className="text-fantasy font-bold text-xl text-[var(--color-silver-muted)]">
                 Human Dungeon Master
-              </h2>
-              <p className="text-sm text-[var(--color-silver-dim)] leading-relaxed">
-                One player commands the world
+              </h3>
+              <p className="text-xs text-[var(--color-silver-dim)] leading-relaxed mt-1">
+                Host a session for your party with manual control and custom
+                lore.
               </p>
-            </GlassCard>
+            </div>
           </button>
-        </div>
+        </section>
 
+        {/* Configuration */}
         {mode ? (
-          <section className="w-full flex flex-col gap-[var(--void-gap)]">
-            <GlassCard className="px-4 py-3 border-[rgba(255,255,255,0.06)]">
-              <p className="text-xs text-[var(--color-silver-dim)] leading-relaxed">
-                Choose a mode, set a campaign style, then create a session.
-                Friends can join anytime with the six-character join code.
-              </p>
-            </GlassCard>
+          <section className="space-y-8 animate-fade-in">
+            {/* Campaign Pills */}
             <div>
-              <p className="text-xs uppercase tracking-wider text-[var(--color-silver-dim)] mb-2">
-                Campaign
-              </p>
+              <label className="block text-[10px] font-bold uppercase tracking-[0.2em] text-[var(--outline)] mb-4">
+                Origin Method
+              </label>
               <PillSelect
                 options={CAMPAIGN_OPTIONS}
                 value={campaignMode}
@@ -278,92 +254,120 @@ export default function Home() {
               />
             </div>
 
+            {/* Adventure Prompt */}
             {campaignMode === "user_prompt" ? (
               <div>
                 <label
                   htmlFor="adventure-prompt"
-                  className="text-xs uppercase tracking-wider text-[var(--color-silver-dim)] mb-2 block"
+                  className="block text-[10px] font-bold uppercase tracking-[0.2em] text-[var(--outline)] mb-4"
                 >
-                  Adventure prompt
+                  The Narrative Seed
                 </label>
                 <textarea
                   id="adventure-prompt"
                   value={adventurePrompt}
                   onChange={(e) => setAdventurePrompt(e.target.value)}
-                  placeholder="Describe the tone, setting, or hook…"
-                  rows={3}
-                  className="w-full rounded-[var(--radius-card)] bg-[var(--color-deep-void)] border border-[rgba(255,255,255,0.08)] px-4 py-3 text-[var(--color-silver-muted)] placeholder:text-[var(--color-silver-dim)] text-base min-h-[44px] resize-none focus:outline-none focus:border-[rgba(212,175,55,0.25)] focus:shadow-[0_0_20px_rgba(212,175,55,0.08)]"
+                  placeholder="Describe your adventure..."
+                  rows={4}
+                  maxLength={500}
+                  className="w-full h-36 bg-[var(--color-deep-void)] p-5 rounded-[var(--radius-card)] border border-[rgba(77,70,53,0.2)] focus:border-[var(--color-gold-rare)]/50 focus:ring-0 text-[var(--color-silver-muted)] font-serif italic text-base leading-relaxed placeholder:text-[var(--outline)]/40 resize-none transition-all"
                 />
               </div>
             ) : null}
 
+            {/* Party Size */}
             <div>
-              <p className="text-xs uppercase tracking-wider text-[var(--color-silver-dim)] mb-2">
-                Party size
-              </p>
-              <PillSelect
-                options={PARTY_SIZES.map((n) => ({
-                  value: String(n),
-                  label: String(n),
-                }))}
-                value={String(maxPlayers)}
-                onChange={(v) =>
-                  setMaxPlayers(Number(v) as (typeof PARTY_SIZES)[number])
-                }
-                size="md"
-              />
+              <label className="block text-[10px] font-bold uppercase tracking-[0.2em] text-[var(--outline)] mb-4">
+                Fellowship Count
+              </label>
+              <div className="flex items-center bg-[var(--color-midnight)] p-1.5 rounded-[var(--radius-card)] border border-[rgba(77,70,53,0.1)]">
+                {PARTY_SIZES.map((n) => (
+                  <button
+                    key={n}
+                    type="button"
+                    onClick={() => setMaxPlayers(n)}
+                    className={`flex-1 min-h-[44px] py-3 font-black text-sm transition-all duration-200 rounded-[var(--radius-card)] ${
+                      maxPlayers === n
+                        ? "bg-[var(--color-gold-rare)] text-[var(--color-obsidian)] shadow-lg shadow-[rgba(242,202,80,0.2)] scale-105 z-10"
+                        : "text-[var(--outline)] hover:text-[var(--color-silver-muted)]"
+                    }`}
+                  >
+                    {n}
+                  </button>
+                ))}
+              </div>
             </div>
           </section>
         ) : null}
 
+        {/* Error */}
         {createError ? (
-          <p className="text-sm text-[var(--color-failure)] w-full text-center">
-            {createError}
-          </p>
+          <div className="bg-[var(--color-failure)]/10 border-l-4 border-[var(--color-failure)] p-3 rounded-r-[var(--radius-card)]">
+            <p className="text-sm text-[var(--color-failure)]">
+              {createError}
+            </p>
+          </div>
         ) : null}
 
-        <div className="flex flex-col gap-3 w-full mt-auto pt-2">
+        {/* Actions */}
+        <div className="flex flex-col gap-4 w-full mt-auto pt-4">
           <GoldButton
             type="button"
             size="lg"
-            className="w-full min-h-[44px] flex items-center justify-center relative overflow-hidden"
+            className="w-full min-h-[56px] flex items-center justify-center gap-3 relative overflow-hidden text-lg"
             disabled={!mode || createLoading}
             onClick={handleCreate}
           >
             {createLoading ? (
-              <span className="relative z-10">Opening portal…</span>
+              <>
+                <span>Opening portal…</span>
+                <span
+                  className="absolute inset-0 animate-shimmer opacity-40 pointer-events-none"
+                  aria-hidden
+                />
+              </>
             ) : (
-              <span className="relative z-10">Create Session</span>
+              <>
+                <span>Create Session</span>
+                <span className="material-symbols-outlined text-lg">
+                  swords
+                </span>
+              </>
             )}
-            {createLoading ? (
-              <span
-                className="absolute inset-0 animate-shimmer opacity-40 pointer-events-none"
-                aria-hidden
-              />
-            ) : null}
           </GoldButton>
 
           {joinOpen ? (
             <form
               onSubmit={handleJoinSubmit}
-              className="flex flex-col gap-3 w-full"
+              className="flex flex-col gap-4 w-full bg-[var(--surface-high)] rounded-[var(--radius-card)] p-6 border border-[rgba(77,70,53,0.3)] animate-slide-up"
             >
-              <input
-                key={joinShakeKey}
-                type="text"
-                value={joinCode}
-                onChange={(e) => {
-                  setJoinCode(e.target.value.toUpperCase());
-                  setJoinError(null);
-                }}
-                placeholder="Join code"
-                autoComplete="off"
-                autoCapitalize="characters"
-                className={`w-full min-h-[44px] rounded-[var(--radius-button)] bg-[var(--color-deep-void)] border border-[rgba(255,255,255,0.1)] px-4 text-[var(--color-silver-muted)] placeholder:text-[var(--color-silver-dim)] text-center text-data tracking-widest uppercase focus:outline-none focus:border-[rgba(212,175,55,0.3)] ${joinShakeKey > 0 ? "animate-shake-once" : ""}`}
-              />
-              <p className="text-[10px] text-[var(--color-silver-dim)] text-center">
-                Example: 7G4K2M
-              </p>
+              <div className="text-center mb-2">
+                <h3 className="text-fantasy text-xl text-[var(--color-silver-muted)] tracking-tight">
+                  Summoning Ritual
+                </h3>
+                <p className="text-[var(--color-silver-dim)] text-xs mt-1">
+                  Enter the ancient cipher to join your party.
+                </p>
+              </div>
+              <div>
+                <label className="block text-[10px] font-bold uppercase tracking-[0.2em] text-[var(--color-gold-rare)]/70 mb-2 ml-1">
+                  Join Code
+                </label>
+                <input
+                  key={joinShakeKey}
+                  type="text"
+                  value={joinCode}
+                  onChange={(e) => {
+                    setJoinCode(e.target.value.toUpperCase());
+                    setJoinError(null);
+                  }}
+                  placeholder="A7-G42"
+                  autoComplete="off"
+                  autoCapitalize="characters"
+                  maxLength={8}
+                  className={`w-full h-16 bg-[var(--color-deep-void)] border-none text-center text-2xl font-serif tracking-[0.3em] text-[var(--color-gold-rare)] placeholder:text-[var(--outline)]/40 rounded-[var(--radius-card)] focus:ring-1 focus:ring-[var(--color-failure)]/50 shadow-[inset_0_2px_8px_rgba(0,0,0,0.8)] transition-all uppercase ${joinShakeKey > 0 ? "animate-shake-once" : ""}`}
+                />
+              </div>
               {joinError ? (
                 <p className="text-sm text-[var(--color-failure)] text-center">
                   {joinError}
@@ -372,25 +376,47 @@ export default function Home() {
               <GoldButton
                 type="submit"
                 size="lg"
-                className="w-full min-h-[44px] flex items-center justify-center"
+                className="w-full min-h-[48px] flex items-center justify-center gap-3"
                 disabled={joinLoading}
               >
-                {joinLoading ? "Joining…" : "Enter"}
+                <span>{joinLoading ? "Joining…" : "Enter Portal"}</span>
+                {!joinLoading && (
+                  <span className="material-symbols-outlined text-lg">
+                    login
+                  </span>
+                )}
               </GoldButton>
+              <button
+                type="button"
+                onClick={() => {
+                  setJoinOpen(false);
+                  setJoinError(null);
+                }}
+                className="w-full py-2 text-[var(--color-silver-dim)] hover:text-[var(--color-gold-rare)] text-xs uppercase tracking-[0.15em] transition-colors flex items-center justify-center gap-2"
+              >
+                <span className="material-symbols-outlined text-sm">
+                  arrow_back
+                </span>
+                Back to Create Session
+              </button>
             </form>
           ) : (
-            <GhostButton
+            <button
               type="button"
-              size="lg"
-              className="w-full min-h-[44px] flex items-center justify-center"
+              className="w-full flex items-center justify-center gap-2 py-3 group transition-colors"
               onClick={() => {
                 setJoinOpen(true);
                 setJoinError(null);
                 setJoinShakeKey(0);
               }}
             >
-              Join with Code
-            </GhostButton>
+              <span className="text-[var(--outline)] text-[10px] font-bold uppercase tracking-[0.15em] group-hover:text-[var(--color-gold-rare)] transition-colors">
+                Already have a scroll?
+              </span>
+              <span className="text-[var(--color-gold-rare)] font-black uppercase text-xs tracking-[0.1em] border-b border-[var(--color-gold-rare)]/20 group-hover:border-[var(--color-gold-rare)] transition-all pb-0.5">
+                Join with Code
+              </span>
+            </button>
           )}
         </div>
       </div>

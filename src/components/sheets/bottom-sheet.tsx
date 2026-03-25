@@ -66,7 +66,7 @@ export function BottomSheet({
           <button
             type="button"
             aria-label="Close overlay"
-            className="absolute inset-0 bg-black/55 backdrop-blur-md"
+            className="absolute inset-0 bg-black/60 backdrop-blur-md"
             onClick={onClose}
           />
           <motion.div
@@ -74,7 +74,7 @@ export function BottomSheet({
             role="dialog"
             aria-modal="true"
             aria-labelledby="bottom-sheet-title"
-            className="relative z-[1] flex max-h-[85vh] min-h-[70vh] w-full flex-col rounded-t-[var(--radius-card)] border border-white/[0.08] border-b-0 bg-[var(--color-obsidian)]/96 shadow-[0_-12px_48px_rgba(0,0,0,0.55)] backdrop-blur-xl"
+            className="relative z-[1] flex max-h-[85vh] min-h-[70vh] w-full flex-col rounded-t-[var(--radius-card)] border-t border-x border-[rgba(77,70,53,0.2)] bg-[var(--color-obsidian)] shadow-[0_-12px_48px_rgba(0,0,0,0.55)]"
             initial={{ y: "100%" }}
             animate={{ y: 0 }}
             exit={{ y: "100%" }}
@@ -93,18 +93,18 @@ export function BottomSheet({
               }
             }}
           >
-            <div className="flex shrink-0 flex-col items-center gap-3 border-b border-white/[0.06] px-4 pt-2">
+            <div className="flex shrink-0 flex-col items-center gap-3 border-b border-[rgba(77,70,53,0.15)] px-4 pt-2">
               <div
                 className="flex min-h-[44px] w-full cursor-grab touch-none items-center justify-center py-2 active:cursor-grabbing"
                 onPointerDown={startDrag}
                 aria-hidden
               >
-                <div className="h-1.5 w-12 rounded-full bg-white/25" />
+                <div className="h-1 w-10 rounded-full bg-[var(--outline-variant)]" />
               </div>
-              <div className="relative flex w-full min-h-[44px] items-center justify-center pb-2">
+              <div className="relative flex w-full min-h-[44px] items-center justify-center pb-3">
                 <h2
                   id="bottom-sheet-title"
-                  className="text-fantasy max-w-[min(100%,18rem)] px-10 text-center text-lg tracking-wide text-[var(--color-silver-muted)]"
+                  className="text-fantasy max-w-[min(100%,18rem)] px-10 text-center text-lg font-black tracking-tight text-[var(--color-silver-muted)]"
                 >
                   {title}
                 </h2>
@@ -112,10 +112,10 @@ export function BottomSheet({
                   type="button"
                   aria-label="Close"
                   onClick={onClose}
-                  className="absolute right-0 top-1/2 flex min-h-[44px] min-w-[44px] -translate-y-1/2 items-center justify-center rounded-[var(--radius-button)] text-[var(--color-silver-muted)] transition-colors hover:text-[var(--color-gold-support)]"
+                  className="absolute right-0 top-1/2 flex min-h-[44px] min-w-[44px] -translate-y-1/2 items-center justify-center rounded-[var(--radius-button)] text-[var(--outline)] transition-colors hover:text-[var(--color-gold-rare)]"
                 >
-                  <span className="text-2xl leading-none" aria-hidden>
-                    ×
+                  <span className="material-symbols-outlined text-xl">
+                    close
                   </span>
                 </button>
               </div>

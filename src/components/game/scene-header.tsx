@@ -28,7 +28,7 @@ export function SceneHeader({
   const showBackdrop = !sceneImage && !previousSceneImage;
 
   return (
-    <div className="relative h-full w-full overflow-hidden rounded-b-[var(--radius-card)]">
+    <div className="relative h-full w-full overflow-hidden">
       <div className="absolute inset-0">
         {showBackdrop ? (
           <div
@@ -76,13 +76,11 @@ export function SceneHeader({
         ) : null}
       </div>
 
-      <div className="absolute inset-0 bg-gradient-to-t from-[var(--color-obsidian)] via-[var(--color-obsidian)]/65 to-black/55" />
-      <div className="absolute inset-0 bg-gradient-to-r from-black/60 via-black/20 to-black/50" />
-      <div className="absolute inset-0 bg-gradient-to-b from-black/35 via-transparent to-transparent" />
+      <div className="absolute inset-0 bg-gradient-to-t from-[var(--color-obsidian)] via-[var(--color-obsidian)]/50 to-transparent" />
 
       {scenePending && (
         <div
-          className="pointer-events-none absolute inset-0 z-[3] flex flex-col items-center justify-center overflow-hidden rounded-b-[var(--radius-card)]"
+          className="pointer-events-none absolute inset-0 z-[3] flex flex-col items-center justify-center overflow-hidden"
           aria-busy
         >
           <div className="animate-shimmer absolute inset-0 opacity-[0.97]" />
@@ -92,23 +90,25 @@ export function SceneHeader({
         </div>
       )}
 
-      <div className="absolute right-3 top-3 z-[2] max-w-[min(58%,280px)]">
-        <div className="glass rounded-[999px] px-3 py-2 text-right shadow-[0_8px_32px_rgba(0,0,0,0.5)] backdrop-blur-md">
-          <p className="text-data text-[10px] uppercase tracking-wider text-[var(--color-silver-dim)]">
+      {/* Turn indicator */}
+      <div className="absolute right-4 top-4 z-[2]">
+        <div className="bg-[var(--color-obsidian)]/80 backdrop-blur-md rounded-[var(--radius-card)] px-4 py-2.5 border border-[rgba(77,70,53,0.2)]">
+          <p className="text-[9px] font-black uppercase tracking-[0.2em] text-[var(--outline)]">
             Round {roundNumber}
           </p>
-          <p className="text-fantasy mt-0.5 text-xs font-medium leading-tight text-[var(--color-gold-rare)] drop-shadow-[0_1px_8px_rgba(0,0,0,0.9)]">
+          <p className="text-fantasy mt-0.5 text-xs font-bold text-[var(--color-gold-rare)]">
             {turnLabel}
           </p>
         </div>
       </div>
 
-      <div className="absolute bottom-4 left-4 right-[28%] z-[2]">
+      {/* Scene title */}
+      <div className="absolute bottom-5 left-5 right-[28%] z-[2]">
         <h1
-          className="text-fantasy line-clamp-2 text-xl font-medium leading-tight tracking-wide text-[var(--color-silver-muted)] sm:text-2xl"
+          className="text-fantasy line-clamp-2 text-xl font-black leading-tight tracking-tight text-[var(--color-silver-muted)] sm:text-2xl"
           style={{
             textShadow:
-              "0 2px 20px rgba(0,0,0,0.98), 0 1px 6px rgba(0,0,0,0.95), 0 0 48px rgba(0,0,0,0.55)",
+              "0 2px 20px rgba(0,0,0,0.98), 0 1px 6px rgba(0,0,0,0.95)",
           }}
         >
           {sceneTitle ?? "The world awaits…"}

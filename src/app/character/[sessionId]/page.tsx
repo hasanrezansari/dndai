@@ -6,7 +6,6 @@ import { useParams, useRouter } from "next/navigation";
 
 import { ClassCard } from "@/components/character/class-card";
 import { StatPill } from "@/components/character/stat-pill";
-import { GlassCard } from "@/components/ui/glass-card";
 import { GoldButton } from "@/components/ui/gold-button";
 import { GhostButton } from "@/components/ui/ghost-button";
 import { SkeletonCard } from "@/components/ui/loading-skeleton";
@@ -152,7 +151,10 @@ export default function CharacterCreationPage() {
           stats,
           pronouns: pronouns.trim() || "they/them",
           traits: traits.trim()
-            ? traits.split(",").map((t) => t.trim()).filter(Boolean)
+            ? traits
+                .split(",")
+                .map((t) => t.trim())
+                .filter(Boolean)
             : undefined,
           backstory: backstory.trim() || undefined,
         }),
@@ -180,42 +182,53 @@ export default function CharacterCreationPage() {
 
   if (!sessionId) {
     return (
-      <main className="min-h-dvh flex items-center justify-center px-4">
+      <main className="min-h-dvh flex items-center justify-center px-4 bg-[var(--color-obsidian)]">
         <p className="text-[var(--color-silver-dim)]">Invalid session</p>
       </main>
     );
   }
 
   return (
-    <main className="min-h-dvh bg-[var(--color-obsidian)] text-[var(--color-silver-muted)] px-4 pb-8 pt-6 max-w-lg mx-auto flex flex-col gap-[var(--void-gap-lg)]">
-      <header className="space-y-1">
-        <h1 className="text-fantasy text-xl sm:text-2xl uppercase tracking-[0.12em] text-[var(--color-silver-muted)] text-center">
+    <main className="min-h-dvh bg-[var(--color-obsidian)] text-[var(--color-silver-muted)] px-6 pb-8 pt-8 max-w-lg mx-auto flex flex-col gap-8">
+      {/* Title */}
+      <header className="text-center space-y-2">
+        <h1 className="text-fantasy text-2xl font-black uppercase tracking-tight text-[var(--color-silver-muted)]">
           Forge Your Hero
         </h1>
+        <p className="text-[10px] text-[var(--outline)] uppercase tracking-[0.2em]">
+          Shape the vessel that enters Ashveil
+        </p>
       </header>
 
-      <GlassCard className="flex flex-col items-center justify-center min-h-[180px] gap-2 bg-[var(--color-deep-void)]/80">
+      {/* Class Preview */}
+      <div className="bg-gradient-to-b from-[var(--surface-container)] to-[var(--color-obsidian)] rounded-[var(--radius-card)] p-6 flex flex-col items-center gap-3 border border-[rgba(77,70,53,0.15)]">
         <span className="text-7xl leading-none select-none" aria-hidden>
           {selectedMeta?.icon ?? "—"}
         </span>
-        <p className="text-sm text-[var(--color-silver-dim)]">
-          {selectedMeta?.label ?? ""}
-        </p>
-        {selectedMeta?.role ? (
-          <p className="text-[10px] uppercase tracking-wider text-[var(--color-gold-support)]">
-            {selectedMeta.role}
-          </p>
-        ) : null}
-        {selectedMeta?.fantasy ? (
-          <p className="text-xs text-center text-[var(--color-silver-dim)] max-w-[28ch] px-3">
-            {selectedMeta.fantasy}
-          </p>
-        ) : null}
-      </GlassCard>
+        <div className="text-center space-y-1.5">
+          <h2 className="text-fantasy text-xl text-[var(--color-silver-muted)]">
+            {selectedMeta?.label ?? ""}
+          </h2>
+          {selectedMeta?.role ? (
+            <p className="text-[9px] font-black uppercase tracking-[0.2em] text-[var(--color-gold-rare)]">
+              {selectedMeta.role}
+            </p>
+          ) : null}
+          {selectedMeta?.fantasy ? (
+            <p className="text-xs text-[var(--color-silver-dim)] max-w-[28ch] italic leading-relaxed">
+              {selectedMeta.fantasy}
+            </p>
+          ) : null}
+        </div>
+      </div>
 
-      <section className="flex flex-col gap-2">
-        <label htmlFor="hero-name" className="text-xs uppercase tracking-wider text-[var(--color-silver-dim)]">
-          Name
+      {/* Name */}
+      <section className="flex flex-col gap-3">
+        <label
+          htmlFor="hero-name"
+          className="text-[10px] font-black uppercase tracking-[0.2em] text-[var(--outline)]"
+        >
+          Hero Name
         </label>
         <input
           id="hero-name"
@@ -224,13 +237,17 @@ export default function CharacterCreationPage() {
           onChange={(e) => setName(e.target.value)}
           autoComplete="off"
           maxLength={48}
-          className="w-full min-h-[44px] rounded-[var(--radius-button)] bg-[var(--color-deep-void)] border border-[rgba(255,255,255,0.08)] px-4 text-base text-[var(--color-silver-muted)] placeholder:text-[var(--color-silver-dim)] focus:outline-none focus:border-[var(--color-gold-support)]"
-          placeholder="Adventurer name"
+          className="w-full min-h-[48px] rounded-[var(--radius-button)] bg-[var(--color-deep-void)] border border-[rgba(77,70,53,0.2)] px-4 text-lg font-serif text-[var(--color-silver-muted)] placeholder:text-[var(--outline)]/40 focus:outline-none focus:border-[var(--color-gold-rare)]/40 transition-colors"
+          placeholder="What shall we call you?"
         />
       </section>
 
-      <section className="flex flex-col gap-2">
-        <label htmlFor="hero-pronouns" className="text-xs uppercase tracking-wider text-[var(--color-silver-dim)]">
+      {/* Pronouns */}
+      <section className="flex flex-col gap-3">
+        <label
+          htmlFor="hero-pronouns"
+          className="text-[10px] font-black uppercase tracking-[0.2em] text-[var(--outline)]"
+        >
           Pronouns
         </label>
         <div className="overflow-x-auto scrollbar-hide -mx-1 px-1">
@@ -248,24 +265,38 @@ export default function CharacterCreationPage() {
         </div>
       </section>
 
-      <section className="flex flex-col gap-2">
-        <label htmlFor="hero-backstory" className="text-xs uppercase tracking-wider text-[var(--color-silver-dim)]">
-          Backstory <span className="normal-case tracking-normal text-[var(--color-silver-dim)]/60">(optional)</span>
+      {/* Backstory */}
+      <section className="flex flex-col gap-3">
+        <label
+          htmlFor="hero-backstory"
+          className="text-[10px] font-black uppercase tracking-[0.2em] text-[var(--outline)]"
+        >
+          Backstory
+          <span className="text-[var(--outline)]/40 normal-case tracking-normal ml-2 font-normal">
+            optional
+          </span>
         </label>
         <textarea
           id="hero-backstory"
           value={backstory}
           onChange={(e) => setBackstory(e.target.value)}
           maxLength={500}
-          rows={2}
-          className="w-full rounded-[var(--radius-button)] bg-[var(--color-deep-void)] border border-[rgba(255,255,255,0.08)] px-4 py-3 text-sm text-[var(--color-silver-muted)] placeholder:text-[var(--color-silver-dim)] focus:outline-none focus:border-[var(--color-gold-support)] resize-none"
+          rows={3}
+          className="w-full rounded-[var(--radius-button)] bg-[var(--color-deep-void)] border border-[rgba(77,70,53,0.2)] px-4 py-3 text-sm font-serif italic text-[var(--color-silver-muted)] placeholder:text-[var(--outline)]/40 focus:outline-none focus:border-[var(--color-gold-rare)]/40 resize-none transition-colors leading-relaxed"
           placeholder="A brief origin story — the AI weaves it into narration"
         />
       </section>
 
-      <section className="flex flex-col gap-2">
-        <label htmlFor="hero-traits" className="text-xs uppercase tracking-wider text-[var(--color-silver-dim)]">
-          Traits <span className="normal-case tracking-normal text-[var(--color-silver-dim)]/60">(optional, comma-separated)</span>
+      {/* Traits */}
+      <section className="flex flex-col gap-3">
+        <label
+          htmlFor="hero-traits"
+          className="text-[10px] font-black uppercase tracking-[0.2em] text-[var(--outline)]"
+        >
+          Traits
+          <span className="text-[var(--outline)]/40 normal-case tracking-normal ml-2 font-normal">
+            comma-separated, optional
+          </span>
         </label>
         <input
           id="hero-traits"
@@ -274,15 +305,19 @@ export default function CharacterCreationPage() {
           onChange={(e) => setTraits(e.target.value)}
           autoComplete="off"
           maxLength={200}
-          className="w-full min-h-[44px] rounded-[var(--radius-button)] bg-[var(--color-deep-void)] border border-[rgba(255,255,255,0.08)] px-4 text-sm text-[var(--color-silver-muted)] placeholder:text-[var(--color-silver-dim)] focus:outline-none focus:border-[var(--color-gold-support)]"
+          className="w-full min-h-[44px] rounded-[var(--radius-button)] bg-[var(--color-deep-void)] border border-[rgba(77,70,53,0.2)] px-4 text-sm text-[var(--color-silver-muted)] placeholder:text-[var(--outline)]/40 focus:outline-none focus:border-[var(--color-gold-rare)]/40 transition-colors"
           placeholder="e.g. cautious, scarred, short-tempered"
         />
       </section>
 
-      <section className="flex flex-col gap-2">
-        <h2 className="text-xs uppercase tracking-wider text-[var(--color-silver-dim)]">
-          Class
-        </h2>
+      {/* Class */}
+      <section className="flex flex-col gap-3">
+        <div className="flex items-center gap-3">
+          <span className="w-1 h-5 bg-[var(--color-gold-rare)]" />
+          <h2 className="text-[10px] font-black uppercase tracking-[0.2em] text-[var(--outline)]">
+            Class
+          </h2>
+        </div>
         <div className="overflow-x-auto scrollbar-hide -mx-1 px-1">
           <div className="flex gap-3 pb-1 w-max">
             {CLASSES.map((c) => (
@@ -299,10 +334,14 @@ export default function CharacterCreationPage() {
         </div>
       </section>
 
-      <section className="flex flex-col gap-2">
-        <h2 className="text-xs uppercase tracking-wider text-[var(--color-silver-dim)]">
-          Race
-        </h2>
+      {/* Race */}
+      <section className="flex flex-col gap-3">
+        <div className="flex items-center gap-3">
+          <span className="w-1 h-5 bg-[var(--color-gold-rare)]" />
+          <h2 className="text-[10px] font-black uppercase tracking-[0.2em] text-[var(--outline)]">
+            Race
+          </h2>
+        </div>
         <div className="overflow-x-auto scrollbar-hide -mx-1 px-1">
           <PillSelect
             options={[...RACES]}
@@ -314,73 +353,97 @@ export default function CharacterCreationPage() {
         </div>
       </section>
 
-      <section className="flex flex-col gap-3">
+      {/* Ability Scores */}
+      <section className="flex flex-col gap-4">
         <div className="flex items-center justify-between gap-2">
-          <h2 className="text-xs uppercase tracking-wider text-[var(--color-silver-dim)]">
-            Ability scores
-          </h2>
-          <GhostButton
+          <div className="flex items-center gap-3">
+            <span className="w-1 h-5 bg-[var(--color-gold-rare)]" />
+            <h2 className="text-[10px] font-black uppercase tracking-[0.2em] text-[var(--outline)]">
+              Ability Scores
+            </h2>
+          </div>
+          <button
             type="button"
-            size="sm"
             onClick={() => void handleReroll()}
             disabled={rerollLoading || !initialRollDone}
-            className="shrink-0 min-h-[44px]"
+            className="min-h-[44px] flex items-center gap-2 px-4 py-2 rounded-[var(--radius-button)] bg-[var(--surface-high)] border border-[rgba(77,70,53,0.2)] text-[10px] font-bold uppercase tracking-[0.15em] text-[var(--color-silver-dim)] hover:text-[var(--color-gold-rare)] hover:border-[var(--color-gold-rare)]/30 transition-all disabled:opacity-30"
           >
-            {rerollLoading ? "Rolling…" : "Reroll Stats"}
-          </GhostButton>
+            <span className="material-symbols-outlined text-sm">casino</span>
+            {rerollLoading ? "Rolling…" : "Reroll"}
+          </button>
         </div>
         {stats ? (
           <div
             key={statsShakeKey}
-            className={`grid grid-cols-3 gap-2 ${statsShakeKey > 0 ? "animate-shake-once" : ""}`}
+            className={`grid grid-cols-3 gap-3 ${statsShakeKey > 0 ? "animate-shake-once" : ""}`}
           >
             {STAT_ORDER.map(({ key, label }) => (
               <StatPill key={key} label={label} value={stats[key]} />
             ))}
           </div>
         ) : (
-          <div className="grid grid-cols-3 gap-2">
+          <div className="grid grid-cols-3 gap-3">
             {STAT_ORDER.map(({ key }) => (
-              <SkeletonCard key={key} className="min-h-[72px]" />
+              <SkeletonCard key={key} className="min-h-[80px]" />
             ))}
           </div>
         )}
       </section>
 
-      <section className="flex flex-col gap-2">
-        <h2 className="text-xs uppercase tracking-wider text-[var(--color-silver-dim)]">
-          Starting gear
-        </h2>
-        <GlassCard className="px-4 py-3">
-          <ul className="text-sm text-[var(--color-silver-dim)] space-y-1">
-            {equipment.map((item) => (
-              <li key={item.name} className="flex gap-2">
-                <span className="text-[var(--color-silver-muted)]">{item.name}</span>
-                <span className="text-[var(--color-silver-dim)]">· {item.type}</span>
-              </li>
-            ))}
-          </ul>
-        </GlassCard>
+      {/* Starting Gear */}
+      <section className="flex flex-col gap-3">
+        <div className="flex items-center gap-3">
+          <span className="w-1 h-5 bg-[var(--color-gold-rare)]" />
+          <h2 className="text-[10px] font-black uppercase tracking-[0.2em] text-[var(--outline)]">
+            Starting Gear
+          </h2>
+        </div>
+        <div className="bg-[var(--color-midnight)] rounded-[var(--radius-card)] border border-[rgba(77,70,53,0.15)] divide-y divide-[rgba(77,70,53,0.1)]">
+          {equipment.map((item) => (
+            <div key={item.name} className="flex items-center gap-3 px-4 py-3">
+              <span className="material-symbols-outlined text-[var(--outline)] text-lg">
+                {item.type === "weapon"
+                  ? "swords"
+                  : item.type === "armor"
+                    ? "shield"
+                    : "deployed_code"}
+              </span>
+              <span className="text-sm text-[var(--color-silver-muted)] flex-grow">
+                {item.name}
+              </span>
+              <span className="text-[9px] font-bold uppercase tracking-wider text-[var(--outline)]">
+                {item.type}
+              </span>
+            </div>
+          ))}
+        </div>
       </section>
 
+      {/* Error */}
       {error ? (
-        <p className="text-sm text-[var(--gradient-hp-end)]" role="alert">
-          {error}
-        </p>
+        <div className="bg-[var(--color-failure)]/10 border-l-4 border-[var(--color-failure)] p-3 rounded-r-[var(--radius-card)]">
+          <p className="text-sm text-[var(--color-failure)]" role="alert">
+            {error}
+          </p>
+        </div>
       ) : null}
 
-      <div className="mt-auto pt-4">
+      {/* Submit */}
+      <div className="mt-auto pt-4 space-y-3">
         <GoldButton
           type="button"
           size="lg"
-          className="w-full min-h-[48px]"
+          className="w-full min-h-[56px] flex items-center justify-center gap-3 text-lg"
           disabled={!canSubmit}
           onClick={() => void handleSubmit()}
         >
-          {submitLoading ? "Entering…" : "Enter the World"}
+          <span>{submitLoading ? "Entering…" : "Enter the World"}</span>
+          {!submitLoading && (
+            <span className="material-symbols-outlined text-lg">swords</span>
+          )}
         </GoldButton>
         {!playerIdResolved ? (
-          <p className="text-xs text-[var(--color-silver-dim)] mt-3 text-center">
+          <p className="text-[10px] text-[var(--outline)] text-center uppercase tracking-wider">
             Rejoin the lobby so your seat is saved, then return here.
           </p>
         ) : null}

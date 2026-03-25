@@ -1,5 +1,4 @@
 import { COPY } from "@/lib/copy/ashveil";
-import { GlassCard } from "@/components/ui/glass-card";
 
 export interface PlayerSlotPlayer {
   id: string;
@@ -20,62 +19,142 @@ interface PlayerSlotProps {
 export function PlayerSlot({ player, isAiDm, isEmpty }: PlayerSlotProps) {
   if (isAiDm) {
     return (
-      <GlassCard className="relative overflow-hidden p-4 min-h-[72px] flex flex-col justify-center">
-        <div
-          className="pointer-events-none absolute inset-0 animate-shimmer opacity-80"
-          aria-hidden
-        />
-        <p className="text-fantasy text-sm tracking-wide text-[var(--color-gold-rare)] relative z-10">
-          AI Dungeon Master
-        </p>
-        <p className="text-xs text-[var(--color-silver-dim)] mt-1 relative z-10">
-          {COPY.aiDmWaiting}
-        </p>
-      </GlassCard>
+      <div className="relative bg-[var(--color-deep-void)] p-5 rounded-[var(--radius-card)] border border-[var(--color-gold-rare)]/20 flex items-center gap-5 shadow-xl">
+        <div className="relative">
+          <div className="w-16 h-16 rounded-[var(--radius-avatar)] bg-[var(--surface-high)] flex items-center justify-center border-2 border-[var(--color-gold-rare)]/40 overflow-hidden">
+            <span
+              className="material-symbols-outlined text-[var(--color-gold-rare)] text-3xl"
+              style={{ fontVariationSettings: "'FILL' 1" }}
+            >
+              auto_awesome
+            </span>
+          </div>
+          <div className="absolute -bottom-1 -right-1 bg-[var(--color-gold-rare)] text-[var(--color-obsidian)] text-[8px] font-black px-1.5 py-0.5 rounded-sm tracking-wider uppercase">
+            SYSTEM
+          </div>
+        </div>
+        <div>
+          <h3 className="text-fantasy text-lg text-[var(--color-gold-rare)] tracking-tight leading-tight">
+            The Chronicler
+          </h3>
+          <p className="text-[var(--color-silver-dim)] text-xs italic mt-1 leading-relaxed">
+            {COPY.aiDmWaiting}
+          </p>
+        </div>
+      </div>
     );
   }
 
   if (isEmpty || !player) {
     return (
-      <GlassCard className="p-4 min-h-[72px] flex items-center justify-center opacity-45 border border-[rgba(255,255,255,0.04)]">
-        <p className="text-sm text-[var(--color-silver-muted)]">{COPY.awaitingHero}</p>
-      </GlassCard>
+      <div className="border-2 border-dashed border-[var(--outline-variant)]/10 p-4 flex items-center justify-center gap-3 min-h-[72px] group cursor-default hover:bg-[var(--surface-high)] transition-colors">
+        <span className="material-symbols-outlined text-[var(--outline-variant)] group-hover:text-[var(--color-gold-rare)] transition-colors">
+          person_add
+        </span>
+        <span className="text-[10px] font-bold uppercase tracking-[0.15em] text-[var(--color-silver-dim)] group-hover:text-[var(--color-silver-muted)] transition-colors">
+          {COPY.awaitingHero}
+        </span>
+      </div>
     );
   }
 
   const displayName = player.name?.trim() || "Adventurer";
-  const readyGlow = player.isReady
-    ? "glow-gold border-[rgba(212,175,55,0.35)]"
-    : "opacity-80 border-[rgba(255,255,255,0.06)]";
   const disconnected = !player.isConnected;
 
   return (
-    <GlassCard
-      className={`p-4 min-h-[72px] flex flex-col gap-2 transition-opacity duration-[var(--duration-med)] ${readyGlow} ${disconnected ? "opacity-50" : ""}`}
+    <div
+      className={`p-4 flex items-center gap-4 transition-all duration-300 ${
+        disconnected
+          ? "bg-[var(--color-midnight)]/30 border-l-2 border-[var(--color-failure)] opacity-60"
+          : player.isReady
+            ? "bg-[var(--surface-high)]"
+            : "bg-[var(--color-midnight)]/50 opacity-70"
+      }`}
     >
-      <div className="flex items-start justify-between gap-2">
-        <div>
-          <p className="text-fantasy text-sm text-[var(--color-silver-muted)] tracking-wide">
+      {/* Avatar placeholder */}
+      <div
+        className={`w-14 h-14 bg-[var(--surface-highest)] rounded-[var(--radius-avatar)] overflow-hidden border flex items-center justify-center shrink-0 ${
+          disconnected
+            ? "border-[var(--outline-variant)]/30 grayscale"
+            : "border-[var(--outline-variant)]/30"
+        }`}
+      >
+        <span
+          className={`material-symbols-outlined text-2xl ${
+            disconnected
+              ? "text-[var(--outline-variant)]"
+              : "text-[var(--color-silver-dim)]"
+          }`}
+        >
+          person
+        </span>
+      </div>
+
+      {/* Info */}
+      <div className="flex-grow min-w-0">
+        <div className="flex items-center gap-2">
+          <span
+            className={`text-fantasy text-lg truncate ${
+              disconnected
+                ? "text-[var(--color-failure)]/60 italic"
+                : "text-[var(--color-silver-muted)]"
+            }`}
+          >
             {displayName}
-          </p>
-          <p className="text-data text-xs text-[var(--color-silver-dim)] mt-0.5">
-            Seat {player.seatIndex + 1}
-            {player.isDm ? " · DM" : ""}
-          </p>
-        </div>
-        <div className="flex flex-col items-end gap-1 shrink-0">
-          {player.isHost ? (
-            <span className="text-[10px] uppercase tracking-wider px-2 py-0.5 rounded-[var(--radius-chip)] bg-[rgba(212,175,55,0.12)] text-[var(--color-gold-support)] border border-[rgba(212,175,55,0.2)]">
+          </span>
+          {player.isHost && (
+            <span className="bg-[var(--color-gold-rare)]/10 text-[var(--color-gold-rare)] text-[8px] font-black px-1.5 py-0.5 border border-[var(--color-gold-rare)]/30 rounded-sm tracking-[0.15em]">
               HOST
             </span>
-          ) : null}
-          <span
-            className={`text-[10px] uppercase tracking-wider ${player.isReady ? "text-[var(--color-gold-rare)]" : "text-[var(--color-silver-dim)]"}`}
-          >
-            {player.isReady ? "Ready" : "Not ready"}
-          </span>
+          )}
+          {player.isDm && (
+            <span className="bg-[var(--color-gold-rare)]/10 text-[var(--color-gold-rare)] text-[8px] font-black px-1.5 py-0.5 border border-[var(--color-gold-rare)]/30 rounded-sm tracking-[0.15em]">
+              DM
+            </span>
+          )}
+        </div>
+        <div className="flex items-center gap-1.5 mt-1">
+          {disconnected ? (
+            <>
+              <span className="material-symbols-outlined text-[12px] text-[var(--color-failure)]">
+                warning
+              </span>
+              <span className="text-[10px] font-bold text-[var(--color-failure)] uppercase tracking-[0.15em]">
+                Disconnected
+              </span>
+            </>
+          ) : player.isReady ? (
+            <>
+              <span className="w-2 h-2 rounded-full bg-[var(--color-gold-rare)] animate-pulse shadow-[0_0_8px_rgba(242,202,80,0.8)]" />
+              <span className="text-[10px] font-bold text-[var(--color-gold-rare)] uppercase tracking-[0.15em]">
+                Ready
+              </span>
+            </>
+          ) : (
+            <>
+              <span className="w-2 h-2 rounded-full bg-[var(--outline-variant)]" />
+              <span className="text-[10px] font-bold text-[var(--color-silver-dim)] uppercase tracking-[0.15em]">
+                Not Ready
+              </span>
+            </>
+          )}
         </div>
       </div>
-    </GlassCard>
+
+      {/* Status icon */}
+      {!disconnected &&
+        (player.isReady ? (
+          <span
+            className="material-symbols-outlined text-[var(--color-gold-rare)]/40"
+            style={{ fontVariationSettings: "'FILL' 1" }}
+          >
+            check_circle
+          </span>
+        ) : (
+          <span className="material-symbols-outlined text-[var(--outline-variant)]">
+            pending
+          </span>
+        ))}
+    </div>
   );
 }
