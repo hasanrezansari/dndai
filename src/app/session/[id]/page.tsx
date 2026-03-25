@@ -1,8 +1,8 @@
 "use client";
 
 import { useSession } from "next-auth/react";
-import { useCallback, useEffect, useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { ConnectionStatus } from "@/components/ui/connection-status";
 import {
@@ -19,6 +19,8 @@ import { JournalSheet } from "@/components/sheets/journal-sheet";
 import { PartySheet } from "@/components/sheets/party-sheet";
 import { NarrativeCard } from "@/components/game/narrative-card";
 import { PlayerStrip } from "@/components/game/player-strip";
+import { QuestPill } from "@/components/game/quest-pill";
+import { SceneDetailPanel } from "@/components/game/scene-detail-sheet";
 import { SceneHeader } from "@/components/game/scene-header";
 import { TurnBanner } from "@/components/game/turn-banner";
 import { SceneTransition } from "@/components/game/scene-transition";
@@ -31,11 +33,13 @@ import { useSessionUiMode } from "@/hooks/use-session-ui-mode";
 import { useSessionChannel } from "@/lib/socket/use-session-channel";
 import { useGameStore } from "@/lib/state/game-store";
 
-function dangerLabel(risk: number): { label: string; color: string } {
-  if (risk >= 86) return { label: "Critical", color: "var(--gradient-hp-end)" };
-  if (risk >= 61) return { label: "Perilous", color: "#e07c3a" };
-  if (risk >= 31) return { label: "Uneasy", color: "var(--color-gold-rare)" };
-  return { label: "Calm", color: "var(--color-silver-dim)" };
+function formatPhaseLabel(phase: string | undefined): string | null {
+  if (!phase?.trim()) return null;
+  return phase
+    .split("_")
+    .filter(Boolean)
+    .map((w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
+    .join(" ");
 }
 
 function atmosphereForPhase(phase: string | undefined): {
@@ -70,7 +74,7 @@ function atmosphereForPhase(phase: string | undefined): {
 function SessionPlaySkeleton() {
   return (
     <div className="flex min-h-dvh flex-col bg-[var(--color-obsidian)] animate-fade-in">
-      <div className="relative z-0 h-[42vh] w-full shrink-0 overflow-hidden bg-[var(--color-deep-void)]">
+      <div className="relative z-0 h-[min(36vh,320px)] w-full shrink-0 overflow-hidden bg-[var(--color-deep-void)]">
         <span
           className="absolute inset-0 animate-shimmer opacity-25 pointer-events-none"
           aria-hidden
@@ -150,7 +154,26 @@ export default function SessionGameplayPage() {
   const [sceneTransitionTrigger, setSceneTransitionTrigger] = useState(false);
   const [prevSceneTitle, setPrevSceneTitle] = useState<string | null>(null);
   const [chronicleOpen, setChronicleOpen] = useState(false);
+  const [sceneDetailOpen, setSceneDetailOpen] = useState(false);
+  const [partyInspectPlayerId, setPartyInspectPlayerId] = useState<
+    string | null
+  >(null);
   const { mode: sessionUiMode, setMode: setSessionUiMode } = useSessionUiMode();
+
+  const phaseLabel = useMemo(
+    () => formatPhaseLabel(session?.phase),
+    [session?.phase],
+  );
+
+  const partyInspectTitle = useMemo(() => {
+    if (!partyInspectPlayerId) return "Party member";
+    const p = players.find((x) => x.id === partyInspectPlayerId);
+    return (
+      p?.character?.name?.trim() ||
+      p?.displayName?.trim() ||
+      `Seat ${(p?.seatIndex ?? 0) + 1}`
+    );
+  }, [partyInspectPlayerId, players]);
 
   useEffect(() => {
     setHydrated(false);
@@ -484,6 +507,27 @@ export default function SessionGameplayPage() {
           <JournalSheet />
         </BottomSheet>
       )}
+      {partyInspectPlayerId ? (
+        <BottomSheet
+          isOpen
+          onClose={() => setPartyInspectPlayerId(null)}
+          title={partyInspectTitle}
+        >
+          <CharacterSheet viewPlayerId={partyInspectPlayerId} />
+        </BottomSheet>
+      ) : null}
+      <BottomSheet
+        isOpen={sceneDetailOpen}
+        onClose={() => setSceneDetailOpen(false)}
+        title="Scene & lore"
+      >
+        <SceneDetailPanel
+          sceneImage={sceneImage}
+          previousSceneImage={previousSceneImage}
+          sceneTitle={sceneTitle}
+          narrativeText={narrativeText}
+        />
+      </BottomSheet>
       <BottomSheet
         isOpen={chronicleOpen}
         onClose={() => setChronicleOpen(false)}
@@ -495,7 +539,7 @@ export default function SessionGameplayPage() {
       </BottomSheet>
       <DiceOverlay />
       <StatPopupOverlay />
-      <div className="relative z-[1] h-[42vh] w-full shrink-0 overflow-hidden">
+      <div className="relative z-[1] h-[min(36vh,320px)] w-full shrink-0 overflow-hidden">
         <button
           type="button"
           onClick={handleLeaveSession}
@@ -511,6 +555,10 @@ export default function SessionGameplayPage() {
           roundNumber={session?.currentRound ?? 1}
           currentPlayerName={currentPlayerName}
           scenePending={scenePending}
+          phase={session?.phase ?? null}
+          phaseLabel={phaseLabel}
+          teaser={narrativeText}
+          onOpenDetails={() => setSceneDetailOpen(true)}
         />
       </div>
 
@@ -537,95 +585,15 @@ export default function SessionGameplayPage() {
           </div>
         ) : null}
         {quest ? (
-          <div className="shrink-0 rounded-[var(--radius-card)] border border-[rgba(77,70,53,0.2)] bg-[var(--surface-container)]/50 px-4 py-3">
-            <div className="mb-2 flex items-center justify-between gap-3">
-              <div className="flex items-center gap-2 min-w-0">
-                <span className="material-symbols-outlined text-[var(--color-gold-rare)] text-sm">flag</span>
-                <p className="line-clamp-1 text-fantasy text-xs font-bold tracking-tight text-[var(--color-silver-muted)]">
-                  {quest.objective}
-                </p>
-              </div>
-              <span className="shrink-0 text-[9px] font-black uppercase tracking-[0.15em] text-[var(--outline)] bg-[var(--surface-high)] px-2 py-0.5 rounded-sm">
-                {quest.status === "ready_to_end"
-                  ? "Concluding"
-                  : quest.status === "failed"
-                    ? "Failed"
-                    : "Active"}
-              </span>
-            </div>
-            {quest.subObjectives?.length ? (
-              <details className="mb-2">
-                <summary className="cursor-pointer text-[10px] font-bold text-[var(--outline)] hover:text-[var(--color-silver-muted)] select-none uppercase tracking-wider">
-                  Sub-objectives ({quest.subObjectives.length})
-                </summary>
-                <ul className="mt-1.5 ml-2 space-y-1 text-[10px] text-[var(--outline)]">
-                  {quest.subObjectives.map((sub, i) => (
-                    <li key={i} className="flex gap-2 items-start">
-                      <span className="material-symbols-outlined text-[var(--color-gold-rare)] text-[10px] mt-px shrink-0">check_circle</span>
-                      <span className="line-clamp-1">{sub}</span>
-                    </li>
-                  ))}
-                </ul>
-              </details>
-            ) : null}
-            <div className="mb-1.5 h-1.5 w-full overflow-hidden rounded-sm bg-[var(--color-deep-void)]">
-              <div
-                className="h-full rounded-sm bg-gradient-to-r from-[var(--color-gold-support)] to-[var(--color-gold-rare)] transition-[width] duration-300"
-                style={{ width: `${Math.max(0, Math.min(100, quest.progress))}%` }}
-              />
-            </div>
-            <div className="flex items-center justify-between text-[9px] font-bold uppercase tracking-wider">
-              <span className="text-[var(--outline)]">Progress {quest.progress}%</span>
-              <span style={{ color: dangerLabel(quest.risk).color }}>
-                {dangerLabel(quest.risk).label} ({quest.risk}%)
-              </span>
-            </div>
-            {quest.endingVote?.open && currentPlayerId ? (
-              <div className="mt-3 rounded-[var(--radius-card)] border border-[var(--color-gold-rare)]/20 bg-[var(--surface-high)] p-3">
-                <p className="mb-2 text-[9px] font-black uppercase tracking-[0.15em] text-[var(--color-gold-rare)] flex items-center gap-2">
-                  <span className="material-symbols-outlined text-xs">how_to_vote</span>
-                  {quest.endingVote.reason === "party_defeated" ? "Party Defeated" : "Objective Complete"}
-                </p>
-                <div className="mb-2 text-[10px] font-bold text-[var(--outline)]">
-                  {Object.values(quest.endingVote.votes).filter((v) => v === "end_now").length}/{quest.endingVote.requiredYes} votes needed
-                </div>
-                <div className="flex gap-2">
-                  <button
-                    type="button"
-                    disabled={voteBusy}
-                    onClick={() => void handleEndingVote("end_now")}
-                    className="min-h-[40px] flex-1 rounded-[var(--radius-card)] bg-[var(--color-gold-rare)] text-[var(--color-obsidian)] text-[10px] font-black uppercase tracking-wider disabled:opacity-30"
-                  >
-                    End Now
-                  </button>
-                  <button
-                    type="button"
-                    disabled={voteBusy}
-                    onClick={() => void handleEndingVote("continue")}
-                    className="min-h-[40px] flex-1 rounded-[var(--radius-card)] border border-[rgba(77,70,53,0.2)] bg-[var(--surface-high)] text-[10px] font-black uppercase tracking-wider text-[var(--color-silver-muted)] disabled:opacity-30"
-                  >
-                    Continue
-                  </button>
-                </div>
-              </div>
-            ) : null}
-            {session?.status === "ended" ? (
-              <div className="mt-3">
-                <button
-                  type="button"
-                  disabled={chapterBusy || session.finalChapterPublished}
-                  onClick={() => void handleGenerateFinalChapter()}
-                  className="min-h-[40px] w-full rounded-[var(--radius-card)] bg-gradient-to-b from-[var(--color-gold-rare)] to-[var(--color-gold-support)] text-[var(--color-obsidian)] text-[10px] font-black uppercase tracking-wider disabled:opacity-30 disabled:grayscale"
-                >
-                  {session.finalChapterPublished
-                    ? "Final Chapter Published"
-                    : chapterBusy
-                      ? "Publishing..."
-                      : "Generate Final Chapter"}
-                </button>
-              </div>
-            ) : null}
-          </div>
+          <QuestPill
+            quest={quest}
+            session={session}
+            currentPlayerId={currentPlayerId}
+            voteBusy={voteBusy}
+            chapterBusy={chapterBusy}
+            onEndingVote={(choice) => void handleEndingVote(choice)}
+            onGenerateFinalChapter={() => void handleGenerateFinalChapter()}
+          />
         ) : null}
         {sessionUiMode === "spotlight" ? (
           <div className="flex min-h-0 flex-1 flex-col gap-3">
@@ -648,6 +616,7 @@ export default function SessionGameplayPage() {
         <PlayerStrip
           players={players}
           currentTurnPlayerId={currentTurnPlayerId}
+          onInspectPlayer={(playerId) => setPartyInspectPlayerId(playerId)}
         />
         <div className="sticky bottom-0 z-20 mt-auto shrink-0 pt-1">
           <TurnBanner visible={isMyTurn && !(session?.mode === "human_dm" && isDm)} />

@@ -6,6 +6,8 @@ import type { GamePlayerView } from "@/lib/state/game-store";
 export interface PlayerStripProps {
   players: GamePlayerView[];
   currentTurnPlayerId: string | null;
+  /** Opens a bottom sheet with that player&apos;s character (party inspect). */
+  onInspectPlayer?: (playerId: string) => void;
 }
 
 function avatarLetter(p: GamePlayerView) {
@@ -14,7 +16,11 @@ function avatarLetter(p: GamePlayerView) {
   return "?";
 }
 
-export function PlayerStrip({ players, currentTurnPlayerId }: PlayerStripProps) {
+export function PlayerStrip({
+  players,
+  currentTurnPlayerId,
+  onInspectPlayer,
+}: PlayerStripProps) {
   const hpFlash = useGameStore((s) => s.hpFlash);
 
   return (
@@ -35,22 +41,36 @@ export function PlayerStrip({ players, currentTurnPlayerId }: PlayerStripProps) 
             `Seat ${p.seatIndex + 1}`;
           const dim = !p.isConnected;
           const flash = hpFlash[p.id];
-
           return (
             <div
               key={p.id}
               className={`flex w-14 shrink-0 flex-col items-center gap-1.5 transition-opacity ${dim ? "opacity-30" : ""}`}
               title={displayName}
             >
-              <div
-                className={`relative flex h-12 w-12 items-center justify-center rounded-[var(--radius-avatar)] text-sm font-black transition-all ${
-                  active
-                    ? "selected-glow bg-[var(--surface-high)] text-[var(--color-gold-rare)] border-2 border-[var(--color-gold-rare)]"
-                    : "bg-[var(--color-midnight)] text-[var(--color-silver-dim)] border border-[rgba(77,70,53,0.2)]"
-                } ${flash === "damage" ? "animate-hp-flash-damage" : flash === "heal" ? "animate-hp-flash-heal" : ""}`}
-              >
-                {p.isConnected ? avatarLetter(p) : "…"}
-              </div>
+              {onInspectPlayer ? (
+                <button
+                  type="button"
+                  onClick={() => onInspectPlayer(p.id)}
+                  className={`relative flex h-12 w-12 items-center justify-center rounded-[var(--radius-avatar)] text-sm font-black transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-gold-rare)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--color-obsidian)] ${
+                    active
+                      ? "selected-glow bg-[var(--surface-high)] text-[var(--color-gold-rare)] border-2 border-[var(--color-gold-rare)]"
+                      : "bg-[var(--color-midnight)] text-[var(--color-silver-dim)] border border-[rgba(77,70,53,0.2)]"
+                  } ${flash === "damage" ? "animate-hp-flash-damage" : flash === "heal" ? "animate-hp-flash-heal" : ""}`}
+                  aria-label={`Open character sheet for ${displayName}`}
+                >
+                  {p.isConnected ? avatarLetter(p) : "…"}
+                </button>
+              ) : (
+                <div
+                  className={`relative flex h-12 w-12 items-center justify-center rounded-[var(--radius-avatar)] text-sm font-black transition-all ${
+                    active
+                      ? "selected-glow bg-[var(--surface-high)] text-[var(--color-gold-rare)] border-2 border-[var(--color-gold-rare)]"
+                      : "bg-[var(--color-midnight)] text-[var(--color-silver-dim)] border border-[rgba(77,70,53,0.2)]"
+                  } ${flash === "damage" ? "animate-hp-flash-damage" : flash === "heal" ? "animate-hp-flash-heal" : ""}`}
+                >
+                  {p.isConnected ? avatarLetter(p) : "…"}
+                </div>
+              )}
               <div
                 className={`h-1.5 w-full max-w-[2.75rem] overflow-hidden rounded-sm bg-[var(--color-deep-void)] ${
                   flash ? "ring-1 ring-offset-1 ring-offset-transparent" : ""

@@ -11,6 +11,28 @@ export interface SceneHeaderProps {
   roundNumber: number;
   currentPlayerName: string | null;
   scenePending: boolean;
+  /** Short atmosphere / phase label for chips (e.g. combat, exploration). */
+  phaseLabel?: string | null;
+  /** Raw session phase for chip accent (exploration, combat, …). */
+  phase?: string | null;
+  /** One-line teaser under the title (e.g. latest narration). */
+  teaser?: string | null;
+  /** Opens full scene + lore sheet (entire header is tappable). */
+  onOpenDetails?: () => void;
+}
+
+function phaseChipClass(phase: string | undefined): string {
+  switch (phase) {
+    case "combat":
+      return "border-[color-mix(in_srgb,var(--atmosphere-combat)_35%,transparent)] text-[var(--color-silver-muted)]";
+    case "social":
+      return "border-[color-mix(in_srgb,var(--atmosphere-social)_35%,transparent)] text-[var(--color-silver-muted)]";
+    case "rest":
+      return "border-[color-mix(in_srgb,var(--atmosphere-mystery)_30%,transparent)] text-[var(--color-silver-muted)]";
+    case "exploration":
+    default:
+      return "border-[color-mix(in_srgb,var(--atmosphere-exploration)_35%,transparent)] text-[var(--color-silver-muted)]";
+  }
 }
 
 export function SceneHeader({
@@ -20,16 +42,37 @@ export function SceneHeader({
   roundNumber,
   currentPlayerName,
   scenePending,
+  phaseLabel,
+  phase,
+  teaser,
+  onOpenDetails,
 }: SceneHeaderProps) {
-  const turnLabel = currentPlayerName
+  const turnShort = currentPlayerName
     ? `${currentPlayerName}'s turn`
     : "Waiting…";
 
   const showBackdrop = !sceneImage && !previousSceneImage;
 
-  /** Full-screen “painting” only when we have nothing to show yet — never cover a real scene. */
   const showBlockingPaintOverlay =
     scenePending && !sceneImage && !previousSceneImage;
+
+  type Chip = { text: string; accentPhase: string | null };
+  const chips: Chip[] = [];
+  if (phaseLabel?.trim()) {
+    chips.push({
+      text: phaseLabel.trim(),
+      accentPhase: phase?.trim() ?? phaseLabel.trim().toLowerCase(),
+    });
+  }
+  chips.push({ text: `Round ${roundNumber}`, accentPhase: null });
+  if (currentPlayerName && chips.length < 3) {
+    const name =
+      currentPlayerName.length > 14
+        ? `${currentPlayerName.slice(0, 12)}…`
+        : currentPlayerName;
+    chips.push({ text: name, accentPhase: null });
+  }
+  const visibleChips = chips.slice(0, 3);
 
   return (
     <div className="relative h-full w-full overflow-hidden">
@@ -75,12 +118,13 @@ export function SceneHeader({
             src={previousSceneImage}
             alt=""
             loading="eager"
+            decoding="async"
             className="absolute inset-0 z-0 h-full w-full object-cover"
           />
         ) : null}
       </div>
 
-      <div className="absolute inset-0 bg-gradient-to-t from-[var(--color-obsidian)] via-[var(--color-obsidian)]/50 to-transparent" />
+      <div className="absolute inset-0 bg-gradient-to-t from-[var(--color-obsidian)] via-[var(--color-obsidian)]/55 to-transparent" />
 
       {showBlockingPaintOverlay ? (
         <div
@@ -94,22 +138,23 @@ export function SceneHeader({
         </div>
       ) : null}
 
-      {/* Turn indicator */}
-      <div className="absolute right-4 top-4 z-[2]">
-        <div className="bg-[var(--color-obsidian)]/80 backdrop-blur-md rounded-[var(--radius-card)] px-4 py-2.5 border border-[rgba(77,70,53,0.2)]">
-          <p className="text-[9px] font-black uppercase tracking-[0.2em] text-[var(--outline)]">
-            Round {roundNumber}
-          </p>
-          <p className="text-fantasy mt-0.5 text-xs font-bold text-[var(--color-gold-rare)]">
-            {turnLabel}
-          </p>
+      <div className="pointer-events-none absolute inset-x-0 bottom-0 top-0 z-[2] flex flex-col justify-end pb-4 pl-4 pr-4 pt-14">
+        <div className="flex flex-wrap items-center gap-1.5">
+          {visibleChips.map((c, i) => (
+            <span
+              key={`${c.text}-${i}`}
+              className={`rounded-[var(--radius-pill)] border bg-[var(--color-obsidian)]/75 px-2.5 py-1 text-[9px] font-black uppercase tracking-[0.14em] backdrop-blur-sm ${
+                c.accentPhase
+                  ? phaseChipClass(c.accentPhase)
+                  : "border-[rgba(77,70,53,0.25)] text-[var(--outline)]"
+              }`}
+            >
+              {c.text}
+            </span>
+          ))}
         </div>
-      </div>
-
-      {/* Scene title */}
-      <div className="absolute bottom-5 left-5 right-[28%] z-[2]">
         <h1
-          className="text-fantasy line-clamp-2 text-xl font-black leading-tight tracking-tight text-[var(--color-silver-muted)] sm:text-2xl"
+          className="text-fantasy mt-2 line-clamp-1 text-lg font-black leading-tight tracking-tight text-[var(--color-silver-muted)] sm:text-xl"
           style={{
             textShadow:
               "0 2px 20px rgba(0,0,0,0.98), 0 1px 6px rgba(0,0,0,0.95)",
@@ -117,7 +162,28 @@ export function SceneHeader({
         >
           {sceneTitle ?? "The world awaits…"}
         </h1>
+        {teaser?.trim() ? (
+          <p className="mt-1 line-clamp-1 text-[11px] leading-snug text-[var(--color-silver-dim)]">
+            {teaser}
+          </p>
+        ) : (
+          <p className="mt-1 line-clamp-1 text-[10px] font-bold uppercase tracking-wider text-[var(--color-gold-rare)]">
+            {turnShort}
+          </p>
+        )}
+        <p className="mt-2 text-[9px] font-bold uppercase tracking-[0.18em] text-[var(--outline)]">
+          Tap for scene &amp; lore
+        </p>
       </div>
+
+      {onOpenDetails && !showBlockingPaintOverlay ? (
+        <button
+          type="button"
+          onClick={onOpenDetails}
+          className="absolute inset-0 z-[4] cursor-pointer border-0 bg-transparent p-0"
+          aria-label="Open scene and lore"
+        />
+      ) : null}
     </div>
   );
 }

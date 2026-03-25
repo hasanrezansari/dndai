@@ -21,6 +21,8 @@ This roadmap is designed for AI-assisted development with Cursor auto mode. Each
 
 **Priority order**: Phases 15-17 are critical path (auth, onboarding, monetization). Phases 18-20 unlock growth. Phases 21-24 are polish and scale.
 
+**Mobile gameplay shell (session layout, Spotlight / Chronicle / Classic):** see [`docs/MOBILE_GAMEPLAY_SHELL.md`](docs/MOBILE_GAMEPLAY_SHELL.md) — phased plan (M1–M4) and pointer to [`docs/SESSION_UI_VIEW_MODES_SPEC.md`](docs/SESSION_UI_VIEW_MODES_SPEC.md).
+
 ---
 
 ## Phase 15: Authentication & User Accounts

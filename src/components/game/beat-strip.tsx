@@ -91,7 +91,7 @@ export function BeatStrip() {
           theater_comedy
         </span>
         <h3 className="text-[10px] font-black uppercase tracking-[0.18em] text-[var(--outline)]">
-          At the table
+          Current beat
         </h3>
       </div>
 
@@ -118,7 +118,7 @@ export function BeatStrip() {
               <dt className="text-[9px] font-bold uppercase tracking-wider text-[var(--outline)]">
                 Last intent
               </dt>
-              <dd className="text-[var(--color-silver-muted)] line-clamp-2">
+              <dd className="text-[var(--color-silver-muted)] line-clamp-2 text-[13px] leading-snug">
                 {actionLine.playerName ? (
                   <span className="text-[var(--color-gold-support)]">
                     {actionLine.playerName}:{" "}
@@ -153,7 +153,7 @@ export function BeatStrip() {
               <dt className="text-[9px] font-bold uppercase tracking-wider text-[var(--outline)]">
                 Fate
               </dt>
-              <dd className="text-[var(--color-silver-muted)] line-clamp-2">
+              <dd className="text-[var(--color-silver-muted)] line-clamp-1 text-[12px]">
                 {statLine.text}
               </dd>
             </div>

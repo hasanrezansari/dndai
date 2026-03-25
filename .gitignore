@@ -40,3 +40,6 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# local Stitch / design exports (not part of app source)
+/stitch_ashveil_grimoire-2/
