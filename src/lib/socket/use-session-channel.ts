@@ -20,7 +20,7 @@ import {
   StateUpdateEventSchema,
   TurnStartedEventSchema,
 } from "@/lib/schemas/events";
-import type { GamePlayerView, GameSessionView } from "@/lib/state/game-store";
+import type { GamePlayerView, GameSessionView, RollingMemoryView } from "@/lib/state/game-store";
 import { useGameStore } from "@/lib/state/game-store";
 
 import { getPusherClient, getSessionChannel } from "./client";
@@ -64,6 +64,7 @@ async function refetchPlayersFromState(sessionId: string) {
         votes: Record<string, "end_now" | "continue">;
       } | null;
     } | null;
+    rollingMemories?: RollingMemoryView[];
   };
   if (Array.isArray(data.players)) {
     useGameStore.getState().setPlayers(data.players);
@@ -73,6 +74,9 @@ async function refetchPlayersFromState(sessionId: string) {
   }
   if ("quest" in data) {
     useGameStore.getState().setQuest(data.quest ?? null);
+  }
+  if (data.rollingMemories) {
+    useGameStore.getState().setRollingMemories(data.rollingMemories);
   }
 }
 

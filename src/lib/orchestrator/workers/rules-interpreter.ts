@@ -1,4 +1,6 @@
-import type { OrchestrationStepResult } from "@/lib/ai/types";
+import type { AIProvider, OrchestrationStepResult } from "@/lib/ai/types";
+import { getAIProvider } from "@/lib/ai";
+import { runOrchestrationStep } from "@/lib/orchestrator/step-runner";
 import {
   RulesInterpreterOutputSchema,
   type ActionIntent,
@@ -28,6 +30,8 @@ function contextLabel(intent: ActionIntent): string {
   switch (intent.action_type) {
     case "attack": return "Attack roll";
     case "cast_spell": return "Spell attack";
+    case "heal": return "Healing check";
+    case "defend": return "Defense check";
     case "move": return "Agility check";
     case "talk": return "Persuasion check";
     case "inspect": return "Perception check";
@@ -40,6 +44,8 @@ function dcForAction(intent: ActionIntent): number {
   switch (intent.action_type) {
     case "attack": return 12;
     case "cast_spell": return 13;
+    case "heal": return 10;
+    case "defend": return 10;
     case "inspect": return 10;
     case "talk": return 11;
     case "move": return 10;
@@ -48,16 +54,10 @@ function dcForAction(intent: ActionIntent): number {
   }
 }
 
-export async function interpretRules(params: {
-  sessionId: string;
-  turnId: string;
-  intent: ActionIntent;
-  characterStats: CharacterStats;
-  characterClass: string;
-}): Promise<OrchestrationStepResult<RulesInterpreterOutput>> {
-  const t0 = Date.now();
-  const { intent, characterStats } = params;
-
+function buildDeterministicFallback(
+  intent: ActionIntent,
+  characterStats: CharacterStats,
+): RulesInterpreterOutput {
   const modifier = getModifier(intent.skill_or_save, characterStats);
   const dc = dcForAction(intent);
   const autoSuccess = intent.action_type === "talk" && !intent.requires_roll;
@@ -74,16 +74,71 @@ export async function interpretRules(params: {
         },
       ];
 
-  const data = RulesInterpreterOutputSchema.parse({
+  return RulesInterpreterOutputSchema.parse({
     legal: true,
     rolls,
     auto_success: autoSuccess,
   });
+}
 
-  return {
-    data,
-    usage: { inputTokens: 0, outputTokens: 0, model: "deterministic" },
-    latencyMs: Date.now() - t0,
-    success: true,
-  };
+const RULES_SYSTEM = `You are the rules interpreter for Ashveil, a dark fantasy tabletop RPG. Given a parsed action intent and character stats, determine the mechanical resolution.
+
+Output JSON:
+- "legal": boolean — whether the action is mechanically possible
+- "denial_reason": string (only if legal=false, explain why)
+- "rolls": array of required dice rolls, each with:
+  - "dice": "d4"|"d6"|"d8"|"d10"|"d12"|"d20"
+  - "modifier": integer ability modifier
+  - "advantage_state": "none"|"advantage"|"disadvantage"
+  - "context": what this roll represents
+  - "dc": difficulty class (number)
+- "auto_success": boolean — true only if the action succeeds without a roll (e.g. simple speech)
+
+Rules:
+- Most actions require a d20 roll + ability modifier
+- attack/cast_spell: DC 10-15 depending on described difficulty
+- heal: typically DC 10, uses WIS modifier
+- defend: typically DC 10, uses CON modifier
+- move/sneak: DEX-based, DC varies by terrain described
+- talk: CHA-based, can be auto_success for simple greetings; DC 11-14 for persuasion
+- inspect: WIS-based, DC 10-13
+- Grant advantage if the action description mentions favorable conditions
+- Grant disadvantage if conditions are clearly against the player
+- Set legal=false if action is physically impossible given context`;
+
+export async function interpretRules(params: {
+  sessionId: string;
+  turnId: string;
+  intent: ActionIntent;
+  characterStats: CharacterStats;
+  characterClass: string;
+  provider?: AIProvider;
+}): Promise<OrchestrationStepResult<RulesInterpreterOutput>> {
+  const { intent, characterStats } = params;
+  const provider = params.provider ?? getAIProvider();
+
+  const userPrompt = JSON.stringify({
+    action_type: intent.action_type,
+    targets: intent.targets,
+    skill_or_save: intent.skill_or_save,
+    requires_roll: intent.requires_roll,
+    suggested_roll_context: intent.suggested_roll_context,
+    character_class: params.characterClass,
+    stats: characterStats,
+  });
+
+  return runOrchestrationStep({
+    stepName: "rules_interpreter",
+    sessionId: params.sessionId,
+    turnId: params.turnId,
+    provider,
+    model: "light",
+    systemPrompt: RULES_SYSTEM,
+    userPrompt,
+    schema: RulesInterpreterOutputSchema,
+    maxTokens: 300,
+    temperature: 0.1,
+    fallback: () => buildDeterministicFallback(intent, characterStats),
+    timeoutMs: 10_000,
+  });
 }

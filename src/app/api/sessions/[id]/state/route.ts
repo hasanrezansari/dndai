@@ -12,6 +12,7 @@ import { db } from "@/lib/db";
 import {
   authUsers,
   characters,
+  memorySummaries,
   narrativeEvents,
   players,
   sceneSnapshots,
@@ -206,6 +207,35 @@ export async function GET(
     const mappedSession = mapSession(sessionRow);
     mappedSession.finalChapterPublished = Boolean(finalChapterRow);
 
+    const summaryRows = await db
+      .select({
+        id: memorySummaries.id,
+        summary_type: memorySummaries.summary_type,
+        content: memorySummaries.content,
+        turn_range_start: memorySummaries.turn_range_start,
+        turn_range_end: memorySummaries.turn_range_end,
+        created_at: memorySummaries.created_at,
+      })
+      .from(memorySummaries)
+      .where(eq(memorySummaries.session_id, sessionId))
+      .orderBy(desc(memorySummaries.created_at))
+      .limit(10);
+
+    const rollingMemories = summaryRows
+      .filter((r) => r.summary_type === "rolling")
+      .map((r) => ({
+        id: r.id,
+        turnRangeStart: r.turn_range_start,
+        turnRangeEnd: r.turn_range_end,
+        content: r.content as {
+          key_events?: string[];
+          active_hooks?: string[];
+          npc_relationships?: string[];
+          world_changes?: string[];
+        },
+        createdAt: r.created_at.toISOString(),
+      }));
+
     return NextResponse.json({
       session: mappedSession,
       players: mappedPlayers,
@@ -216,6 +246,7 @@ export async function GET(
       scenePending,
       dmAwaiting,
       quest,
+      rollingMemories,
     });
   } catch (e) {
     return handleApiError(e);

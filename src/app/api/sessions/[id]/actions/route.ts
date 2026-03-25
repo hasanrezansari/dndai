@@ -173,13 +173,25 @@ export async function POST(
       return NextResponse.json({ actionId, turnId }, { status: 202 });
     }
 
-    const { nextPlayerId } = await advanceTurn(sessionId);
+    const { nextPlayerId, roundAdvanced } = await advanceTurn(sessionId);
 
     const [sessionAfterAdvance] = await db
-      .select({ state_version: sessions.state_version })
+      .select({ state_version: sessions.state_version, current_round: sessions.current_round })
       .from(sessions)
       .where(eq(sessions.id, sessionId))
       .limit(1);
+
+    if (roundAdvanced && sessionAfterAdvance) {
+      const completedRound = sessionAfterAdvance.current_round - 1;
+      try {
+        await broadcastToSession(sessionId, "round-summary", {
+          summary_text: `Round ${completedRound} complete. The party presses onward into round ${sessionAfterAdvance.current_round}.`,
+          round_number: completedRound,
+        });
+      } catch (err) {
+        console.error("[actions] round-summary broadcast failed:", err);
+      }
+    }
 
     try {
       await broadcastToSession(sessionId, "narration-update", {

@@ -5,6 +5,7 @@ import {
   authUsers,
   characters,
   narrativeEvents,
+  npcStates,
   players,
   sceneSnapshots,
   sessions,
@@ -38,6 +39,8 @@ export interface TurnContext {
   allPlayerNames: string[];
   allCharacterSummaries: string[];
   questContext: string | null;
+  npcContext: string | null;
+  npcIds: Array<{ id: string; name: string }>;
   nextPlayerName: string;
   nextPlayerId: string;
   roundAdvanced: boolean;
@@ -179,6 +182,20 @@ export async function buildTurnContext({
     questContext = `Objective: ${quest.objective} | Progress: ${quest.progress}% | Danger: ${quest.risk}% | Status: ${quest.status}`;
   }
 
+  const npcRows = await db
+    .select()
+    .from(npcStates)
+    .where(eq(npcStates.session_id, sessionId));
+
+  const activeNpcs = npcRows.filter((n) => n.status !== "dead");
+  let npcContext: string | null = null;
+  const npcIds = npcRows.map((n) => ({ id: n.id, name: n.name }));
+  if (activeNpcs.length > 0) {
+    npcContext = activeNpcs
+      .map((n) => `${n.name} (${n.role}, ${n.attitude}, at ${n.location})${n.notes ? ` — ${n.notes}` : ""}`)
+      .join("; ");
+  }
+
   return {
     session: {
       mode: sessionRow.mode,
@@ -208,6 +225,8 @@ export async function buildTurnContext({
     allPlayerNames,
     allCharacterSummaries,
     questContext,
+    npcContext,
+    npcIds,
     nextPlayerName,
     nextPlayerId,
     roundAdvanced,

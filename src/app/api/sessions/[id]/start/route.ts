@@ -10,11 +10,14 @@ export const maxDuration = 60;
 import { apiError, handleApiError } from "@/lib/api/errors";
 import { requireUser, unauthorizedResponse } from "@/lib/auth/guards";
 import { getAIProvider } from "@/lib/ai";
+import { CampaignSeedOutputSchema, type CampaignSeedOutput } from "@/lib/schemas/ai-io";
+import { runOrchestrationStep } from "@/lib/orchestrator/step-runner";
 import { COPY } from "@/lib/copy/ashveil";
 import { db } from "@/lib/db";
 import {
   characters,
   narrativeEvents,
+  npcStates,
   players,
   sessions,
 } from "@/lib/db/schema";
@@ -46,7 +49,23 @@ function buildTemplateFallback(charNames: string, adventurePrompt: string): stri
   return fn(charNames || "the adventurers", adventurePrompt);
 }
 
-const OpeningSchema = z.object({
+const CAMPAIGN_SEEDER_SYSTEM = `You are the Campaign Seeder for Ashveil, a dark fantasy tabletop RPG. Generate a complete campaign setup from a theme or prompt.
+
+Output JSON with ALL these fields:
+- "campaign_title": evocative 3-6 word title
+- "world_summary": 2-3 sentence world description
+- "opening_mission": what the party must do first (1-2 sentences)
+- "objective": clear quest objective (1 sentence)
+- "first_scene": { "title": "location name", "description": "80-120 word cinematic opening narration", "sensory_tags": ["sight", "sound", "smell"] }
+- "initial_npcs": array of 1-3 NPCs each with { "name", "role", "attitude", "hook" (optional 1-sentence plot hook) }
+- "initial_threat": 1-sentence description of the primary danger
+- "tone": overall mood (e.g. "grim and desperate", "mysterious and foreboding")
+- "style_policy": narrative style guidance for future narration (1-2 sentences)
+- "visual_bible_seed": { "palette": "color description", "motifs": "recurring visual elements", "architecture": "building style" }
+
+Make it dark fantasy. Keep the opening scene atmospheric and evocative, not action-packed.`;
+
+const FallbackOpeningSchema = z.object({
   scene_text: z.string(),
   campaign_title: z.string(),
 });
@@ -157,32 +176,96 @@ export async function POST(
       activeSession?.adventure_prompt?.trim() ||
       "a mysterious dark fantasy adventure";
 
+    let seededObjective = `Complete the mission: ${adventurePrompt}`;
+    let seededSubObjectives: string[] | undefined;
+
     try {
       const provider = getAIProvider();
-      const aiCall = provider.generateStructured({
-        model: "light",
-        systemPrompt: `You are the Dungeon Master of Ashveil, a dark fantasy RPG. Generate a cinematic opening scene that sets the world, atmosphere, and initial situation for the players. 80-120 words. Output JSON: { "scene_text": "...", "campaign_title": "..." }`,
-        userPrompt: JSON.stringify({
-          adventure_theme: adventurePrompt,
-          characters: charNames,
-          mode: activeSession?.mode,
-        }),
-        schema: OpeningSchema,
-        maxTokens: 500,
-        temperature: 0.8,
+      const seedUserPrompt = JSON.stringify({
+        adventure_theme: adventurePrompt,
+        characters: charNames,
+        player_count: allPlayers.length,
+        mode: activeSession?.mode,
+        campaign_mode: activeSession?.campaign_mode ?? "user_prompt",
       });
-      const openingResult = await Promise.race([
-        aiCall,
-        new Promise<never>((_, reject) =>
-          setTimeout(() => reject(new Error("opening timeout")), 20_000),
-        ),
-      ]);
-      openingScene = openingResult.data.scene_text;
-      campaignTitle =
-        openingResult.data.campaign_title.trim() || campaignTitle;
+
+      const seedResult = await runOrchestrationStep<CampaignSeedOutput>({
+        stepName: "campaign_seeder",
+        sessionId,
+        turnId: null,
+        provider,
+        model: "heavy",
+        systemPrompt: CAMPAIGN_SEEDER_SYSTEM,
+        userPrompt: seedUserPrompt,
+        schema: CampaignSeedOutputSchema,
+        maxTokens: 1200,
+        temperature: 0.85,
+        timeoutMs: 25_000,
+      });
+      const seed = seedResult.data;
+
+      openingScene = seed.first_scene.description;
+      campaignTitle = seed.campaign_title.trim() || campaignTitle;
+      seededObjective = seed.objective;
+
+      const missionParts = seed.opening_mission.split(/[.!?]\s+/).filter(Boolean);
+      if (missionParts.length > 1) {
+        seededSubObjectives = missionParts.map((p) => p.replace(/[.!?]$/, "").trim());
+      }
+
+      const seedExtras: Record<string, unknown> = {};
+      if (seed.world_summary) seedExtras.world_summary = seed.world_summary;
+      if (seed.style_policy) seedExtras.style_policy = seed.style_policy;
+      if (seed.tone) seedExtras.tone = seed.tone;
+      if (seed.visual_bible_seed) seedExtras.visual_bible_seed = seed.visual_bible_seed;
+
+      if (Object.keys(seedExtras).length > 0) {
+        await db
+          .update(sessions)
+          .set(seedExtras)
+          .where(eq(sessions.id, sessionId));
+      }
+
+      if (seed.initial_npcs?.length) {
+        for (const npc of seed.initial_npcs) {
+          try {
+            await db.insert(npcStates).values({
+              session_id: sessionId,
+              name: npc.name,
+              role: npc.role,
+              attitude: npc.attitude,
+              status: "alive",
+              location: seed.first_scene.title || "Unknown",
+              visual_profile: npc.visual_profile ?? {},
+              notes: npc.hook ?? "",
+            });
+          } catch (npcErr) {
+            console.error("[start] NPC insert failed:", npcErr);
+          }
+        }
+      }
     } catch (err) {
-      console.error("[start] AI opening failed, using template:", err instanceof Error ? err.message : err);
-      openingScene = buildTemplateFallback(charNames, adventurePrompt);
+      console.error("[start] AI seeder failed, trying simple opening:", err instanceof Error ? err.message : err);
+      try {
+        const provider = getAIProvider();
+        const fallbackResult = await runOrchestrationStep({
+          stepName: "campaign_seeder_fallback",
+          sessionId,
+          turnId: null,
+          provider,
+          model: "light",
+          systemPrompt: `You are the Dungeon Master of Ashveil, a dark fantasy RPG. Generate a cinematic opening scene. 80-120 words. Output JSON: { "scene_text": "...", "campaign_title": "..." }`,
+          userPrompt: JSON.stringify({ adventure_theme: adventurePrompt, characters: charNames }),
+          schema: FallbackOpeningSchema,
+          maxTokens: 500,
+          temperature: 0.8,
+          timeoutMs: 15_000,
+        });
+        openingScene = fallbackResult.data.scene_text;
+        campaignTitle = fallbackResult.data.campaign_title.trim() || campaignTitle;
+      } catch {
+        openingScene = buildTemplateFallback(charNames, adventurePrompt);
+      }
     }
 
     await db
@@ -195,7 +278,8 @@ export async function POST(
 
     await initializeQuestState({
       sessionId,
-      objective: `Complete the mission: ${adventurePrompt}`,
+      objective: seededObjective,
+      subObjectives: seededSubObjectives,
       round: activeSession?.current_round ?? 1,
     });
 

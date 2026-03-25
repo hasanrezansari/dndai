@@ -1,7 +1,7 @@
 import { and, eq } from "drizzle-orm";
 
 import { db } from "@/lib/db";
-import { characters, players, sessions } from "@/lib/db/schema";
+import { characters, npcStates, players, sceneSnapshots, sessions } from "@/lib/db/schema";
 import { StatePatchSchema } from "@/lib/schemas/state-patches";
 import type { StatePatch } from "@/lib/schemas/state-patches";
 
@@ -118,6 +118,89 @@ export async function commitStatePatches(
           updated_at: new Date(),
         })
         .where(eq(sessions.id, sessionId));
+    } else if (patch.op === "npc_hp") {
+      const [npc] = await db
+        .select()
+        .from(npcStates)
+        .where(
+          and(
+            eq(npcStates.session_id, sessionId),
+            eq(npcStates.id, patch.npcId),
+          ),
+        )
+        .limit(1);
+      if (npc) {
+        const newStatus = patch.delta < 0 && Math.abs(patch.delta) >= 10 ? "dead" : npc.status;
+        await db
+          .update(npcStates)
+          .set({
+            status: newStatus,
+            notes: `${npc.notes} | HP change: ${patch.delta > 0 ? "+" : ""}${patch.delta} (${patch.reason})`.trim(),
+            updated_at: new Date(),
+          })
+          .where(eq(npcStates.id, patch.npcId));
+      }
+    } else if (patch.op === "inventory_add") {
+      const rows = await db
+        .select({ character: characters })
+        .from(characters)
+        .innerJoin(players, eq(characters.player_id, players.id))
+        .where(
+          and(
+            eq(players.session_id, sessionId),
+            eq(players.id, patch.playerId),
+          ),
+        )
+        .limit(1);
+      const char = rows[0]?.character;
+      if (char) {
+        const current = Array.isArray(char.inventory) ? char.inventory : [];
+        await db
+          .update(characters)
+          .set({ inventory: [...current, patch.item] })
+          .where(eq(characters.id, char.id));
+      }
+    } else if (patch.op === "inventory_remove") {
+      const rows = await db
+        .select({ character: characters })
+        .from(characters)
+        .innerJoin(players, eq(characters.player_id, players.id))
+        .where(
+          and(
+            eq(players.session_id, sessionId),
+            eq(players.id, patch.playerId),
+          ),
+        )
+        .limit(1);
+      const char = rows[0]?.character;
+      if (char) {
+        const current = Array.isArray(char.inventory) ? char.inventory : [];
+        const filtered = current.filter((item: unknown) => {
+          if (item && typeof item === "object" && "id" in item) {
+            return (item as { id: string }).id !== patch.itemId;
+          }
+          return true;
+        });
+        await db
+          .update(characters)
+          .set({ inventory: filtered })
+          .where(eq(characters.id, char.id));
+      }
+    } else if (patch.op === "location_set") {
+      const [sess2] = await db
+        .select()
+        .from(sessions)
+        .where(eq(sessions.id, sessionId))
+        .limit(1);
+      if (sess2) {
+        await db.insert(sceneSnapshots).values({
+          session_id: sessionId,
+          round_number: sess2.current_round,
+          state_version: sess2.state_version,
+          summary: patch.summary,
+          image_status: "none",
+        });
+      }
     }
   }
 

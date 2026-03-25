@@ -99,11 +99,15 @@ export async function getQuestState(sessionId: string): Promise<QuestState | nul
 export async function initializeQuestState(params: {
   sessionId: string;
   objective: string;
+  subObjectives?: string[];
   round: number;
 }): Promise<QuestState> {
   const existing = await getQuestState(params.sessionId);
   if (existing) return existing;
   const state = defaultQuestState(params.objective);
+  if (params.subObjectives?.length) {
+    state.subObjectives = params.subObjectives;
+  }
   await persistQuestState(params.sessionId, params.round, state);
   return state;
 }

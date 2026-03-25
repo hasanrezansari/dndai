@@ -2,7 +2,7 @@ import { and, eq } from "drizzle-orm";
 
 import { getAIProvider } from "@/lib/ai";
 import { db } from "@/lib/db";
-import { actions, narrativeEvents, turns } from "@/lib/db/schema";
+import { actions, narrativeEvents, npcStates, turns } from "@/lib/db/schema";
 import { broadcastToSession } from "@/lib/socket/server";
 import { buildTurnContext } from "@/lib/orchestrator/context-builder";
 import { commitStatePatches } from "@/lib/orchestrator/apply-state";
@@ -10,6 +10,8 @@ import { logTrace } from "@/lib/orchestrator/trace";
 import { parseIntent } from "@/lib/orchestrator/workers/intent-parser";
 import { interpretRules } from "@/lib/orchestrator/workers/rules-interpreter";
 import { generateNarration } from "@/lib/orchestrator/workers/narrator";
+import { checkVisualDelta } from "@/lib/orchestrator/workers/visual-delta";
+import { buildMemoryBundle, shouldSummarize, runSummarizer } from "@/lib/memory";
 
 import type { ActionIntent, NarratorOutput } from "@/lib/schemas/ai-io";
 import type { DiceRoll, NarrativeEvent } from "@/lib/schemas/domain";
@@ -76,10 +78,25 @@ function scaleDelta(base: number, rollTotal: number): number {
   return base > 0 ? base * scale : base * scale;
 }
 
+function resolveNpcTarget(
+  intent: ActionIntent,
+  npcIds: Array<{ id: string; name: string }>,
+): { id: string; name: string } | null {
+  if (!npcIds.length) return null;
+  const npcTargets = intent.targets?.filter((t) => t.kind === "npc") ?? [];
+  const first = npcTargets[0];
+  if (!first?.label) return null;
+  const label = first.label.toLowerCase();
+  return npcIds.find((n) => n.name.toLowerCase() === label) ??
+    npcIds.find((n) => label.includes(n.name.toLowerCase())) ??
+    null;
+}
+
 function computeStatePatches(
   intent: ActionIntent,
   rolls: DiceRoll[],
   actingPlayerId: string,
+  npcIds: Array<{ id: string; name: string }> = [],
 ): StatePatch[] {
   const patches: StatePatch[] = [];
   const roll = rolls[0];
@@ -89,12 +106,19 @@ function computeStatePatches(
   const type = intent.action_type;
 
   if (type === "attack" || type === "cast_spell") {
+    const npcTarget = resolveNpcTarget(intent, npcIds);
     switch (roll.result) {
       case "critical_success":
         patches.push({ op: "player_hp", playerId: actingPlayerId, delta: scaleDelta(2, t) });
+        if (npcTarget) {
+          patches.push({ op: "npc_hp", npcId: npcTarget.id, delta: -scaleDelta(3, t), reason: `${type} critical hit` });
+        }
         break;
       case "success":
         patches.push({ op: "player_hp", playerId: actingPlayerId, delta: 1 });
+        if (npcTarget) {
+          patches.push({ op: "npc_hp", npcId: npcTarget.id, delta: -scaleDelta(2, t), reason: `${type} hit` });
+        }
         break;
       case "failure":
         patches.push({ op: "player_hp", playerId: actingPlayerId, delta: scaleDelta(-1, t) });
@@ -103,6 +127,24 @@ function computeStatePatches(
         patches.push({ op: "player_hp", playerId: actingPlayerId, delta: scaleDelta(-2, t) });
         patches.push({ op: "condition_add", targetId: actingPlayerId, condition: "staggered" });
         break;
+    }
+  } else if (type === "heal") {
+    if (roll.result === "critical_success") {
+      patches.push({ op: "player_hp", playerId: actingPlayerId, delta: scaleDelta(3, t) });
+    } else if (roll.result === "success") {
+      patches.push({ op: "player_hp", playerId: actingPlayerId, delta: scaleDelta(2, t) });
+    } else if (roll.result === "critical_failure") {
+      patches.push({ op: "player_hp", playerId: actingPlayerId, delta: scaleDelta(-1, t) });
+    }
+  } else if (type === "defend") {
+    if (roll.result === "critical_success") {
+      patches.push({ op: "player_hp", playerId: actingPlayerId, delta: scaleDelta(2, t) });
+      patches.push({ op: "condition_add", targetId: actingPlayerId, condition: "defended" });
+    } else if (roll.result === "success") {
+      patches.push({ op: "player_hp", playerId: actingPlayerId, delta: 1 });
+      patches.push({ op: "condition_add", targetId: actingPlayerId, condition: "defended" });
+    } else if (roll.result === "critical_failure") {
+      patches.push({ op: "player_hp", playerId: actingPlayerId, delta: scaleDelta(-1, t) });
     }
   } else if (type === "use_item") {
     const isHealItem = intent.suggested_roll_context?.toLowerCase().includes("heal") ||
@@ -139,6 +181,47 @@ function mapNarrativeRow(row: typeof narrativeEvents.$inferSelect): NarrativeEve
     image_hint: row.image_hint as NarrativeEvent["image_hint"],
     created_at: row.created_at.toISOString(),
   };
+}
+
+const NPC_DEATH_WORDS = /\b(dies|killed|slain|dead|perishes|falls\s+lifeless|collapses\s+dead)\b/i;
+const NPC_FLEE_WORDS = /\b(flees|escapes|runs\s+away|retreats|vanishes|disappears)\b/i;
+const NPC_HOSTILE_WORDS = /\b(attacks|hostile|enraged|furious|turns\s+on|threatens)\b/i;
+const NPC_FRIENDLY_WORDS = /\b(grateful|friendly|thanks|allies|helps|trusts|softens)\b/i;
+
+async function updateNpcStatesFromNarrative(
+  sessionId: string,
+  npcIds: Array<{ id: string; name: string }>,
+  visibleChanges: string[],
+  sceneText: string,
+): Promise<void> {
+  const combined = [...visibleChanges, sceneText].join(" ");
+
+  for (const npc of npcIds) {
+    const namePattern = new RegExp(`\\b${npc.name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\b`, "i");
+    if (!namePattern.test(combined)) continue;
+
+    const npcMentions = combined;
+    const updates: Record<string, unknown> = { updated_at: new Date() };
+
+    if (NPC_DEATH_WORDS.test(npcMentions)) {
+      updates.status = "dead";
+    } else if (NPC_FLEE_WORDS.test(npcMentions)) {
+      updates.status = "fled";
+    }
+
+    if (NPC_HOSTILE_WORDS.test(npcMentions)) {
+      updates.attitude = "hostile";
+    } else if (NPC_FRIENDLY_WORDS.test(npcMentions)) {
+      updates.attitude = "friendly";
+    }
+
+    if (Object.keys(updates).length > 1) {
+      await db
+        .update(npcStates)
+        .set(updates)
+        .where(eq(npcStates.id, npc.id));
+    }
+  }
 }
 
 function rollDc(roll: { dice: string; dc?: number }): number {
@@ -206,6 +289,7 @@ export async function runTurnPipeline(params: {
     characterName: ctx.character.name,
     characterClass: ctx.character.class,
     recentEvents: ctx.recentEvents,
+    provider,
   });
   const intent = intentResult.data;
 
@@ -220,6 +304,7 @@ export async function runTurnPipeline(params: {
     intent,
     characterStats: ctx.character.stats,
     characterClass: ctx.character.class,
+    provider,
   });
   const rules = rulesResult.data;
 
@@ -227,6 +312,14 @@ export async function runTurnPipeline(params: {
   const diceRolls: DiceRoll[] = [];
   if (rules.rolls.length > 0) {
     for (const roll of rules.rolls) {
+      try {
+        await broadcastToSession(sessionId, "dice-rolling", {
+          roll_context: roll.context,
+          dice_type: roll.dice,
+        });
+      } catch (err) {
+        console.error("[pipeline] dice-rolling broadcast failed:", err);
+      }
       const dr = await performRoll({
         actionId,
         diceType: roll.dice,
@@ -258,7 +351,7 @@ export async function runTurnPipeline(params: {
   });
 
   const s0 = Date.now();
-  const statePatches = computeStatePatches(intent, diceRolls, playerId);
+  const statePatches = computeStatePatches(intent, diceRolls, playerId, ctx.npcIds);
   const questUpdate = await applyTurnQuestProgress({
     sessionId,
     round: ctx.session.currentRound,
@@ -332,7 +425,8 @@ export async function runTurnPipeline(params: {
   const actorName = ctx.character.name;
   const nextActorName = ctx.nextPlayerName;
 
-  const recentNarrative = ctx.recentEvents.join("\n---\n").slice(0, 6000);
+  const memoryBundle = await buildMemoryBundle("narrator", sessionId);
+
   const sceneContext =
     ctx.currentSceneDescription?.trim() ||
     ctx.session.campaignTitle?.trim() ||
@@ -354,10 +448,14 @@ export async function runTurnPipeline(params: {
     characterTraits: ctx.character.traits,
     characterBackstory: ctx.character.backstory,
     nextPlayerName: nextActorName,
-    recentNarrative,
+    recentNarrative: memoryBundle.recentEventWindow,
     sceneContext,
     partySummary: ctx.allCharacterSummaries.join("; "),
     questContext: ctx.questContext,
+    npcContext: ctx.npcContext,
+    canonicalState: memoryBundle.canonicalState,
+    rollingSummary: memoryBundle.rollingSummary,
+    stylePolicy: memoryBundle.stylePolicy,
     provider,
   });
 
@@ -387,7 +485,42 @@ export async function runTurnPipeline(params: {
     throw new Error("Failed to persist narrative");
   }
 
-  const imageNeeded = true;
+  if (ctx.npcIds.length > 0 && narration.visible_changes.length > 0) {
+    try {
+      await updateNpcStatesFromNarrative(sessionId, ctx.npcIds, narration.visible_changes, narration.scene_text);
+    } catch (err) {
+      console.error("[pipeline] NPC state update failed, continuing:", err);
+    }
+  }
+
+  try {
+    if (await shouldSummarize(sessionId, ctx.session.currentRound)) {
+      await runSummarizer({ sessionId, currentRound: ctx.session.currentRound, provider });
+    }
+  } catch (err) {
+    console.error("[pipeline] summarizer failed, continuing:", err);
+  }
+
+  const visualDeltaResult = await checkVisualDelta({
+    sessionId,
+    turnId,
+    narrativeText: narration.scene_text,
+    currentSceneDescription: ctx.currentSceneDescription,
+  });
+  const imageNeeded = visualDeltaResult.data.image_needed;
+
+  await logTrace({
+    sessionId,
+    turnId,
+    stepName: "visual_delta",
+    input: { narrative_len: narration.scene_text.length },
+    output: { image_needed: imageNeeded, reasons: visualDeltaResult.data.reasons },
+    modelUsed: "deterministic",
+    tokensIn: 0,
+    tokensOut: 0,
+    latencyMs: visualDeltaResult.latencyMs,
+    success: true,
+  });
 
   let imageJobPayload: SessionImageJobPayload | undefined;
   if (imageNeeded) {

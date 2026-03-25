@@ -1,4 +1,5 @@
 import type { AIProvider, ModelTier, OrchestrationStepResult, TokenUsage, ZodSchema } from "@/lib/ai/types";
+import { waitForAIRateLimit } from "@/lib/ai/rate-limiter";
 import { logTrace } from "@/lib/orchestrator/trace";
 
 function asRecord(value: unknown): Record<string, unknown> {
@@ -68,6 +69,7 @@ export async function runOrchestrationStep<T>(params: {
   let error: string | undefined;
 
   try {
+    await waitForAIRateLimit(params.sessionId);
     const r1 = await runWithTimeout(params.userPrompt);
     data = r1.data;
     usage = r1.usage;

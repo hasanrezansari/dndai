@@ -21,6 +21,7 @@ import { NarrativeCard } from "@/components/game/narrative-card";
 import { PlayerStrip } from "@/components/game/player-strip";
 import { SceneHeader } from "@/components/game/scene-header";
 import { TurnBanner } from "@/components/game/turn-banner";
+import { SceneTransition } from "@/components/game/scene-transition";
 import { FeedList } from "@/components/feed/feed-list";
 import { useSessionChannel } from "@/lib/socket/use-session-channel";
 import { useGameStore } from "@/lib/state/game-store";
@@ -30,6 +31,35 @@ function dangerLabel(risk: number): { label: string; color: string } {
   if (risk >= 61) return { label: "Perilous", color: "#e07c3a" };
   if (risk >= 31) return { label: "Uneasy", color: "var(--color-gold-rare)" };
   return { label: "Calm", color: "var(--color-silver-dim)" };
+}
+
+function atmosphereForPhase(phase: string | undefined): {
+  gradient: string;
+  glowColor: string;
+} {
+  switch (phase) {
+    case "combat":
+      return {
+        gradient: "radial-gradient(ellipse at 50% 0%, rgba(139,37,0,0.18) 0%, transparent 70%)",
+        glowColor: "rgba(139,37,0,0.12)",
+      };
+    case "social":
+      return {
+        gradient: "radial-gradient(ellipse at 50% 0%, rgba(184,134,11,0.12) 0%, transparent 70%)",
+        glowColor: "rgba(184,134,11,0.08)",
+      };
+    case "rest":
+      return {
+        gradient: "radial-gradient(ellipse at 50% 0%, rgba(123,45,142,0.10) 0%, transparent 65%)",
+        glowColor: "rgba(123,45,142,0.06)",
+      };
+    case "exploration":
+    default:
+      return {
+        gradient: "radial-gradient(ellipse at 50% 0%, rgba(27,77,110,0.15) 0%, transparent 70%)",
+        glowColor: "rgba(27,77,110,0.08)",
+      };
+  }
 }
 
 function SessionPlaySkeleton() {
@@ -111,6 +141,8 @@ export default function SessionGameplayPage() {
   const [hydrated, setHydrated] = useState(false);
   const [voteBusy, setVoteBusy] = useState(false);
   const [chapterBusy, setChapterBusy] = useState(false);
+  const [sceneTransitionTrigger, setSceneTransitionTrigger] = useState(false);
+  const [prevSceneTitle, setPrevSceneTitle] = useState<string | null>(null);
 
   useEffect(() => {
     setHydrated(false);
@@ -167,6 +199,20 @@ export default function SessionGameplayPage() {
     const me = players.find((p) => p.id === currentPlayerId);
     setIsDm(Boolean(me?.isDm));
   }, [currentPlayerId, players, setIsDm]);
+
+  useEffect(() => {
+    if (!sceneTitle || sceneTitle === prevSceneTitle) return;
+    if (prevSceneTitle !== null) {
+      setSceneTransitionTrigger(true);
+      const timer = setTimeout(() => setSceneTransitionTrigger(false), 100);
+      return () => clearTimeout(timer);
+    }
+    setPrevSceneTitle(sceneTitle);
+  }, [sceneTitle, prevSceneTitle]);
+
+  useEffect(() => {
+    if (sceneTitle) setPrevSceneTitle(sceneTitle);
+  }, [sceneTitle]);
 
   const currentTurnPlayerId = session?.currentPlayerId ?? null;
   const isMyTurn =
@@ -371,8 +417,25 @@ export default function SessionGameplayPage() {
     );
   }
 
+  const atmosphere = atmosphereForPhase(session?.phase);
+
   return (
-    <div className="flex min-h-dvh flex-col bg-[var(--color-obsidian)]">
+    <div className="relative flex min-h-dvh flex-col bg-[var(--color-obsidian)]">
+      <div
+        className="pointer-events-none fixed inset-0 z-0 transition-opacity duration-1000"
+        style={{ background: atmosphere.gradient }}
+        aria-hidden
+      />
+      <div
+        className="pointer-events-none fixed inset-x-0 top-0 z-0 h-1 transition-colors duration-1000"
+        style={{ boxShadow: `0 0 80px 40px ${atmosphere.glowColor}` }}
+        aria-hidden
+      />
+      <SceneTransition
+        imageUrl={sceneImage}
+        locationTitle={sceneTitle}
+        trigger={sceneTransitionTrigger}
+      />
       <ConnectionStatus />
       {activeSheet === "character" && (
         <BottomSheet isOpen onClose={closeSheet} title="Character">
@@ -390,7 +453,7 @@ export default function SessionGameplayPage() {
         </BottomSheet>
       )}
       <DiceOverlay />
-      <div className="relative z-0 h-[42vh] w-full shrink-0 overflow-hidden">
+      <div className="relative z-[1] h-[42vh] w-full shrink-0 overflow-hidden">
         <button
           type="button"
           onClick={handleLeaveSession}
@@ -408,7 +471,7 @@ export default function SessionGameplayPage() {
         />
       </div>
 
-      <div className="relative z-10 shrink-0 px-4">
+      <div className="relative z-[2] shrink-0 px-4">
         <NarrativeCard text={narrativeText} isThinking={isThinking} />
       </div>
 

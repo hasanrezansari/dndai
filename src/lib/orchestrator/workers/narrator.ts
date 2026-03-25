@@ -26,6 +26,11 @@ PARTY & QUEST AWARENESS:
 - "party_summary" lists each party member with race, class, HP, and pronouns. Reference party members naturally.
 - "quest_progress" shows the campaign objective and how close the party is to completing it. Subtly reflect quest tension — do NOT read numbers aloud.
 
+MEMORY CONTEXT:
+- "canonical_state" is the authoritative world state: round, phase, party, NPCs, quest. Use it to stay consistent.
+- "rolling_summary" (if present) is a compressed memory of earlier events: key events, active plot hooks, NPC relationships, world changes. Weave relevant details naturally — do NOT dump facts.
+- "style_rules" (if present) provides additional narration style guidance specific to this campaign.
+
 RULES:
 - 60-140 words STRICTLY
 - Narrate the outcome of the player's SPECIFIC action (from "player_action") based on dice results
@@ -190,6 +195,10 @@ export async function generateNarration(params: {
   sceneContext: string;
   partySummary?: string;
   questContext?: string | null;
+  npcContext?: string | null;
+  canonicalState?: string;
+  rollingSummary?: string | null;
+  stylePolicy?: string;
   provider: AIProvider;
 }): Promise<OrchestrationStepResult<NarratorOutput>> {
   const userPrompt = JSON.stringify({
@@ -205,6 +214,10 @@ export async function generateNarration(params: {
     scene_context: params.sceneContext,
     party_summary: params.partySummary ?? "",
     quest_progress: params.questContext ?? "",
+    active_npcs: params.npcContext ?? "",
+    canonical_state: params.canonicalState ?? "",
+    rolling_summary: params.rollingSummary ?? "",
+    style_rules: params.stylePolicy ?? "",
   });
 
   const rollResult = params.diceResults[0]?.result as DiceRoll["result"] | undefined;
@@ -214,7 +227,7 @@ export async function generateNarration(params: {
     sessionId: params.sessionId,
     turnId: params.turnId,
     provider: params.provider,
-    model: "light",
+    model: "heavy",
     systemPrompt: NARRATOR_SYSTEM,
     userPrompt,
     schema: NarratorOutputSchema,

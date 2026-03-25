@@ -72,6 +72,19 @@ export interface GamePlayerView {
   };
 }
 
+export interface RollingMemoryView {
+  id: string;
+  turnRangeStart: number;
+  turnRangeEnd: number;
+  content: {
+    key_events?: string[];
+    active_hooks?: string[];
+    npc_relationships?: string[];
+    world_changes?: string[];
+  };
+  createdAt: string;
+}
+
 export interface DiceOverlayData {
   context: string;
   diceType: string;
@@ -100,6 +113,7 @@ interface GameState {
   dmAwaiting: { turnId: string; actingPlayerId: string } | null;
   dmDc: number | null;
   quest: QuestProgressView | null;
+  rollingMemories: RollingMemoryView[];
 
   setSessionId: (id: string) => void;
   setSession: (session: GameState["session"]) => void;
@@ -132,6 +146,7 @@ interface GameState {
     scenePending?: boolean;
     dmAwaiting?: { turnId: string; actingPlayerId: string } | null;
     quest?: QuestProgressView | null;
+    rollingMemories?: RollingMemoryView[];
   }) => void;
   reset: () => void;
   openSheet: (sheet: ActiveSheet) => void;
@@ -143,6 +158,7 @@ interface GameState {
   ) => void;
   setDmDc: (dc: number | null) => void;
   setQuest: (quest: QuestProgressView | null) => void;
+  setRollingMemories: (memories: RollingMemoryView[]) => void;
 }
 
 const emptyState = {
@@ -164,6 +180,7 @@ const emptyState = {
   dmAwaiting: null as { turnId: string; actingPlayerId: string } | null,
   dmDc: null as number | null,
   quest: null as QuestProgressView | null,
+  rollingMemories: [] as RollingMemoryView[],
 };
 
 export const useGameStore = create<GameState>((set) => ({
@@ -233,6 +250,8 @@ export const useGameStore = create<GameState>((set) => ({
 
   setQuest: (quest) => set({ quest }),
 
+  setRollingMemories: (memories) => set({ rollingMemories: memories }),
+
   updateSessionField: (field, value) =>
     set((s) => {
       if (!s.session) return s;
@@ -252,6 +271,7 @@ export const useGameStore = create<GameState>((set) => ({
       waitingForDm: Boolean(data.dmAwaiting),
       dmAwaiting: data.dmAwaiting ?? null,
       quest: data.quest ?? null,
+      rollingMemories: data.rollingMemories ?? [],
     }),
 
   reset: () => set({ ...emptyState }),

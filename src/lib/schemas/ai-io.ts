@@ -17,6 +17,8 @@ export const ActionIntentSchema = z.object({
     "talk",
     "inspect",
     "use_item",
+    "defend",
+    "heal",
     "other",
   ]),
   targets: z.array(ActionIntentTargetSchema).default([]),

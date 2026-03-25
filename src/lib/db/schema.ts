@@ -83,6 +83,12 @@ export const sessions = pgTable(
     adventure_prompt: text("adventure_prompt"),
     module_key: text("module_key"),
     campaign_title: text("campaign_title"),
+    world_summary: text("world_summary"),
+    style_policy: text("style_policy"),
+    tone: text("tone"),
+    visual_bible_seed: jsonb("visual_bible_seed")
+      .$type<Record<string, unknown>>()
+      .default(sql`'{}'::jsonb`),
     created_at: timestamp("created_at", { withTimezone: true })
       .notNull()
       .defaultNow(),
