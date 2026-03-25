@@ -2,7 +2,7 @@
 
 import { useSession } from "next-auth/react";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 
 import { ConnectionStatus } from "@/components/ui/connection-status";
 import {
@@ -68,6 +68,7 @@ function SessionPlaySkeleton() {
 
 export default function SessionGameplayPage() {
   const params = useParams();
+  const router = useRouter();
   const idParam = params.id;
   const sessionId =
     typeof idParam === "string"
@@ -293,6 +294,13 @@ export default function SessionGameplayPage() {
     [sessionId],
   );
 
+  const handleLeaveSession = useCallback(() => {
+    if (window.confirm("Leave this session?")) {
+      useGameStore.getState().reset();
+      router.push("/");
+    }
+  }, [router]);
+
   if (!sessionId) {
     return (
       <div className="flex min-h-dvh items-center justify-center bg-[var(--color-obsidian)] px-4 text-[var(--color-silver-dim)]">
@@ -330,6 +338,13 @@ export default function SessionGameplayPage() {
       )}
       <DiceOverlay />
       <div className="relative z-0 h-[42vh] w-full shrink-0 overflow-hidden">
+        <button
+          type="button"
+          onClick={handleLeaveSession}
+          className="absolute left-3 top-3 z-30 min-h-[36px] min-w-[36px] rounded-full border border-white/10 bg-black/50 px-3 py-1 text-xs font-medium text-[var(--color-silver-dim)] backdrop-blur-md transition-colors hover:bg-black/70 hover:text-[var(--color-silver-muted)]"
+        >
+          Leave
+        </button>
         <SceneHeader
           sceneImage={sceneImage}
           previousSceneImage={previousSceneImage}

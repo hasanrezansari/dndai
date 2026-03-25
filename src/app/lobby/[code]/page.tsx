@@ -122,14 +122,19 @@ export default function LobbyPage() {
     const bump = () => {
       void refetchSession(sessionId);
     };
+    const onSessionStarted = () => {
+      router.push(`/character/${sessionId}`);
+    };
     channel.bind("player-joined", bump);
     channel.bind("player-ready", bump);
     channel.bind("player-disconnected", bump);
+    channel.bind("session-started", onSessionStarted);
 
     return () => {
       channel.unbind("player-joined");
       channel.unbind("player-ready");
       channel.unbind("player-disconnected");
+      channel.unbind("session-started");
       pusher.unsubscribe(name);
     };
   }, [sessionId, refetchSession]);
@@ -191,7 +196,7 @@ export default function LobbyPage() {
         window.alert(data.error ?? "Could not start");
         return;
       }
-      router.push(`/session/${sessionId}`);
+      router.push(`/character/${sessionId}`);
     } finally {
       setStartLoading(false);
     }
