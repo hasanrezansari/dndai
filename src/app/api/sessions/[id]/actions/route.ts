@@ -162,16 +162,18 @@ export async function POST(
             sceneContext: imgPayload.sceneContext,
             characterNames: imgPayload.characterNames,
           });
-          console.log("[image-after] pipeline done, imageUrl:", !!result.imageUrl);
+          console.log("[image-after] pipeline done, imageUrl:", result.imageUrl ?? "null");
           if (result.imageUrl) {
             await broadcastToSession(sessionId, "scene-image-ready", {
               scene_id: sceneImageId,
               image_url: result.imageUrl,
             });
+            console.log("[image-after] broadcast scene-image-ready OK");
           } else {
             await broadcastToSession(sessionId, "scene-image-failed", {
               scene_id: sceneImageId,
             });
+            console.log("[image-after] broadcast scene-image-failed");
           }
         } catch (err) {
           console.error("[image-after] action image failed:", err);

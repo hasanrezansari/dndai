@@ -247,6 +247,43 @@ export function useSessionChannel(sessionId: string | null) {
       });
     };
 
+    let scenePollTimer: ReturnType<typeof setInterval> | null = null;
+
+    function stopScenePoll() {
+      if (scenePollTimer) {
+        clearInterval(scenePollTimer);
+        scenePollTimer = null;
+      }
+    }
+
+    async function pollSceneImage() {
+      if (!useGameStore.getState().scenePending) {
+        stopScenePoll();
+        return;
+      }
+      try {
+        const res = await fetch(`/api/sessions/${sessionId}/state`);
+        if (!res.ok) return;
+        const data = (await res.json()) as {
+          sceneImage?: string | null;
+          scenePending?: boolean;
+        };
+        if (data.sceneImage && !useGameStore.getState().scenePending) return;
+        if (data.sceneImage) {
+          useGameStore.getState().setSceneImage(data.sceneImage);
+        }
+        if (!data.scenePending) {
+          useGameStore.getState().setScenePending(false);
+          stopScenePoll();
+        }
+      } catch { /* best effort */ }
+    }
+
+    function startScenePoll() {
+      stopScenePoll();
+      scenePollTimer = setInterval(pollSceneImage, 8_000);
+    }
+
     const onSceneImagePending = (raw: unknown) => {
       const parsed = SceneImagePendingEventSchema.safeParse(raw);
       if (!parsed.success) return;
@@ -257,6 +294,7 @@ export function useSessionChannel(sessionId: string | null) {
         text: parsed.data.label,
         timestamp: nowIso(),
       });
+      startScenePoll();
     };
 
     const onSceneImageReady = (raw: unknown) => {
@@ -264,12 +302,14 @@ export function useSessionChannel(sessionId: string | null) {
       if (!parsed.success) return;
       useGameStore.getState().setSceneImage(parsed.data.image_url);
       useGameStore.getState().setScenePending(false);
+      stopScenePoll();
     };
 
     const onSceneImageFailed = (raw: unknown) => {
       const parsed = SceneImageFailedEventSchema.safeParse(raw);
       if (!parsed.success) return;
       useGameStore.getState().setScenePending(false);
+      stopScenePoll();
     };
 
     const onAwaitingDm = (raw: unknown) => {
@@ -324,6 +364,7 @@ export function useSessionChannel(sessionId: string | null) {
     channel.bind("dm-notice", onDmNotice);
 
     return () => {
+      stopScenePoll();
       channel.unbind("player-joined", onPlayerJoined);
       channel.unbind("player-ready", onPlayerReady);
       channel.unbind("player-disconnected", onPlayerDisconnected);
