@@ -98,6 +98,29 @@ export async function POST(
     }
 
     if (pipelineResult.kind === "human_dm") {
+      if (pipelineResult.shouldEndSession) {
+        await resolveCurrentProcessingTurn(sessionId);
+        const stateVersion = await finalizeSessionEnd(sessionId);
+        try {
+          await broadcastToSession(sessionId, "dm-notice", {
+            message: "The campaign reaches its conclusion.",
+          });
+        } catch (err) {
+          console.error(err);
+        }
+        try {
+          await broadcastToSession(sessionId, "state-update", {
+            changes: pipelineResult.statePatches,
+            state_version: stateVersion,
+          });
+        } catch (err) {
+          console.error(err);
+        }
+        await releaseTurnLock(sessionId);
+        lockHeld = false;
+        return NextResponse.json({ actionId, turnId }, { status: 202 });
+      }
+
       const [sessionRow] = await db
         .select({ state_version: sessions.state_version })
         .from(sessions)
@@ -197,6 +220,7 @@ export async function POST(
             narrativeText: imgPayload.narrativeText,
             sceneContext: imgPayload.sceneContext,
             characterNames: imgPayload.characterNames,
+            imageHint: imgPayload.imageHint,
           });
           console.log("[image-after] pipeline done, imageUrl:", result.imageUrl ?? "null");
           if (result.imageUrl) {

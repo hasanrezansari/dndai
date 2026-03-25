@@ -1,0 +1,239 @@
+import { describe, expect, it, vi } from "vitest";
+
+vi.mock("@/lib/db", () => ({ db: {} }));
+
+import {
+  defaultQuestState,
+  evaluateEndingVote,
+  intentWeight,
+  maybeOpenEndingVote,
+  scoreFromRoll,
+  type QuestState,
+} from "@/server/services/quest-service";
+
+describe("scoreFromRoll", () => {
+  it("returns high progress and negative risk for critical success", () => {
+    const { progressDelta, riskDelta } = scoreFromRoll("critical_success");
+    expect(progressDelta).toBeGreaterThanOrEqual(10);
+    expect(riskDelta).toBeLessThan(0);
+  });
+
+  it("returns positive progress and negative risk for success", () => {
+    const { progressDelta, riskDelta } = scoreFromRoll("success");
+    expect(progressDelta).toBeGreaterThan(0);
+    expect(riskDelta).toBeLessThanOrEqual(0);
+  });
+
+  it("returns low progress and high risk for failure", () => {
+    const { progressDelta, riskDelta } = scoreFromRoll("failure");
+    expect(progressDelta).toBeLessThanOrEqual(3);
+    expect(riskDelta).toBeGreaterThan(0);
+  });
+
+  it("returns minimal progress and high risk for critical failure", () => {
+    const { progressDelta, riskDelta } = scoreFromRoll("critical_failure");
+    expect(progressDelta).toBeLessThanOrEqual(2);
+    expect(riskDelta).toBeGreaterThanOrEqual(8);
+  });
+
+  it("returns moderate values for undefined result", () => {
+    const { progressDelta, riskDelta } = scoreFromRoll(undefined);
+    expect(progressDelta).toBeGreaterThan(0);
+    expect(riskDelta).toBeGreaterThan(0);
+  });
+});
+
+describe("intentWeight", () => {
+  it("gives higher weight to combat actions", () => {
+    expect(intentWeight("attack")).toBeGreaterThan(1);
+    expect(intentWeight("cast_spell")).toBeGreaterThan(1);
+  });
+
+  it("gives moderate weight to social actions", () => {
+    expect(intentWeight("talk")).toBeLessThanOrEqual(1);
+    expect(intentWeight("talk")).toBeGreaterThan(0);
+  });
+
+  it("gives base weight to unknown actions", () => {
+    expect(intentWeight("unknown_action")).toBeLessThan(1);
+    expect(intentWeight("unknown_action")).toBeGreaterThan(0);
+  });
+});
+
+describe("defaultQuestState", () => {
+  it("creates a fresh state with zero progress and risk", () => {
+    const state = defaultQuestState("Save the village");
+    expect(state.objective).toBe("Save the village");
+    expect(state.progress).toBe(0);
+    expect(state.risk).toBe(0);
+    expect(state.status).toBe("active");
+    expect(state.endingVote).toBeNull();
+  });
+
+  it("truncates long objectives", () => {
+    const long = "A".repeat(200);
+    const state = defaultQuestState(long);
+    expect(state.objective.length).toBeLessThanOrEqual(140);
+    expect(state.objective.endsWith("...")).toBe(true);
+  });
+
+  it("provides fallback for empty objectives", () => {
+    const state = defaultQuestState("");
+    expect(state.objective.length).toBeGreaterThan(0);
+  });
+});
+
+describe("maybeOpenEndingVote", () => {
+  const voters = ["p1", "p2", "p3"];
+
+  it("opens vote when status is ready_to_end and no existing vote", () => {
+    const state: QuestState = {
+      ...defaultQuestState("test"),
+      progress: 100,
+      status: "ready_to_end",
+    };
+    const { state: next, opened } = maybeOpenEndingVote(state, 5, voters);
+    expect(opened).toBe(true);
+    expect(next.endingVote?.open).toBe(true);
+    expect(next.endingVote?.reason).toBe("objective_complete");
+    expect(next.endingVote?.eligibleVoterIds).toEqual(voters);
+    expect(next.endingVote?.requiredYes).toBe(2);
+  });
+
+  it("opens vote when status is failed", () => {
+    const state: QuestState = {
+      ...defaultQuestState("test"),
+      risk: 100,
+      status: "failed",
+    };
+    const { state: next, opened } = maybeOpenEndingVote(state, 5, voters);
+    expect(opened).toBe(true);
+    expect(next.endingVote?.reason).toBe("party_defeated");
+  });
+
+  it("does not open vote when status is active", () => {
+    const state: QuestState = {
+      ...defaultQuestState("test"),
+      status: "active",
+    };
+    const { opened } = maybeOpenEndingVote(state, 5, voters);
+    expect(opened).toBe(false);
+  });
+
+  it("does not open vote during cooldown", () => {
+    const state: QuestState = {
+      ...defaultQuestState("test"),
+      progress: 100,
+      status: "ready_to_end",
+      endingVote: {
+        open: false,
+        reason: "objective_complete",
+        initiatedRound: 2,
+        cooldownUntilRound: 10,
+        failedAttempts: 1,
+        requiredYes: 2,
+        eligibleVoterIds: voters,
+        votes: {},
+      },
+    };
+    const { opened } = maybeOpenEndingVote(state, 5, voters);
+    expect(opened).toBe(false);
+  });
+
+  it("does not open a second vote while one is already open", () => {
+    const state: QuestState = {
+      ...defaultQuestState("test"),
+      progress: 100,
+      status: "ready_to_end",
+      endingVote: {
+        open: true,
+        reason: "objective_complete",
+        initiatedRound: 5,
+        cooldownUntilRound: 5,
+        failedAttempts: 0,
+        requiredYes: 2,
+        eligibleVoterIds: voters,
+        votes: {},
+      },
+    };
+    const { opened } = maybeOpenEndingVote(state, 5, voters);
+    expect(opened).toBe(false);
+  });
+});
+
+describe("evaluateEndingVote", () => {
+  const voters = ["p1", "p2", "p3"];
+
+  function makeVoteState(
+    votes: Record<string, "end_now" | "continue">,
+    failedAttempts = 0,
+  ): QuestState {
+    return {
+      ...defaultQuestState("test"),
+      status: "ready_to_end",
+      endingVote: {
+        open: true,
+        reason: "objective_complete",
+        initiatedRound: 5,
+        cooldownUntilRound: 5,
+        failedAttempts,
+        requiredYes: 2,
+        eligibleVoterIds: voters,
+        votes,
+      },
+    };
+  }
+
+  it("passes when supermajority votes end_now", () => {
+    const state = makeVoteState({ p1: "end_now", p2: "end_now" });
+    const { shouldEndSession, changed, message } = evaluateEndingVote(state, 5);
+    expect(shouldEndSession).toBe(true);
+    expect(changed).toBe(true);
+    expect(message).toBe("Ending vote passed");
+  });
+
+  it("fails when all vote continue", () => {
+    const state = makeVoteState({
+      p1: "continue",
+      p2: "continue",
+      p3: "continue",
+    });
+    const { shouldEndSession, changed, message } = evaluateEndingVote(state, 5);
+    expect(shouldEndSession).toBe(false);
+    expect(changed).toBe(true);
+    expect(message).toContain("failed");
+  });
+
+  it("forces end after 2 failed attempts", () => {
+    const state = makeVoteState(
+      { p1: "continue", p2: "continue", p3: "continue" },
+      1,
+    );
+    const { shouldEndSession, message } = evaluateEndingVote(state, 5);
+    expect(shouldEndSession).toBe(true);
+    expect(message).toContain("forced");
+  });
+
+  it("does nothing when votes are incomplete and not expired", () => {
+    const state = makeVoteState({ p1: "end_now" });
+    const { shouldEndSession, changed } = evaluateEndingVote(state, 5);
+    expect(shouldEndSession).toBe(false);
+    expect(changed).toBe(false);
+  });
+
+  it("expires vote after 2 rounds", () => {
+    const state = makeVoteState({ p1: "end_now" });
+    const { changed } = evaluateEndingVote(state, 7);
+    expect(changed).toBe(true);
+  });
+
+  it("does nothing if no vote is open", () => {
+    const state: QuestState = {
+      ...defaultQuestState("test"),
+      endingVote: null,
+    };
+    const { shouldEndSession, changed } = evaluateEndingVote(state, 5);
+    expect(shouldEndSession).toBe(false);
+    expect(changed).toBe(false);
+  });
+});

@@ -64,6 +64,9 @@ export async function createCharacter(params: {
   characterClass: string;
   race: string;
   stats: CharacterStats;
+  pronouns?: string;
+  traits?: string[];
+  backstory?: string;
 }): Promise<{ characterId: string }> {
   const [player] = await db
     .select()
@@ -112,7 +115,11 @@ export async function createCharacter(params: {
       inventory,
       abilities,
       conditions: [],
-      visual_profile: {},
+      visual_profile: {
+        pronouns: params.pronouns?.trim() || "they/them",
+        traits: (params.traits ?? []).filter(Boolean).slice(0, 5),
+        backstory: (params.backstory ?? "").trim().slice(0, 500),
+      },
     })
     .returning({ id: characters.id });
 

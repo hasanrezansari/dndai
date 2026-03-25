@@ -43,6 +43,8 @@ export default function CharacterCreationPage() {
   const [name, setName] = useState("");
   const [characterClass, setCharacterClass] = useState<CharacterClass>("warrior");
   const [race, setRace] = useState<CharacterRace>("human");
+  const [pronouns, setPronouns] = useState("they/them");
+  const [backstory, setBackstory] = useState("");
   const [stats, setStats] = useState<CharacterStats | null>(null);
   const [statsShakeKey, setStatsShakeKey] = useState(0);
   const [initialRollDone, setInitialRollDone] = useState(false);
@@ -147,6 +149,8 @@ export default function CharacterCreationPage() {
           characterClass,
           race,
           stats,
+          pronouns: pronouns.trim() || "they/them",
+          backstory: backstory.trim() || undefined,
         }),
       });
       if (!res.ok) {
@@ -218,6 +222,40 @@ export default function CharacterCreationPage() {
           maxLength={48}
           className="w-full min-h-[44px] rounded-[var(--radius-button)] bg-[var(--color-deep-void)] border border-[rgba(255,255,255,0.08)] px-4 text-base text-[var(--color-silver-muted)] placeholder:text-[var(--color-silver-dim)] focus:outline-none focus:border-[var(--color-gold-support)]"
           placeholder="Adventurer name"
+        />
+      </section>
+
+      <section className="flex flex-col gap-2">
+        <label htmlFor="hero-pronouns" className="text-xs uppercase tracking-wider text-[var(--color-silver-dim)]">
+          Pronouns
+        </label>
+        <div className="overflow-x-auto scrollbar-hide -mx-1 px-1">
+          <PillSelect
+            options={[
+              { value: "he/him", label: "He / Him" },
+              { value: "she/her", label: "She / Her" },
+              { value: "they/them", label: "They / Them" },
+            ]}
+            value={pronouns}
+            onChange={setPronouns}
+            wrap={false}
+            className="w-max pb-1"
+          />
+        </div>
+      </section>
+
+      <section className="flex flex-col gap-2">
+        <label htmlFor="hero-backstory" className="text-xs uppercase tracking-wider text-[var(--color-silver-dim)]">
+          Backstory <span className="normal-case tracking-normal text-[var(--color-silver-dim)]/60">(optional)</span>
+        </label>
+        <textarea
+          id="hero-backstory"
+          value={backstory}
+          onChange={(e) => setBackstory(e.target.value)}
+          maxLength={500}
+          rows={2}
+          className="w-full rounded-[var(--radius-button)] bg-[var(--color-deep-void)] border border-[rgba(255,255,255,0.08)] px-4 py-3 text-sm text-[var(--color-silver-muted)] placeholder:text-[var(--color-silver-dim)] focus:outline-none focus:border-[var(--color-gold-support)] resize-none"
+          placeholder="A brief origin story — the AI weaves it into narration"
         />
       </section>
 

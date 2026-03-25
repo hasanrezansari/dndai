@@ -22,6 +22,12 @@ export type SessionImageJobPayload = {
   narrativeText: string;
   sceneContext: string;
   characterNames: string[];
+  imageHint?: {
+    subjects?: string[];
+    environment?: string;
+    mood?: string;
+    avoid?: string[];
+  };
 };
 
 function resolveAppOrigin(): string | null {
@@ -65,11 +71,34 @@ export async function scheduleSessionImageGeneration(
   }
 }
 
-function computeStatePatches(intent: ActionIntent, rolls: DiceRoll[]): StatePatch[] {
-  if (intent.action_type === "attack" && rolls[0]?.result === "critical_success") {
-    return [];
+function computeStatePatches(
+  intent: ActionIntent,
+  rolls: DiceRoll[],
+  actingPlayerId: string,
+): StatePatch[] {
+  const patches: StatePatch[] = [];
+  const roll = rolls[0];
+  if (!roll) return patches;
+
+  if (intent.action_type === "attack" || intent.action_type === "cast_spell") {
+    if (roll.result === "critical_failure") {
+      patches.push({ op: "player_hp", playerId: actingPlayerId, delta: -2 });
+    }
+    if (roll.result === "failure") {
+      patches.push({ op: "player_hp", playerId: actingPlayerId, delta: -1 });
+    }
+    if (roll.result === "critical_success") {
+      patches.push({ op: "player_hp", playerId: actingPlayerId, delta: 2 });
+    }
   }
-  return [];
+
+  if (intent.action_type === "move" || intent.action_type === "use_item") {
+    if (roll.result === "critical_failure") {
+      patches.push({ op: "player_hp", playerId: actingPlayerId, delta: -3 });
+    }
+  }
+
+  return patches;
 }
 
 function mapNarrativeRow(row: typeof narrativeEvents.$inferSelect): NarrativeEvent {
@@ -203,7 +232,7 @@ export async function runTurnPipeline(params: {
   });
 
   const s0 = Date.now();
-  const statePatches = computeStatePatches(intent, diceRolls);
+  const statePatches = computeStatePatches(intent, diceRolls, playerId);
   const questUpdate = await applyTurnQuestProgress({
     sessionId,
     round: ctx.session.currentRound,
@@ -268,7 +297,7 @@ export async function runTurnPipeline(params: {
       kind: "human_dm",
       diceRolls,
       statePatches,
-      shouldEndSession: false,
+      shouldEndSession: questUpdate.shouldEndSession,
       expectedNextPlayerId: ctx.nextPlayerId,
     };
   }
@@ -295,9 +324,14 @@ export async function runTurnPipeline(params: {
       result: r.result,
     })),
     characterName: actorName,
+    characterPronouns: ctx.character.pronouns,
+    characterTraits: ctx.character.traits,
+    characterBackstory: ctx.character.backstory,
     nextPlayerName: nextActorName,
     recentNarrative,
     sceneContext,
+    partySummary: ctx.allCharacterSummaries.join("; "),
+    questContext: ctx.questContext,
     provider,
   });
 
@@ -340,6 +374,7 @@ export async function runTurnPipeline(params: {
         ctx.session.adventurePrompt?.trim() ||
         "",
       characterNames: ctx.allPlayerNames,
+      imageHint: narration.image_hint,
     };
   }
 

@@ -28,6 +28,7 @@ export type QuestState = {
   risk: number;
   status: QuestStatus;
   endingVote: EndingVoteState | null;
+  recentActions?: string[];
   updatedAt: string;
 };
 
@@ -58,7 +59,7 @@ function normalizeObjective(objective: string): string {
   return `${o.slice(0, 137)}...`;
 }
 
-function defaultQuestState(objective: string): QuestState {
+export function defaultQuestState(objective: string): QuestState {
   return {
     objective: normalizeObjective(objective),
     progress: 0,
@@ -147,7 +148,7 @@ async function eligibleEndingVoters(sessionId: string): Promise<string[]> {
   return rows.filter((r) => !r.isDm).map((r) => r.playerId);
 }
 
-function maybeOpenEndingVote(
+export function maybeOpenEndingVote(
   state: QuestState,
   round: number,
   eligibleVoterIds: string[],
@@ -194,7 +195,7 @@ function maybeOpenEndingVote(
   };
 }
 
-function evaluateEndingVote(
+export function evaluateEndingVote(
   state: QuestState,
   round: number,
 ): {
@@ -254,7 +255,7 @@ function evaluateEndingVote(
   return { state, shouldEndSession: false, changed: false, message: null };
 }
 
-function scoreFromRoll(result: DiceRoll["result"] | undefined): {
+export function scoreFromRoll(result: DiceRoll["result"] | undefined): {
   progressDelta: number;
   riskDelta: number;
 } {
@@ -272,7 +273,7 @@ function scoreFromRoll(result: DiceRoll["result"] | undefined): {
   }
 }
 
-function intentWeight(actionType: string): number {
+export function intentWeight(actionType: string): number {
   switch (actionType) {
     case "attack":
     case "cast_spell":
@@ -304,10 +305,21 @@ export async function applyTurnQuestProgress(params: {
     (await getQuestState(params.sessionId)) ??
     defaultQuestState(params.objectiveFallback);
 
+  const recentActions = Array.isArray(current.recentActions)
+    ? [...current.recentActions]
+    : [];
+  const consecutiveSame = recentActions.filter(
+    (a) => a === params.actionType,
+  ).length;
+  const diminishing = Math.max(0.25, 1 - consecutiveSame * 0.2);
+
   const primary = scoreFromRoll(params.diceRolls[0]?.result);
-  const weight = intentWeight(params.actionType);
+  const weight = intentWeight(params.actionType) * diminishing;
   const progressDelta = Math.max(1, Math.round(primary.progressDelta * weight));
   const riskDelta = Math.round(primary.riskDelta);
+
+  recentActions.push(params.actionType);
+  if (recentActions.length > 5) recentActions.shift();
 
   let progress = clamp(current.progress + progressDelta, 0, MAX_PROGRESS);
   let risk = clamp(current.risk + riskDelta, 0, MAX_RISK);
@@ -329,6 +341,7 @@ export async function applyTurnQuestProgress(params: {
     risk,
     status,
     endingVote: current.endingVote ?? null,
+    recentActions,
     updatedAt: new Date().toISOString(),
   };
 

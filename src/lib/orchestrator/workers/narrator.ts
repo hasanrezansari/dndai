@@ -17,6 +17,15 @@ If the player says "I dance with a goblin", narrate them dancing with a goblin.
 If the player says "I try to befriend the dragon", narrate them attempting to befriend the dragon.
 The dice results determine SUCCESS or FAILURE of their stated action.
 
+CHARACTER IDENTITY:
+- Use "character_pronouns" (he/him, she/her, they/them, etc.) consistently when referring to the character.
+- Weave "character_traits" naturally into descriptions where fitting (e.g. a cautious character hesitates, a bold one charges in).
+- Reference "character_backstory" for flavor when it naturally ties to the action.
+
+PARTY & QUEST AWARENESS:
+- "party_summary" lists each party member with race, class, HP, and pronouns. Reference party members naturally.
+- "quest_progress" shows the campaign objective and how close the party is to completing it. Subtly reflect quest tension — do NOT read numbers aloud.
+
 RULES:
 - 60-140 words STRICTLY
 - Narrate the outcome of the player's SPECIFIC action (from "player_action") based on dice results
@@ -33,7 +42,7 @@ RULES:
   - "visible_changes": array of brief world changes (can be empty [])
   - "tone": mood of the scene (e.g. "tense", "triumphant", "ominous")
   - "next_actor_id": always set to null
-  - "image_hint": {"subjects": [], "avoid": []} (optional scene hints)`;
+  - "image_hint": {"subjects": ["key visual subjects in the scene"], "environment": "environment description", "mood": "visual mood", "avoid": ["things to avoid"]} (scene hints for image generation)`;
 
 export function wordCount(s: string): number {
   return s.trim().split(/\s+/).filter(Boolean).length;
@@ -173,9 +182,14 @@ export async function generateNarration(params: {
   intent: ActionIntent;
   diceResults: Array<{ context: string; total: number; result: string }>;
   characterName: string;
+  characterPronouns?: string;
+  characterTraits?: string[];
+  characterBackstory?: string;
   nextPlayerName: string;
   recentNarrative: string;
   sceneContext: string;
+  partySummary?: string;
+  questContext?: string | null;
   provider: AIProvider;
 }): Promise<OrchestrationStepResult<NarratorOutput>> {
   const userPrompt = JSON.stringify({
@@ -183,9 +197,14 @@ export async function generateNarration(params: {
     intent: params.intent,
     dice_results: params.diceResults,
     character_name: params.characterName,
+    character_pronouns: params.characterPronouns ?? "they/them",
+    character_traits: params.characterTraits ?? [],
+    character_backstory: params.characterBackstory ?? "",
     next_player_name: params.nextPlayerName,
     recent_narrative: params.recentNarrative,
     scene_context: params.sceneContext,
+    party_summary: params.partySummary ?? "",
+    quest_progress: params.questContext ?? "",
   });
 
   const rollResult = params.diceResults[0]?.result as DiceRoll["result"] | undefined;

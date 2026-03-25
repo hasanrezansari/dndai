@@ -108,6 +108,7 @@ export async function createSession(params: {
       user_id: params.hostUserId,
       seat_index: 0,
       is_host: true,
+      is_dm: params.mode === "human_dm",
       is_ready: false,
     });
   } catch (e) {

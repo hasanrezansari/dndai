@@ -28,6 +28,7 @@ async function fetchPartyDescriptions(sessionId: string): Promise<string> {
       name: characters.name,
       class: characters.class,
       race: characters.race,
+      visual_profile: characters.visual_profile,
     })
     .from(characters)
     .innerJoin(players, eq(players.id, characters.player_id))
@@ -36,7 +37,12 @@ async function fetchPartyDescriptions(sessionId: string): Promise<string> {
   if (rows.length === 0) return "a party of adventurers";
 
   return rows
-    .map((r) => `${r.name} (${r.race} ${r.class})`)
+    .map((r) => {
+      const vp = (r.visual_profile ?? {}) as Record<string, unknown>;
+      const traits = Array.isArray(vp.traits) ? vp.traits.map(String).join(", ") : "";
+      const base = `${r.name} (${r.race} ${r.class})`;
+      return traits ? `${base} [${traits}]` : base;
+    })
     .join(", ");
 }
 
@@ -45,8 +51,14 @@ function buildPrompt(params: {
   sceneContext: string;
   partyDescription: string;
   previousPrompt: string | null;
+  imageHint?: {
+    subjects?: string[];
+    environment?: string;
+    mood?: string;
+    avoid?: string[];
+  };
 }): string {
-  const { narrativeText, sceneContext, partyDescription, previousPrompt } = params;
+  const { narrativeText, sceneContext, partyDescription, previousPrompt, imageHint } = params;
 
   const scene = sceneContext.trim().slice(0, 300) || narrativeText.slice(0, 300);
   const action = narrativeText.slice(0, 250);
@@ -55,12 +67,24 @@ function buildPrompt(params: {
     ? `\nMaintain the same environment, architecture, and color palette as the previous scene. Show visual progression, not a new location unless the story moved.`
     : "";
 
+  const subjectLine =
+    imageHint?.subjects?.length
+      ? `Key subjects: ${imageHint.subjects.join(", ")}.`
+      : "";
+  const envLine = imageHint?.environment
+    ? `Environment: ${imageHint.environment}.`
+    : "";
+  const moodLine = imageHint?.mood ? `Mood: ${imageHint.mood}.` : "";
+
   return [
     `Art style: ${ART_STYLE}.`,
     `Scene: ${scene}`,
     `Current moment: ${action}`,
+    subjectLine,
+    envLine,
+    moodLine,
     `Characters present: ${partyDescription}.`,
-    `${continuityHint}`,
+    continuityHint,
     `Keep character appearances consistent. Wide cinematic composition, 16:9 aspect ratio, no text or UI overlays.`,
   ].filter(Boolean).join("\n");
 }
@@ -71,8 +95,14 @@ export async function runImagePipeline(params: {
   narrativeText: string;
   sceneContext: string;
   characterNames: string[];
+  imageHint?: {
+    subjects?: string[];
+    environment?: string;
+    mood?: string;
+    avoid?: string[];
+  };
 }): Promise<{ imageUrl: string | null }> {
-  const { sessionId, turnId, narrativeText, sceneContext } = params;
+  const { sessionId, turnId, narrativeText, sceneContext, imageHint } = params;
 
   const partyDescription = await fetchPartyDescriptions(sessionId);
 
@@ -91,6 +121,7 @@ export async function runImagePipeline(params: {
     sceneContext,
     partyDescription,
     previousPrompt: prevSnap?.image_prompt ?? null,
+    imageHint,
   });
 
   const tStart = Date.now();

@@ -10,6 +10,7 @@ import {
 } from "@/lib/db/schema";
 import { computeNextPlayableTurnState } from "@/lib/rules/turn-logic";
 import { CharacterStatsSchema, type CharacterStats } from "@/lib/schemas/domain";
+import { getQuestState } from "@/server/services/quest-service";
 
 export interface TurnContext {
   session: {
@@ -27,10 +28,15 @@ export interface TurnContext {
     stats: CharacterStats;
     hp: number;
     mana: number;
+    pronouns: string;
+    traits: string[];
+    backstory: string;
   };
   recentEvents: string[];
   currentSceneDescription: string | null;
   allPlayerNames: string[];
+  allCharacterSummaries: string[];
+  questContext: string | null;
   nextPlayerName: string;
   nextPlayerId: string;
   roundAdvanced: boolean;
@@ -146,6 +152,25 @@ export async function buildTurnContext({
     ? displayNameForPlayerRow(nextRow)
     : "Adventurer";
 
+  const vp = (charRow.visual_profile ?? {}) as Record<string, unknown>;
+  const pronouns = typeof vp.pronouns === "string" ? vp.pronouns : "they/them";
+  const traits = Array.isArray(vp.traits) ? vp.traits.map(String) : [];
+  const backstory = typeof vp.backstory === "string" ? vp.backstory : "";
+
+  const allCharacterSummaries = playerCharacterPairs.map((row) => {
+    const c = row.character;
+    if (!c) return `${displayNameForPlayerRow(row)} (no character)`;
+    const cvp = (c.visual_profile ?? {}) as Record<string, unknown>;
+    const cpro = typeof cvp.pronouns === "string" ? cvp.pronouns : "they/them";
+    return `${c.name} (${c.race} ${c.class}, HP ${c.hp}/${c.max_hp}, ${cpro})`;
+  });
+
+  const quest = await getQuestState(sessionId);
+  let questContext: string | null = null;
+  if (quest) {
+    questContext = `Objective: ${quest.objective} | Progress: ${quest.progress}% | Danger: ${quest.risk}% | Status: ${quest.status}`;
+  }
+
   return {
     session: {
       mode: sessionRow.mode,
@@ -166,10 +191,15 @@ export async function buildTurnContext({
       stats,
       hp: charRow.hp,
       mana: charRow.mana,
+      pronouns,
+      traits,
+      backstory,
     },
     recentEvents,
     currentSceneDescription,
     allPlayerNames,
+    allCharacterSummaries,
+    questContext,
     nextPlayerName,
     nextPlayerId,
     roundAdvanced,
