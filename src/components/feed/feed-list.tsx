@@ -73,7 +73,7 @@ export function FeedList({ entries, className = "" }: FeedListProps) {
       <div
         ref={scrollRef}
         onScroll={onScroll}
-        className="scrollbar-hide flex min-h-0 flex-1 flex-col gap-[var(--void-gap)] overflow-y-auto overflow-x-hidden pb-16"
+        className="scrollbar-hide flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto overflow-x-hidden pb-16 sm:gap-4"
       >
         {entries.length === 0 ? (
           <p className="text-center text-sm text-[var(--color-silver-dim)]">

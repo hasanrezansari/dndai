@@ -318,6 +318,66 @@ body {
   animation: hp-flash-heal 1.2s ease-in-out;
 }
 
+/* Feed visual overhaul — atmosphere + motion (uses design tokens only) */
+.feed-entry-narration-bg {
+  background: linear-gradient(
+    165deg,
+    color-mix(in srgb, var(--atmosphere-exploration) 14%, var(--color-deep-void)) 0%,
+    color-mix(in srgb, var(--atmosphere-mystery) 10%, var(--surface-container)) 50%,
+    color-mix(in srgb, var(--color-deep-void) 92%, transparent) 100%
+  );
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+}
+
+.feed-entry-round-break {
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    color-mix(in srgb, var(--color-gold-rare) 12%, var(--color-deep-void)) 50%,
+    transparent 100%
+  );
+}
+
+@keyframes dice-critical-pop {
+  0% {
+    transform: scale(0.9);
+    opacity: 0.65;
+  }
+  55% {
+    transform: scale(1.06);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+.animate-dice-critical-pop {
+  animation: dice-critical-pop 0.55s var(--ease-spring);
+}
+
+@keyframes feed-stat-reveal {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-feed-stat-reveal {
+  animation: feed-stat-reveal 0.38s var(--ease-out-soft);
+}
+
+.feed-entry-action-highlight {
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--color-gold-rare) 35%, transparent),
+    0 0 24px color-mix(in srgb, var(--color-gold-rare) 12%, transparent);
+}
+
 .scrollbar-hide {
   -ms-overflow-style: none;
   scrollbar-width: none;
