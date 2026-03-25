@@ -33,14 +33,14 @@ function resolveAppOrigin(): string | null {
   return null;
 }
 
-export function scheduleSessionImageGeneration(
+export async function scheduleSessionImageGeneration(
   sessionId: string,
   sceneId: string,
   payload: SessionImageJobPayload,
-): void {
+): Promise<void> {
   const origin = resolveAppOrigin();
   if (!origin) {
-    console.error("scheduleSessionImageGeneration: missing app origin (VERCEL_URL:", process.env.VERCEL_URL, "NEXTAUTH_URL:", process.env.NEXTAUTH_URL, ")");
+    console.error("[image] missing app origin — VERCEL_URL:", process.env.VERCEL_URL, "NEXTAUTH_URL:", process.env.NEXTAUTH_URL);
     return;
   }
   const url = `${origin}/api/sessions/${sessionId}/image`;
@@ -52,11 +52,16 @@ export function scheduleSessionImageGeneration(
   if (secret) {
     headers.Authorization = `Bearer ${secret}`;
   }
-  void fetch(url, {
-    method: "POST",
-    headers,
-    body: JSON.stringify({ ...payload, scene_id: sceneId }),
-  }).catch(() => {});
+  try {
+    const res = await fetch(url, {
+      method: "POST",
+      headers,
+      body: JSON.stringify({ ...payload, scene_id: sceneId }),
+    });
+    console.log("[image] scheduled, status:", res.status);
+  } catch (err) {
+    console.error("[image] schedule fetch failed:", err);
+  }
 }
 
 function computeStatePatches(intent: ActionIntent, rolls: DiceRoll[]): StatePatch[] {

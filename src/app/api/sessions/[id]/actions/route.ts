@@ -1,6 +1,7 @@
 import { randomUUID } from "crypto";
 
 import { eq } from "drizzle-orm";
+import { after } from "next/server";
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 
@@ -152,11 +153,10 @@ export async function POST(
       } catch (err) {
         console.error(err);
       }
-      scheduleSessionImageGeneration(
-        sessionId,
-        sceneImageId,
-        pipelineResult.imageJobPayload,
-      );
+      const imgPayload = pipelineResult.imageJobPayload;
+      after(async () => {
+        await scheduleSessionImageGeneration(sessionId, sceneImageId, imgPayload);
+      });
     }
 
     await releaseTurnLock(sessionId);

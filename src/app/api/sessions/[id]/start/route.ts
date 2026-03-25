@@ -1,6 +1,7 @@
 import { randomUUID } from "crypto";
 
 import { and, asc, eq } from "drizzle-orm";
+import { after } from "next/server";
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 
@@ -215,11 +216,13 @@ export async function POST(
         ? characterNamesForImage
         : allPlayers.map((p) => p.user_id.slice(0, 8));
     const imgSceneCtx = [campaignTitle, adventurePrompt].filter(Boolean).join(" ");
-    scheduleSessionImageGeneration(sessionId, sceneImageId, {
-      turnId: firstTurnId,
-      narrativeText: openingScene,
-      sceneContext: imgSceneCtx,
-      characterNames: imgCharNames,
+    after(async () => {
+      await scheduleSessionImageGeneration(sessionId, sceneImageId, {
+        turnId: firstTurnId,
+        narrativeText: openingScene,
+        sceneContext: imgSceneCtx,
+        characterNames: imgCharNames,
+      });
     });
 
     try {
