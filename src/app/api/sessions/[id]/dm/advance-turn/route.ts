@@ -1,8 +1,11 @@
+import { eq } from "drizzle-orm";
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 
 import { apiError, handleApiError } from "@/lib/api/errors";
 import { requireUser, unauthorizedResponse } from "@/lib/auth/guards";
+import { db } from "@/lib/db";
+import { turns } from "@/lib/db/schema";
 import { broadcastToSession } from "@/lib/socket/server";
 import { assertHumanSessionDm, DmAuthError } from "@/server/services/dm-auth";
 import {
@@ -56,6 +59,13 @@ export async function POST(
     }
 
     try {
+      const [turnMeta] = await db
+        .select({ round_number: turns.round_number })
+        .from(turns)
+        .where(eq(turns.id, parsed.data.turnId))
+        .limit(1);
+      const dmRound = turnMeta?.round_number ?? 1;
+
       const result = await resolveHumanDmTurn({
         sessionId,
         turnId: parsed.data.turnId,
@@ -69,6 +79,8 @@ export async function POST(
           visible_changes: result.visibleChanges,
           next_actor: { player_id: result.nextPlayerId },
           event_type: "narration",
+          turn_id: parsed.data.turnId,
+          round_number: dmRound,
         });
       } catch (err) {
         console.error(err);

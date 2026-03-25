@@ -138,14 +138,18 @@ export async function GET(
       .sort((a, b) => a.seatIndex - b.seatIndex);
 
     const narrativeRows = await db
-      .select()
+      .select({
+        ev: narrativeEvents,
+        turn_round: turns.round_number,
+      })
       .from(narrativeEvents)
+      .leftJoin(turns, eq(turns.id, narrativeEvents.turn_id))
       .where(eq(narrativeEvents.session_id, sessionId))
       .orderBy(desc(narrativeEvents.created_at))
       .limit(20);
 
     const chronological = [...narrativeRows].reverse();
-    const feed: FeedEntry[] = chronological.map((ev) => ({
+    const feed: FeedEntry[] = chronological.map(({ ev, turn_round }) => ({
       id: ev.id,
       type: "narration" as const,
       text: ev.scene_text,
@@ -154,10 +158,12 @@ export async function GET(
           ? ev.visible_changes.join(" · ")
           : undefined,
       timestamp: ev.created_at.toISOString(),
+      turnId: ev.turn_id ?? undefined,
+      roundNumber: turn_round ?? undefined,
     }));
 
     const latestNarrative = narrativeRows[0];
-    const narrativeText = latestNarrative?.scene_text ?? null;
+    const narrativeText = latestNarrative?.ev.scene_text ?? null;
 
     const [latestScene] = await db
       .select()

@@ -23,6 +23,7 @@ import { SceneHeader } from "@/components/game/scene-header";
 import { TurnBanner } from "@/components/game/turn-banner";
 import { SceneTransition } from "@/components/game/scene-transition";
 import { StatPopupOverlay } from "@/components/game/stat-popup";
+import { ChronicleFeed } from "@/components/feed/chronicle-feed";
 import { FeedList } from "@/components/feed/feed-list";
 import { BeatStrip } from "@/components/game/beat-strip";
 import { SessionViewModeToggle } from "@/components/game/session-view-mode-toggle";
@@ -489,7 +490,7 @@ export default function SessionGameplayPage() {
         title="Chronicle"
       >
         <div className="flex h-[min(70vh,560px)] min-h-[240px] flex-col overflow-hidden">
-          <FeedList entries={feed} className="min-h-0 flex-1" />
+          <ChronicleFeed entries={feed} className="min-h-0 flex-1" />
         </div>
       </BottomSheet>
       <DiceOverlay />
@@ -503,12 +504,6 @@ export default function SessionGameplayPage() {
           <span className="material-symbols-outlined text-sm">arrow_back</span>
           Leave
         </button>
-        <div className="absolute right-3 top-3 z-30 w-[min(100%,11.5rem)] max-w-[calc(100%-5rem)]">
-          <SessionViewModeToggle
-            mode={sessionUiMode}
-            onChange={setSessionUiMode}
-          />
-        </div>
         <SceneHeader
           sceneImage={sceneImage}
           previousSceneImage={previousSceneImage}
@@ -519,8 +514,17 @@ export default function SessionGameplayPage() {
         />
       </div>
 
-      <div className="relative z-[2] shrink-0 px-4">
+      <div className="relative z-[2] shrink-0 space-y-2 px-4">
         <NarrativeCard text={narrativeText} isThinking={isThinking} />
+        <div className="rounded-[var(--radius-card)] border border-[rgba(77,70,53,0.18)] bg-[var(--surface-container)]/30 px-3 py-2.5">
+          <p className="mb-2 text-[9px] font-black uppercase tracking-[0.2em] text-[var(--outline)]">
+            Table layout
+          </p>
+          <SessionViewModeToggle
+            mode={sessionUiMode}
+            onChange={setSessionUiMode}
+          />
+        </div>
       </div>
 
       <div className="flex min-h-0 flex-1 flex-col gap-[var(--void-gap)] px-4 pb-2 pt-[var(--void-gap)]">
@@ -636,6 +640,8 @@ export default function SessionGameplayPage() {
             </button>
             <div className="min-h-0 flex-1" aria-hidden />
           </div>
+        ) : sessionUiMode === "chronicle" ? (
+          <ChronicleFeed entries={feed} className="min-h-0 flex-1" />
         ) : (
           <FeedList entries={feed} className="min-h-0 flex-1" />
         )}

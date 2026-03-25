@@ -8,6 +8,11 @@ export interface FeedEntry {
   id: string;
   type: "action" | "dice" | "narration" | "state_change" | "stat_change" | "system";
   playerName?: string;
+  /** Acting player for this row (when known). */
+  playerId?: string;
+  /** Turn this row belongs to — groups Chronicle cards when set. */
+  turnId?: string;
+  roundNumber?: number;
   text: string;
   detail?: string;
   timestamp: string;
@@ -135,6 +140,8 @@ interface GameState {
   rollingMemories: RollingMemoryView[];
   statPopups: StatPopup[];
   hpFlash: Record<string, "damage" | "heal">;
+  /** Latest turn from `turn-started` — fallback when events omit `turn_id`. */
+  activeTurnId: string | null;
 
   setSessionId: (id: string) => void;
   setSession: (session: GameState["session"]) => void;
@@ -182,6 +189,7 @@ interface GameState {
   setRollingMemories: (memories: RollingMemoryView[]) => void;
   addStatPopups: (popups: StatPopup[]) => void;
   setHpFlash: (flash: Record<string, "damage" | "heal">) => void;
+  setActiveTurnId: (id: string | null) => void;
 }
 
 const emptyState = {
@@ -206,6 +214,7 @@ const emptyState = {
   rollingMemories: [] as RollingMemoryView[],
   statPopups: [] as StatPopup[],
   hpFlash: {} as Record<string, "damage" | "heal">,
+  activeTurnId: null as string | null,
 };
 
 export const useGameStore = create<GameState>((set) => ({
@@ -282,6 +291,8 @@ export const useGameStore = create<GameState>((set) => ({
 
   setHpFlash: (flash) => set({ hpFlash: flash }),
 
+  setActiveTurnId: (id) => set({ activeTurnId: id }),
+
   updateSessionField: (field, value) =>
     set((s) => {
       if (!s.session) return s;
@@ -304,5 +315,5 @@ export const useGameStore = create<GameState>((set) => ({
       rollingMemories: data.rollingMemories ?? [],
     }),
 
-  reset: () => set({ ...emptyState }),
+  reset: () => set({ ...emptyState, activeTurnId: null }),
 }));
