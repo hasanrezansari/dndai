@@ -55,11 +55,12 @@ export function SceneHeader({
               key={sceneImage}
               src={sceneImage}
               alt=""
-              loading="lazy"
+              loading="eager"
+              decoding="async"
               className="absolute inset-0 z-[1] h-full w-full object-cover"
-              initial={{ opacity: previousSceneImage ? 0 : 1 }}
+              initial={{ opacity: 1 }}
               animate={{ opacity: 1 }}
-              transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] as const }}
+              transition={{ duration: 0.4 }}
             />
           ) : null}
         </AnimatePresence>
@@ -69,7 +70,7 @@ export function SceneHeader({
           <img
             src={previousSceneImage}
             alt=""
-            loading="lazy"
+            loading="eager"
             className="absolute inset-0 z-0 h-full w-full object-cover"
           />
         ) : null}

@@ -30,13 +30,14 @@ export async function GET(
     return NextResponse.redirect(raw, 302);
   }
 
-  const match = raw.match(/^data:(image\/\w+);base64,(.+)$/);
+  const match = raw.match(/^data:(image\/[\w+.-]+);base64,/);
   if (!match) {
     return new NextResponse("Bad image data", { status: 500 });
   }
 
   const mime = match[1]!;
-  const buf = Buffer.from(match[2]!, "base64");
+  const b64 = raw.slice(match[0]!.length);
+  const buf = Buffer.from(b64, "base64");
 
   return new NextResponse(buf, {
     status: 200,
