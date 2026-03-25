@@ -1,43 +1,38 @@
-import type { AIProvider, OrchestrationStepResult } from "@/lib/ai/types";
-import { runOrchestrationStep } from "@/lib/orchestrator/step-runner";
+import type { OrchestrationStepResult } from "@/lib/ai/types";
 import {
   VisualDeltaOutputSchema,
   type VisualDeltaOutput,
 } from "@/lib/schemas/ai-io";
 
-const VISUAL_SYSTEM = `You are a visual change detector for a tabletop RPG. Compare the latest narrative with the current scene description.
-Determine if the visual scene has significantly changed (new location, dramatic event, major environmental change).
-Minor actions (talking, picking up small items, brief dialogue) do NOT warrant a new image.
-Respond with valid JSON: image_needed (boolean), reasons (array of short strings explaining the decision), priority one of low, normal, high.`;
+const LOCATION_WORDS = /\b(enter|arrive|travel|descend|ascend|emerge|cross|portal|door|gate|cave|forest|dungeon|castle|tower|village|temple|tomb|chamber|hall|throne|river|mountain|cliff|bridge)\b/i;
+const DRAMATIC_WORDS = /\b(explod|collaps|transform|summon|dragon|demon|fire|flood|earthquake|lightning|storm|destroy|shatter|crumble|rise|awaken)\b/i;
 
 export async function checkVisualDelta(params: {
   sessionId: string;
   turnId: string;
   narrativeText: string;
   currentSceneDescription: string | null;
-  provider: AIProvider;
 }): Promise<OrchestrationStepResult<VisualDeltaOutput>> {
-  const userPrompt = JSON.stringify({
-    narrative_text: params.narrativeText,
-    current_scene_description: params.currentSceneDescription,
+  const t0 = Date.now();
+  const text = params.narrativeText;
+  const reasons: string[] = [];
+
+  if (LOCATION_WORDS.test(text)) reasons.push("Location change detected");
+  if (DRAMATIC_WORDS.test(text)) reasons.push("Dramatic visual event");
+
+  const imageNeeded = reasons.length > 0;
+  const priority = reasons.length >= 2 ? "high" : imageNeeded ? "normal" : "low";
+
+  const data = VisualDeltaOutputSchema.parse({
+    image_needed: imageNeeded,
+    reasons,
+    priority,
   });
 
-  return runOrchestrationStep({
-    stepName: "visual_delta",
-    sessionId: params.sessionId,
-    turnId: params.turnId,
-    provider: params.provider,
-    model: "light",
-    systemPrompt: VISUAL_SYSTEM,
-    userPrompt,
-    schema: VisualDeltaOutputSchema,
-    maxTokens: 256,
-    temperature: 0.3,
-    fallback: () =>
-      VisualDeltaOutputSchema.parse({
-        image_needed: false,
-        reasons: [],
-        priority: "normal",
-      }),
-  });
+  return {
+    data,
+    usage: { inputTokens: 0, outputTokens: 0, model: "deterministic" },
+    latencyMs: Date.now() - t0,
+    success: true,
+  };
 }

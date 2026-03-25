@@ -142,7 +142,6 @@ export async function runTurnPipeline(params: {
     characterName: ctx.character.name,
     characterClass: ctx.character.class,
     recentEvents: ctx.recentEvents,
-    provider,
   });
   const intent = intentResult.data;
 
@@ -157,7 +156,6 @@ export async function runTurnPipeline(params: {
     intent,
     characterStats: ctx.character.stats,
     characterClass: ctx.character.class,
-    provider,
   });
   const rules = rulesResult.data;
 
@@ -321,7 +319,6 @@ export async function runTurnPipeline(params: {
         turnId,
         narrativeText: narration.scene_text,
         currentSceneDescription: ctx.currentSceneDescription,
-        provider,
       });
       imageNeeded = vis.data.image_needed;
     }

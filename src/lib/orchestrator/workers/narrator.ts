@@ -103,7 +103,7 @@ export async function generateNarration(params: {
     sessionId: params.sessionId,
     turnId: params.turnId,
     provider: params.provider,
-    model: "heavy",
+    model: "light",
     systemPrompt: NARRATOR_SYSTEM,
     userPrompt,
     schema: NarratorOutputSchema,
