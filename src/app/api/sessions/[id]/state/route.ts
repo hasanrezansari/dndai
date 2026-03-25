@@ -151,7 +151,11 @@ export async function GET(
       .orderBy(desc(sceneSnapshots.created_at))
       .limit(1);
 
-    const sceneImage = latestScene?.image_url ?? null;
+    const rawSceneImage = latestScene?.image_url ?? null;
+    const sceneImage =
+      rawSceneImage?.startsWith("data:") && latestScene
+        ? `/api/sessions/${sessionId}/scene-image/${latestScene.id}`
+        : rawSceneImage;
     const scenePending =
       latestScene?.image_status === "pending" ||
       latestScene?.image_status === "generating";

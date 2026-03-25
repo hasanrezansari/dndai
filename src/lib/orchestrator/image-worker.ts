@@ -1,6 +1,6 @@
 import { desc, eq } from "drizzle-orm";
 
-import { generateSceneImage } from "@/lib/ai/image-provider";
+import { generateSceneImageOpenRouter } from "@/lib/ai/openrouter-image-provider";
 import { db } from "@/lib/db";
 import {
   imageJobs,
@@ -22,25 +22,23 @@ export async function runImagePipeline(params: {
   const chars = characterNames.length > 0 ? characterNames.join(", ") : "adventurers";
   const composedPrompt = `Dark fantasy RPG scene: ${sceneSummary}. Characters: ${chars}. Dramatic cinematic lighting, painterly fantasy illustration, detailed environment, atmospheric, no text or UI.`;
 
-  const tFal = Date.now();
-  let imageUrl: string;
-  let seed = 0;
+  const tStart = Date.now();
+  let base64: string;
   try {
-    const out = await generateSceneImage({ prompt: composedPrompt });
-    imageUrl = out.imageUrl;
-    seed = out.seed;
+    const out = await generateSceneImageOpenRouter({ prompt: composedPrompt });
+    base64 = out.base64;
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     await logTrace({
       sessionId,
       turnId,
-      stepName: "scene_image_fal",
+      stepName: "scene_image_openrouter",
       input: { prompt_prefix: composedPrompt.slice(0, 120) },
       output: {},
-      modelUsed: "fal-ai/fast-sdxl",
+      modelUsed: "gemini-2.5-flash-image",
       tokensIn: 0,
       tokensOut: 0,
-      latencyMs: Date.now() - tFal,
+      latencyMs: Date.now() - tStart,
       success: false,
       errorMessage: msg,
     });
@@ -50,13 +48,13 @@ export async function runImagePipeline(params: {
   await logTrace({
     sessionId,
     turnId,
-    stepName: "scene_image_fal",
+    stepName: "scene_image_openrouter",
     input: { prompt_prefix: composedPrompt.slice(0, 120) },
-    output: { seed, has_url: true },
-    modelUsed: "fal-ai/fast-sdxl",
+    output: { has_data: true },
+    modelUsed: "gemini-2.5-flash-image",
     tokensIn: 0,
     tokensOut: 0,
-    latencyMs: Date.now() - tFal,
+    latencyMs: Date.now() - tStart,
     success: true,
   });
 
@@ -94,6 +92,8 @@ export async function runImagePipeline(params: {
     sceneContext.trim().slice(0, 4000) ||
     narrativeText.slice(0, 500);
 
+  const dataUrl = `data:image/png;base64,${base64}`;
+
   try {
     const [snap] = await db
       .insert(sceneSnapshots)
@@ -104,17 +104,19 @@ export async function runImagePipeline(params: {
         summary,
         image_status: "ready",
         image_prompt: composedPrompt,
-        image_url: imageUrl,
+        image_url: dataUrl,
       })
       .returning();
+
+    const servingUrl = `/api/sessions/${sessionId}/scene-image/${snap!.id}`;
 
     await db.insert(imageJobs).values({
       session_id: sessionId,
       scene_snapshot_id: snap?.id ?? null,
       prompt: composedPrompt,
       status: "completed",
-      provider: "fal",
-      image_url: imageUrl,
+      provider: "openrouter",
+      image_url: servingUrl,
       completed_at: new Date(),
     });
 
@@ -130,6 +132,8 @@ export async function runImagePipeline(params: {
       latencyMs: 0,
       success: true,
     });
+
+    return { imageUrl: servingUrl };
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     await logTrace({
@@ -147,6 +151,4 @@ export async function runImagePipeline(params: {
     });
     return { imageUrl: null };
   }
-
-  return { imageUrl };
 }
