@@ -9,6 +9,7 @@ import { commitStatePatches } from "@/lib/orchestrator/apply-state";
 import { logTrace } from "@/lib/orchestrator/trace";
 import { parseIntent } from "@/lib/orchestrator/workers/intent-parser";
 import { interpretRules } from "@/lib/orchestrator/workers/rules-interpreter";
+import { interpretConsequences, consequenceToPatches } from "@/lib/orchestrator/workers/consequence-interpreter";
 import { generateNarration } from "@/lib/orchestrator/workers/narrator";
 import { checkVisualDelta } from "@/lib/orchestrator/workers/visual-delta";
 import { buildMemoryBundle, shouldSummarize, runSummarizer } from "@/lib/memory";
@@ -73,11 +74,6 @@ export async function scheduleSessionImageGeneration(
   }
 }
 
-function scaleDelta(base: number, rollTotal: number): number {
-  const scale = Math.max(1, Math.ceil(rollTotal / 5));
-  return base > 0 ? base * scale : base * scale;
-}
-
 function resolveNpcTarget(
   intent: ActionIntent,
   npcIds: Array<{ id: string; name: string }>,
@@ -92,76 +88,157 @@ function resolveNpcTarget(
     null;
 }
 
-function computeStatePatches(
+function isSelfTarget(intent: ActionIntent): boolean {
+  return intent.targets?.some(
+    (t) => t.kind === "player" && t.label?.toLowerCase() === "self",
+  ) ?? false;
+}
+
+function isHealContext(intent: ActionIntent, rawInput: string): boolean {
+  const ctx = (intent.suggested_roll_context ?? "").toLowerCase();
+  const raw = rawInput.toLowerCase();
+  return /\b(heal|potion|restore|cure|mend|bandage|first\s+aid|tend)\b/.test(ctx) ||
+    /\b(heal|potion|restore|cure|mend|bandage|first\s+aid|tend)\b/.test(raw);
+}
+
+function computeFallbackPatches(
   intent: ActionIntent,
   rolls: DiceRoll[],
   actingPlayerId: string,
+  rawInput: string,
   npcIds: Array<{ id: string; name: string }> = [],
 ): StatePatch[] {
   const patches: StatePatch[] = [];
   const roll = rolls[0];
   if (!roll) return patches;
 
-  const t = roll.total;
   const type = intent.action_type;
+  const selfTarget = isSelfTarget(intent);
+  const npcTarget = resolveNpcTarget(intent, npcIds);
 
   if (type === "attack" || type === "cast_spell") {
-    const npcTarget = resolveNpcTarget(intent, npcIds);
+    if (selfTarget) {
+      switch (roll.result) {
+        case "critical_success":
+          patches.push({ op: "player_hp", playerId: actingPlayerId, delta: -6 });
+          patches.push({ op: "condition_add", targetId: actingPlayerId, condition: "wounded" });
+          break;
+        case "success":
+          patches.push({ op: "player_hp", playerId: actingPlayerId, delta: -4 });
+          break;
+        case "failure":
+          patches.push({ op: "player_hp", playerId: actingPlayerId, delta: -2 });
+          break;
+        case "critical_failure":
+          patches.push({ op: "player_hp", playerId: actingPlayerId, delta: -1 });
+          break;
+      }
+    } else {
+      switch (roll.result) {
+        case "critical_success":
+          if (npcTarget) {
+            patches.push({ op: "npc_hp", npcId: npcTarget.id, delta: -8, reason: `${type} critical hit` });
+          }
+          patches.push({ op: "player_hp", playerId: actingPlayerId, delta: 1 });
+          break;
+        case "success":
+          if (npcTarget) {
+            patches.push({ op: "npc_hp", npcId: npcTarget.id, delta: -4, reason: `${type} hit` });
+          }
+          break;
+        case "failure":
+          patches.push({ op: "player_hp", playerId: actingPlayerId, delta: -2 });
+          break;
+        case "critical_failure":
+          patches.push({ op: "player_hp", playerId: actingPlayerId, delta: -4 });
+          patches.push({ op: "condition_add", targetId: actingPlayerId, condition: "staggered" });
+          break;
+      }
+      if (type === "cast_spell") {
+        const manaCost = roll.result === "critical_success" ? -1 : -2;
+        patches.push({ op: "player_mana", playerId: actingPlayerId, delta: manaCost });
+      }
+    }
+  } else if (type === "heal") {
     switch (roll.result) {
       case "critical_success":
-        patches.push({ op: "player_hp", playerId: actingPlayerId, delta: scaleDelta(2, t) });
-        if (npcTarget) {
-          patches.push({ op: "npc_hp", npcId: npcTarget.id, delta: -scaleDelta(3, t), reason: `${type} critical hit` });
-        }
+        patches.push({ op: "player_hp", playerId: actingPlayerId, delta: 6 });
+        patches.push({ op: "condition_remove", targetId: actingPlayerId, condition: "wounded" });
+        patches.push({ op: "player_mana", playerId: actingPlayerId, delta: -1 });
         break;
       case "success":
-        if (npcTarget) {
-          patches.push({ op: "npc_hp", npcId: npcTarget.id, delta: -scaleDelta(2, t), reason: `${type} hit` });
-        }
+        patches.push({ op: "player_hp", playerId: actingPlayerId, delta: 3 });
+        patches.push({ op: "player_mana", playerId: actingPlayerId, delta: -2 });
         break;
       case "failure":
-        patches.push({ op: "player_hp", playerId: actingPlayerId, delta: scaleDelta(-1, t) });
+        patches.push({ op: "player_mana", playerId: actingPlayerId, delta: -1 });
         break;
       case "critical_failure":
-        patches.push({ op: "player_hp", playerId: actingPlayerId, delta: scaleDelta(-2, t) });
+        patches.push({ op: "player_hp", playerId: actingPlayerId, delta: -2 });
+        patches.push({ op: "player_mana", playerId: actingPlayerId, delta: -2 });
+        break;
+    }
+  } else if (type === "defend") {
+    switch (roll.result) {
+      case "critical_success":
+        patches.push({ op: "player_hp", playerId: actingPlayerId, delta: 2 });
+        patches.push({ op: "condition_add", targetId: actingPlayerId, condition: "defended" });
+        break;
+      case "success":
+        patches.push({ op: "player_hp", playerId: actingPlayerId, delta: 1 });
+        patches.push({ op: "condition_add", targetId: actingPlayerId, condition: "defended" });
+        break;
+      case "failure":
+        patches.push({ op: "player_hp", playerId: actingPlayerId, delta: -2 });
+        break;
+      case "critical_failure":
+        patches.push({ op: "player_hp", playerId: actingPlayerId, delta: -4 });
         patches.push({ op: "condition_add", targetId: actingPlayerId, condition: "staggered" });
         break;
     }
-  } else if (type === "heal") {
-    if (roll.result === "critical_success") {
-      patches.push({ op: "player_hp", playerId: actingPlayerId, delta: scaleDelta(3, t) });
-    } else if (roll.result === "success") {
-      patches.push({ op: "player_hp", playerId: actingPlayerId, delta: scaleDelta(2, t) });
-    } else if (roll.result === "critical_failure") {
-      patches.push({ op: "player_hp", playerId: actingPlayerId, delta: scaleDelta(-1, t) });
-    }
-  } else if (type === "defend") {
-    if (roll.result === "critical_success") {
-      patches.push({ op: "player_hp", playerId: actingPlayerId, delta: scaleDelta(2, t) });
-      patches.push({ op: "condition_add", targetId: actingPlayerId, condition: "defended" });
-    } else if (roll.result === "success") {
-      patches.push({ op: "player_hp", playerId: actingPlayerId, delta: 1 });
-      patches.push({ op: "condition_add", targetId: actingPlayerId, condition: "defended" });
-    } else if (roll.result === "critical_failure") {
-      patches.push({ op: "player_hp", playerId: actingPlayerId, delta: scaleDelta(-1, t) });
-    }
   } else if (type === "use_item") {
-    const isHealItem = intent.suggested_roll_context?.toLowerCase().includes("heal") ||
-      intent.suggested_roll_context?.toLowerCase().includes("potion");
-    if (isHealItem && (roll.result === "success" || roll.result === "critical_success")) {
-      patches.push({ op: "player_hp", playerId: actingPlayerId, delta: scaleDelta(2, t) });
-    } else if (roll.result === "critical_failure") {
-      patches.push({ op: "player_hp", playerId: actingPlayerId, delta: scaleDelta(-2, t) });
+    if (isHealContext(intent, rawInput)) {
+      if (roll.result === "critical_success") {
+        patches.push({ op: "player_hp", playerId: actingPlayerId, delta: 5 });
+        patches.push({ op: "condition_remove", targetId: actingPlayerId, condition: "wounded" });
+      } else if (roll.result === "success") {
+        patches.push({ op: "player_hp", playerId: actingPlayerId, delta: 3 });
+      } else if (roll.result === "failure") {
+        patches.push({ op: "player_hp", playerId: actingPlayerId, delta: 1 });
+      } else if (roll.result === "critical_failure") {
+        patches.push({ op: "player_hp", playerId: actingPlayerId, delta: -2 });
+      }
+    } else {
+      if (roll.result === "critical_failure") {
+        patches.push({ op: "player_hp", playerId: actingPlayerId, delta: -2 });
+      }
     }
-  } else if (type === "move" || type === "inspect") {
+  } else if (type === "move") {
+    if (roll.result === "failure") {
+      patches.push({ op: "player_hp", playerId: actingPlayerId, delta: -1 });
+    } else if (roll.result === "critical_failure") {
+      patches.push({ op: "player_hp", playerId: actingPlayerId, delta: -3 });
+      patches.push({ op: "condition_add", targetId: actingPlayerId, condition: "prone" });
+    }
+  } else if (type === "inspect") {
     if (roll.result === "critical_failure") {
-      patches.push({ op: "player_hp", playerId: actingPlayerId, delta: scaleDelta(-1, t) });
+      patches.push({ op: "player_hp", playerId: actingPlayerId, delta: -2 });
     }
-  } else if (type === "other") {
-    if (roll.result === "critical_success") {
-      patches.push({ op: "player_hp", playerId: actingPlayerId, delta: scaleDelta(1, t) });
-    } else if (roll.result === "critical_failure") {
-      patches.push({ op: "player_hp", playerId: actingPlayerId, delta: scaleDelta(-1, t) });
+  } else if (type === "talk") {
+    if (roll.result === "critical_failure") {
+      patches.push({ op: "player_hp", playerId: actingPlayerId, delta: -1 });
+    }
+  } else {
+    switch (roll.result) {
+      case "critical_success":
+        patches.push({ op: "player_hp", playerId: actingPlayerId, delta: 2 });
+        break;
+      case "failure":
+        patches.push({ op: "player_hp", playerId: actingPlayerId, delta: -2 });
+        break;
+      case "critical_failure":
+        patches.push({ op: "player_hp", playerId: actingPlayerId, delta: -3 });
+        break;
     }
   }
 
@@ -350,7 +427,39 @@ export async function runTurnPipeline(params: {
   });
 
   const s0 = Date.now();
-  const statePatches = computeStatePatches(intent, diceRolls, playerId, ctx.npcIds);
+  const fallbackPatches = computeFallbackPatches(intent, diceRolls, playerId, rawInput, ctx.npcIds);
+
+  const actingMember = ctx.partyMembers.find((p) => p.playerId === playerId) ?? {
+    playerId,
+    name: ctx.character.name,
+    hp: ctx.character.hp,
+    maxHp: ctx.character.maxHp,
+    mana: ctx.character.mana,
+    maxMana: ctx.character.maxMana,
+    conditions: ctx.character.conditions,
+  };
+
+  const consequenceResult = await interpretConsequences({
+    sessionId,
+    turnId,
+    rawInput,
+    intent,
+    diceRolls,
+    actingPlayer: actingMember,
+    partyMembers: ctx.partyMembers,
+    npcs: ctx.npcDetails,
+    sceneContext:
+      ctx.currentSceneDescription?.trim() ||
+      ctx.recentEvents.slice(-2).join(" ").slice(0, 500) ||
+      "",
+    fallbackPatches,
+    provider,
+  });
+
+  const statePatches = consequenceResult.usage.model === "fallback"
+    ? fallbackPatches
+    : consequenceToPatches(consequenceResult.data);
+
   const questUpdate = await applyTurnQuestProgress({
     sessionId,
     round: ctx.session.currentRound,
@@ -365,13 +474,18 @@ export async function runTurnPipeline(params: {
     sessionId,
     turnId,
     stepName: "state_delta",
-    input: { intent_summary: intent.action_type },
-    output: { patches: statePatches, quest_state: questUpdate.state },
-    modelUsed: "deterministic",
-    tokensIn: 0,
-    tokensOut: 0,
+    input: { intent_summary: intent.action_type, ai_consequences: consequenceResult.usage.model !== "fallback" },
+    output: {
+      patches: statePatches,
+      consequence_effects: consequenceResult.data.effects,
+      quest_state: questUpdate.state,
+    },
+    modelUsed: consequenceResult.usage.model,
+    tokensIn: consequenceResult.usage.inputTokens,
+    tokensOut: consequenceResult.usage.outputTokens,
     latencyMs: Date.now() - s0,
-    success: true,
+    success: consequenceResult.success,
+    errorMessage: consequenceResult.error,
   });
 
   const a0 = Date.now();

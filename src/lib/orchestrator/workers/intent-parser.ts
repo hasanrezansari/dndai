@@ -3,24 +3,27 @@ import { getAIProvider } from "@/lib/ai";
 import { runOrchestrationStep } from "@/lib/orchestrator/step-runner";
 import { ActionIntentSchema, type ActionIntent } from "@/lib/schemas/ai-io";
 
-const ATTACK_PATTERNS = /\b(attack|hit|strike|slash|stab|punch|kick|shoot|smash|fight|swing|cleave|smite)\b/i;
-const SPELL_PATTERNS = /\b(cast|spell|fireball|magic|conjure|summon|enchant|invoke|lightning|thunder|eldritch|cantrip)\b/i;
-const HEAL_PATTERNS = /\b(heal|mend|cure|restore|bandage|patch\s?up|lay\s+on\s+hands|prayer)\b/i;
-const DEFEND_PATTERNS = /\b(defend|block|parry|shield|brace|guard|protect|dodge|deflect)\b/i;
-const MOVE_PATTERNS = /\b(move|go|walk|run|sneak|climb|jump|swim|fly|dash|hide|stealth|flee|retreat|enter|leave|approach)\b/i;
-const TALK_PATTERNS = /\b(talk|speak|say|ask|tell|persuade|intimidate|deceive|negotiate|greet|convince|bribe|charm)\b/i;
-const INSPECT_PATTERNS = /\b(look|inspect|examine|search|investigate|check|observe|scan|sense|detect|read|study|what'?s?\s+around)\b/i;
-const ITEM_PATTERNS = /\b(use|drink|eat|equip|wield|open|pick\s?up|grab|take|light|torch|potion|scroll|key)\b/i;
+const ATTACK_PATTERNS = /\b(a{1,2}t{1,2}a?c?k|hit|strike|slash|stab|punch|kick|shoot|smash|fight|swing|cleave|smite|slay|kill|murder|wound|damage|harm|hurt|bite|claw|charge|assault|battle|combat|duel)\b/i;
+const SPELL_PATTERNS = /\b(cast|spell|fireball|magic|conjure|summon|enchant|invoke|lightning|thunder|eldritch|cantrip|arcane|hex|curse|blast|bolt|ray|teleport|wards?|dispel|ritual)\b/i;
+const HEAL_PATTERNS = /\b(heal|mend|cure|restore|bandage|patch\s?up|lay\s+on\s+hands|prayer|revive|recover|potion|medic|first\s+aid|tend\s+wounds?|rest\s+and\s+heal)\b/i;
+const DEFEND_PATTERNS = /\b(defend|block|parry|shield|brace|guard|protect|dodge|deflect|hunker|take\s+cover|fortify|barricade)\b/i;
+const MOVE_PATTERNS = /\b(move|go|walk|run|sneak|climb|jump|swim|fly|dash|hide|stealth|flee|retreat|enter|leave|approach|travel|head\s+to|advance|proceed|venture|explore|wander|scout)\b/i;
+const TALK_PATTERNS = /\b(talk|speak|say|ask|tell|persuade|intimidate|deceive|negotiate|greet|convince|bribe|charm|yell|shout|plead|beg|threaten|lie|bluff|reason\s+with|converse|discuss|argue)\b/i;
+const INSPECT_PATTERNS = /\b(look|inspect|examine|search|investigate|check|observe|scan|sense|detect|read|study|what'?s?\s+around|peer|survey|scrutinize|analyze|notice|perceive|watch)\b/i;
+const ITEM_PATTERNS = /\b(use|drink|eat|equip|wield|open|pick\s?up|grab|take|light|torch|potion|scroll|key|consume|apply|activate|throw|deploy|pull\s+out|draw\s+my|unsheathe)\b/i;
+const SELF_HARM_PATTERNS = /\b(myself|self|my\s+own|i\s+(take|lose|sacrifice|hurt|harm|damage|wound)\b)/i;
 
 function classifyActionHeuristic(raw: string): ActionIntent["action_type"] {
-  if (ATTACK_PATTERNS.test(raw)) return "attack";
-  if (SPELL_PATTERNS.test(raw)) return "cast_spell";
-  if (HEAL_PATTERNS.test(raw)) return "heal";
-  if (DEFEND_PATTERNS.test(raw)) return "defend";
-  if (TALK_PATTERNS.test(raw)) return "talk";
-  if (INSPECT_PATTERNS.test(raw)) return "inspect";
-  if (ITEM_PATTERNS.test(raw)) return "use_item";
-  if (MOVE_PATTERNS.test(raw)) return "move";
+  const lower = raw.toLowerCase();
+  if (ATTACK_PATTERNS.test(lower)) return "attack";
+  if (SPELL_PATTERNS.test(lower)) return "cast_spell";
+  if (HEAL_PATTERNS.test(lower)) return "heal";
+  if (DEFEND_PATTERNS.test(lower)) return "defend";
+  if (TALK_PATTERNS.test(lower)) return "talk";
+  if (INSPECT_PATTERNS.test(lower)) return "inspect";
+  if (ITEM_PATTERNS.test(lower)) return "use_item";
+  if (MOVE_PATTERNS.test(lower)) return "move";
+  if (SELF_HARM_PATTERNS.test(lower)) return "attack";
   return "other";
 }
 
@@ -42,18 +45,41 @@ function guessStat(actionType: ActionIntent["action_type"], raw: string): Action
   }
 }
 
+function detectTargets(raw: string): ActionIntent["targets"] {
+  const targets: ActionIntent["targets"] = [];
+  const lower = raw.toLowerCase();
+  if (SELF_HARM_PATTERNS.test(lower)) {
+    targets.push({ kind: "player", label: "self" });
+  } else if (/\b(door|chest|lock|wall|trap|lever|gate|altar|shrine|statue|boulder|tree|bush|rope)\b/i.test(lower)) {
+    targets.push({ kind: "environment", label: "object" });
+  }
+  return targets;
+}
+
 function buildHeuristicFallback(raw: string): ActionIntent {
   const actionType = classifyActionHeuristic(raw);
   const skill = guessStat(actionType, raw);
   const needsRoll = actionType !== "talk";
+  const targets = detectTargets(raw);
+
+  const contextMap: Partial<Record<ActionIntent["action_type"], string>> = {
+    attack: `Attack roll${targets.some(t => t.label === "self") ? " (self-harm)" : ""}`,
+    cast_spell: "Spell attack",
+    heal: "Healing check",
+    defend: "Defense check",
+    move: "Agility check",
+    talk: "Persuasion check",
+    inspect: "Perception check to notice something.",
+    use_item: "Skill check",
+  };
 
   return ActionIntentSchema.parse({
     action_type: actionType,
-    targets: [],
+    targets,
     skill_or_save: skill,
     requires_roll: needsRoll,
     confidence: 0.6,
-    suggested_roll_context: raw.slice(0, 200),
+    suggested_roll_context: contextMap[actionType] ?? raw.slice(0, 200),
   });
 }
 
@@ -112,7 +138,7 @@ export async function parseIntent(params: {
     maxTokens: 300,
     temperature: 0.2,
     fallback: () => buildHeuristicFallback(raw),
-    timeoutMs: 10_000,
+    timeoutMs: 20_000,
   });
 
   if (result.data.confidence < LOW_CONFIDENCE_THRESHOLD && !result.data.rephrase_reason) {

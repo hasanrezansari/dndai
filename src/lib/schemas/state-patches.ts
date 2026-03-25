@@ -22,6 +22,12 @@ export const PlayerHpPatchSchema = z.object({
   delta: z.number(),
 });
 
+export const PlayerManaPatchSchema = z.object({
+  op: z.literal("player_mana"),
+  playerId: z.string(),
+  delta: z.number(),
+});
+
 export const ConditionAddPatchSchema = z.object({
   op: z.literal("condition_add"),
   targetId: z.string(),
@@ -60,6 +66,7 @@ export const LocationSetPatchSchema = z.object({
 export const StatePatchSchema = z.discriminatedUnion("op", [
   NpcHpPatchSchema,
   PlayerHpPatchSchema,
+  PlayerManaPatchSchema,
   ConditionAddPatchSchema,
   ConditionRemovePatchSchema,
   InventoryAddPatchSchema,

@@ -68,6 +68,29 @@ export async function commitStatePatches(
           .set({ hp, conditions })
           .where(eq(characters.id, char.id));
       }
+    } else if (patch.op === "player_mana") {
+      const rows = await db
+        .select({ character: characters })
+        .from(characters)
+        .innerJoin(players, eq(characters.player_id, players.id))
+        .where(
+          and(
+            eq(players.session_id, sessionId),
+            eq(players.id, patch.playerId),
+          ),
+        )
+        .limit(1);
+      const char = rows[0]?.character;
+      if (char) {
+        const mana = Math.min(
+          char.max_mana,
+          Math.max(0, char.mana + patch.delta),
+        );
+        await db
+          .update(characters)
+          .set({ mana })
+          .where(eq(characters.id, char.id));
+      }
     } else if (patch.op === "condition_add") {
       const rows = await db
         .select({ character: characters })

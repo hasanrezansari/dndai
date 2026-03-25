@@ -14,6 +14,23 @@ import { computeNextPlayableTurnState } from "@/lib/rules/turn-logic";
 import { CharacterStatsSchema, type CharacterStats } from "@/lib/schemas/domain";
 import { getQuestState } from "@/server/services/quest-service";
 
+export interface PartyMemberInfo {
+  playerId: string;
+  name: string;
+  hp: number;
+  maxHp: number;
+  mana: number;
+  maxMana: number;
+  conditions: string[];
+}
+
+export interface NpcDetail {
+  id: string;
+  name: string;
+  status: string;
+  attitude: string;
+}
+
 export interface TurnContext {
   session: {
     mode: string;
@@ -29,7 +46,10 @@ export interface TurnContext {
     race: string;
     stats: CharacterStats;
     hp: number;
+    maxHp: number;
     mana: number;
+    maxMana: number;
+    conditions: string[];
     pronouns: string;
     traits: string[];
     backstory: string;
@@ -38,6 +58,8 @@ export interface TurnContext {
   currentSceneDescription: string | null;
   allPlayerNames: string[];
   allCharacterSummaries: string[];
+  partyMembers: PartyMemberInfo[];
+  npcDetails: NpcDetail[];
   questContext: string | null;
   npcContext: string | null;
   npcIds: Array<{ id: string; name: string }>;
@@ -190,11 +212,31 @@ export async function buildTurnContext({
   const activeNpcs = npcRows.filter((n) => n.status !== "dead");
   let npcContext: string | null = null;
   const npcIds = npcRows.map((n) => ({ id: n.id, name: n.name }));
+  const npcDetails: NpcDetail[] = npcRows.map((n) => ({
+    id: n.id,
+    name: n.name,
+    status: n.status,
+    attitude: n.attitude,
+  }));
   if (activeNpcs.length > 0) {
     npcContext = activeNpcs
       .map((n) => `${n.name} (${n.role}, ${n.attitude}, at ${n.location})${n.notes ? ` — ${n.notes}` : ""}`)
       .join("; ");
   }
+
+  const partyMembers: PartyMemberInfo[] = playerCharacterPairs
+    .filter((row) => row.character && !row.player.is_dm)
+    .map((row) => ({
+      playerId: row.player.id,
+      name: row.character!.name,
+      hp: row.character!.hp,
+      maxHp: row.character!.max_hp,
+      mana: row.character!.mana,
+      maxMana: row.character!.max_mana,
+      conditions: Array.isArray(row.character!.conditions)
+        ? row.character!.conditions.map(String)
+        : [],
+    }));
 
   return {
     session: {
@@ -215,7 +257,10 @@ export async function buildTurnContext({
       race: charRow.race,
       stats,
       hp: charRow.hp,
+      maxHp: charRow.max_hp,
       mana: charRow.mana,
+      maxMana: charRow.max_mana,
+      conditions: Array.isArray(charRow.conditions) ? charRow.conditions.map(String) : [],
       pronouns,
       traits,
       backstory,
@@ -224,6 +269,8 @@ export async function buildTurnContext({
     currentSceneDescription,
     allPlayerNames,
     allCharacterSummaries,
+    partyMembers,
+    npcDetails,
     questContext,
     npcContext,
     npcIds,

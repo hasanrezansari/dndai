@@ -99,6 +99,24 @@ export const CampaignSeedOutputSchema = z.object({
 });
 export type CampaignSeedOutput = output<typeof CampaignSeedOutputSchema>;
 
+export const ConsequenceEffectSchema = z.object({
+  target_type: z.enum(["player", "npc"]).default("player"),
+  target_id: z.string(),
+  hp_delta: z.number().int().min(-30).max(30).default(0),
+  mana_delta: z.number().int().min(-20).max(20).default(0),
+  conditions_add: z.array(z.string()).default([]),
+  conditions_remove: z.array(z.string()).default([]),
+  reasoning: z.string().max(120).default(""),
+});
+export type ConsequenceEffect = output<typeof ConsequenceEffectSchema>;
+
+export const ConsequenceOutputSchema = z.object({
+  effects: z.array(ConsequenceEffectSchema).default([]),
+  phase_change: z.enum(["exploration", "combat", "social", "rest"]).nullable().default(null),
+  narrative_hint: z.string().max(200).default(""),
+});
+export type ConsequenceOutput = output<typeof ConsequenceOutputSchema>;
+
 export const ImagePromptOutputSchema = z.object({
   prompt: z.string(),
   style_key: z.string(),
