@@ -21,7 +21,14 @@ import {
   StateUpdateEventSchema,
   TurnStartedEventSchema,
 } from "@/lib/schemas/events";
-import type { GamePlayerView, GameSessionView, RollingMemoryView, StatEffect, StatPopup } from "@/lib/state/game-store";
+import type {
+  GamePlayerView,
+  GameSessionView,
+  NpcCombatantView,
+  RollingMemoryView,
+  StatEffect,
+  StatPopup,
+} from "@/lib/state/game-store";
 import { useGameStore } from "@/lib/state/game-store";
 
 import { getPusherClient, getSessionChannel } from "./client";
@@ -74,10 +81,17 @@ async function refetchPlayersFromState(sessionId: string) {
   const data = (await res.json()) as {
     session?: GameSessionView;
     players: GamePlayerView[];
+    npcs?: NpcCombatantView[];
     sceneTitle?: string | null;
     sceneImage?: string | null;
     quest?: {
       objective: string;
+      objectiveLeads?: Array<{
+        id: string;
+        text: string;
+        confidence: number;
+        updatedRound: number;
+      }>;
       progress: number;
       risk: number;
       status: "active" | "ready_to_end" | "failed";
@@ -96,6 +110,9 @@ async function refetchPlayersFromState(sessionId: string) {
   };
   if (Array.isArray(data.players)) {
     useGameStore.getState().setPlayers(data.players);
+  }
+  if (Array.isArray(data.npcs)) {
+    useGameStore.getState().setNpcs(data.npcs);
   }
   if (data.session) {
     useGameStore.getState().setSession(data.session);
@@ -426,7 +443,8 @@ export function useSessionChannel(sessionId: string | null) {
     }
 
     async function pollSceneImage() {
-      if (!useGameStore.getState().scenePending) {
+      const before = useGameStore.getState();
+      if (!before.scenePending) {
         stopScenePoll();
         return;
       }
@@ -438,7 +456,7 @@ export function useSessionChannel(sessionId: string | null) {
           scenePending?: boolean;
         };
         if (data.sceneImage && !useGameStore.getState().scenePending) return;
-        if (data.sceneImage) {
+        if (data.sceneImage && data.sceneImage !== before.sceneImage) {
           useGameStore.getState().setSceneImage(data.sceneImage);
           useGameStore.getState().attachImageToLatestNarration(data.sceneImage);
         }
@@ -474,8 +492,11 @@ export function useSessionChannel(sessionId: string | null) {
     const onSceneImageReady = (raw: unknown) => {
       const parsed = SceneImageReadyEventSchema.safeParse(raw);
       if (!parsed.success) return;
-      useGameStore.getState().setSceneImage(parsed.data.image_url);
-      useGameStore.getState().attachImageToLatestNarration(parsed.data.image_url);
+      const currentScene = useGameStore.getState().sceneImage;
+      if (parsed.data.image_url !== currentScene) {
+        useGameStore.getState().setSceneImage(parsed.data.image_url);
+        useGameStore.getState().attachImageToLatestNarration(parsed.data.image_url);
+      }
       useGameStore.getState().setScenePending(false);
       stopScenePoll();
     };

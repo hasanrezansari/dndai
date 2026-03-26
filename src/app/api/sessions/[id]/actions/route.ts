@@ -218,7 +218,7 @@ export async function POST(
     }
 
     const advanceResult = await advanceTurn(sessionId);
-    const { nextPlayerId, roundAdvanced } = advanceResult;
+    const { nextPlayerId } = advanceResult;
 
     if (advanceResult.partyWipe) {
       const stateVersion = await finalizeSessionEnd(sessionId);
@@ -273,19 +273,6 @@ export async function POST(
       .from(sessions)
       .where(eq(sessions.id, sessionId))
       .limit(1);
-
-    if (roundAdvanced && sessionAfterAdvance) {
-      const completedRound = sessionAfterAdvance.current_round - 1;
-      try {
-        await broadcastToSession(sessionId, "round-summary", {
-          summary_text: `Round ${completedRound} complete. The party presses onward into round ${sessionAfterAdvance.current_round}.`,
-          round_number: completedRound,
-          turn_id: turnId,
-        });
-      } catch (err) {
-        console.error("[actions] round-summary broadcast failed:", err);
-      }
-    }
 
     try {
       await broadcastToSession(sessionId, "narration-update", {

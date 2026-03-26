@@ -45,6 +45,7 @@ export default function CharacterCreationPage() {
   const [pronouns, setPronouns] = useState("they/them");
   const [traits, setTraits] = useState("");
   const [backstory, setBackstory] = useState("");
+  const [appearance, setAppearance] = useState("");
   const [stats, setStats] = useState<CharacterStats | null>(null);
   const [statsShakeKey, setStatsShakeKey] = useState(0);
   const [initialRollDone, setInitialRollDone] = useState(false);
@@ -157,6 +158,7 @@ export default function CharacterCreationPage() {
                 .filter(Boolean)
             : undefined,
           backstory: backstory.trim() || undefined,
+          appearance: appearance.trim() || undefined,
         }),
       });
       if (!res.ok) {
@@ -201,21 +203,32 @@ export default function CharacterCreationPage() {
       </header>
 
       {/* Class Preview */}
-      <div className="bg-gradient-to-b from-[var(--surface-container)] to-[var(--color-obsidian)] rounded-[var(--radius-card)] p-6 flex flex-col items-center gap-3 border border-[rgba(77,70,53,0.15)]">
-        <span className="text-7xl leading-none select-none" aria-hidden>
+      <div className="relative overflow-hidden rounded-[var(--radius-card)] border border-[rgba(77,70,53,0.15)] bg-gradient-to-b from-[var(--surface-container)] to-[var(--color-obsidian)] p-6 flex flex-col items-center gap-3">
+        {selectedMeta?.imageUrl ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={selectedMeta.imageUrl}
+            alt=""
+            className="absolute inset-0 h-full w-full object-cover opacity-45"
+            loading="eager"
+            decoding="async"
+          />
+        ) : null}
+        <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-[var(--color-obsidian)] via-[var(--color-obsidian)]/65 to-transparent" />
+        <span className="relative text-7xl leading-none select-none drop-shadow-[0_4px_12px_rgba(0,0,0,0.85)]" aria-hidden>
           {selectedMeta?.icon ?? "—"}
         </span>
         <div className="text-center space-y-1.5">
-          <h2 className="text-fantasy text-xl text-[var(--color-silver-muted)]">
+          <h2 className="relative text-fantasy text-xl text-[var(--color-silver-muted)]">
             {selectedMeta?.label ?? ""}
           </h2>
           {selectedMeta?.role ? (
-            <p className="text-[9px] font-black uppercase tracking-[0.2em] text-[var(--color-gold-rare)]">
+            <p className="relative text-[9px] font-black uppercase tracking-[0.2em] text-[var(--color-gold-rare)]">
               {selectedMeta.role}
             </p>
           ) : null}
           {selectedMeta?.fantasy ? (
-            <p className="text-xs text-[var(--color-silver-dim)] max-w-[28ch] italic leading-relaxed">
+            <p className="relative text-xs text-[var(--color-silver-dim)] max-w-[28ch] italic leading-relaxed">
               {selectedMeta.fantasy}
             </p>
           ) : null}
@@ -265,6 +278,28 @@ export default function CharacterCreationPage() {
         </div>
       </section>
 
+
+      {/* Appearance */}
+      <section className="flex flex-col gap-3">
+        <label
+          htmlFor="hero-appearance"
+          className="text-[10px] font-black uppercase tracking-[0.2em] text-[var(--outline)]"
+        >
+          Appearance
+          <span className="text-[var(--outline)]/40 normal-case tracking-normal ml-2 font-normal">
+            optional
+          </span>
+        </label>
+        <textarea
+          id="hero-appearance"
+          value={appearance}
+          onChange={(e) => setAppearance(e.target.value)}
+          maxLength={220}
+          rows={2}
+          className="w-full rounded-[var(--radius-button)] bg-[var(--color-deep-void)] border border-[rgba(77,70,53,0.2)] px-4 py-3 text-sm text-[var(--color-silver-muted)] placeholder:text-[var(--outline)]/40 focus:outline-none focus:border-[var(--color-gold-rare)]/40 resize-none transition-colors leading-relaxed"
+          placeholder="e.g. scarred jaw, raven cloak, silver-trim armor, amber eyes"
+        />
+      </section>
       {/* Backstory */}
       <section className="flex flex-col gap-3">
         <label
@@ -324,6 +359,7 @@ export default function CharacterCreationPage() {
               <ClassCard
                 key={c.value}
                 icon={c.icon}
+                imageUrl={c.imageUrl}
                 label={c.label}
                 role={c.role}
                 selected={characterClass === c.value}

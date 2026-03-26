@@ -21,6 +21,7 @@ export interface BottomSheetProps {
   onClose: () => void;
   title: string;
   children: React.ReactNode;
+  fullHeight?: boolean;
 }
 
 export function BottomSheet({
@@ -28,6 +29,7 @@ export function BottomSheet({
   onClose,
   title,
   children,
+  fullHeight = false,
 }: BottomSheetProps) {
   const reduced = useReducedMotion();
   const controls = useDragControls();
@@ -74,7 +76,11 @@ export function BottomSheet({
             role="dialog"
             aria-modal="true"
             aria-labelledby="bottom-sheet-title"
-            className="relative z-[1] flex max-h-[85vh] min-h-[70vh] w-full flex-col rounded-t-[var(--radius-card)] border-t border-x border-[rgba(77,70,53,0.2)] bg-[var(--color-obsidian)] shadow-[0_-12px_48px_rgba(0,0,0,0.55)]"
+            className={`relative z-[1] flex w-full flex-col border-[rgba(77,70,53,0.2)] bg-[var(--color-obsidian)] ${
+              fullHeight
+                ? "h-dvh max-h-dvh min-h-dvh rounded-none border-0"
+                : "max-h-[85vh] min-h-[70vh] rounded-t-[var(--radius-card)] border-t border-x shadow-[0_-12px_48px_rgba(0,0,0,0.55)]"
+            }`}
             initial={{ y: "100%" }}
             animate={{ y: 0 }}
             exit={{ y: "100%" }}

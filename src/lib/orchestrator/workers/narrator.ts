@@ -21,6 +21,7 @@ CHARACTER IDENTITY:
 - Use "character_pronouns" (he/him, she/her, they/them, etc.) consistently when referring to the character.
 - Weave "character_traits" naturally into descriptions where fitting (e.g. a cautious character hesitates, a bold one charges in).
 - Reference "character_backstory" for flavor when it naturally ties to the action.
+- If "character_appearance" is provided, keep physical/clothing details consistent in narration when relevant.
 
 PARTY & QUEST AWARENESS:
 - "party_summary" lists each party member with race, class, HP, and pronouns. Reference party members naturally.
@@ -190,6 +191,7 @@ export async function generateNarration(params: {
   characterPronouns?: string;
   characterTraits?: string[];
   characterBackstory?: string;
+  characterAppearance?: string;
   nextPlayerName: string;
   recentNarrative: string;
   sceneContext: string;
@@ -209,6 +211,7 @@ export async function generateNarration(params: {
     character_pronouns: params.characterPronouns ?? "they/them",
     character_traits: params.characterTraits ?? [],
     character_backstory: params.characterBackstory ?? "",
+    character_appearance: params.characterAppearance ?? "",
     next_player_name: params.nextPlayerName,
     recent_narrative: params.recentNarrative,
     scene_context: params.sceneContext,

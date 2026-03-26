@@ -279,6 +279,9 @@ export default function LobbyPage() {
     (p) => p.is_ready && p.is_connected,
   ).length;
   const totalSeats = session.max_players;
+  const lobbyTeaser =
+    session.adventure_prompt?.trim() ||
+    "Gather your party. The portal stirs beyond the veil.";
 
   return (
     <main className="min-h-dvh flex flex-col px-6 pb-10 bg-[var(--color-obsidian)]">
@@ -318,6 +321,39 @@ export default function LobbyPage() {
             </p>
           </div>
         </header>
+
+        <section className="mb-6 overflow-hidden rounded-[var(--radius-card)] border border-[rgba(77,70,53,0.18)]">
+          <div className="relative aspect-[16/10]">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src="/images/ashveil-start-cover.png"
+              alt="Ashveil adventure key art"
+              className="absolute inset-0 h-full w-full object-cover"
+              loading="eager"
+            />
+            <div className="absolute inset-0 bg-gradient-to-t from-[var(--color-obsidian)] via-[var(--color-obsidian)]/68 to-transparent" />
+            <div className="pointer-events-none absolute inset-0 opacity-20">
+              <div className="h-full w-full animate-shimmer" />
+            </div>
+            <div className="absolute inset-x-0 bottom-0 z-[1] px-4 pb-4 pt-8">
+              <div className="flex items-start gap-3">
+                <div className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-[var(--radius-avatar)] border border-[var(--color-gold-rare)]/35 bg-[var(--surface-high)]/85 backdrop-blur-sm">
+                  <span className="material-symbols-outlined text-[var(--color-gold-rare)]">
+                    auto_awesome
+                  </span>
+                </div>
+                <div className="min-w-0">
+                  <p className="text-[9px] font-black uppercase tracking-[0.18em] text-[var(--color-gold-rare)]">
+                    Portal Forecast
+                  </p>
+                  <p className="mt-1 text-fantasy text-[13px] leading-relaxed text-[var(--color-silver-muted)]">
+                    {lobbyTeaser}
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
 
         {/* Party List */}
         <section className="flex-1 space-y-0 overflow-hidden rounded-[var(--radius-card)] border border-[rgba(77,70,53,0.15)] divide-y divide-[rgba(77,70,53,0.1)]">

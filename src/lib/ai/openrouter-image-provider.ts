@@ -14,6 +14,20 @@ interface OpenRouterImageResponse {
   error?: { message?: string; code?: number };
 }
 
+function parseDataUrlBase64(dataUrl: string): string | null {
+  const match = dataUrl.match(/^data:image\/[\w+.-]+;base64,(.+)$/);
+  return match?.[1] ?? null;
+}
+
+async function fetchImageAsBase64(url: string): Promise<string> {
+  const res = await fetch(url);
+  if (!res.ok) {
+    throw new Error(`Image fetch failed ${res.status} for ${url}`);
+  }
+  const arr = await res.arrayBuffer();
+  return Buffer.from(arr).toString("base64");
+}
+
 export async function generateSceneImageOpenRouter(params: {
   prompt: string;
   negativePrompt?: string;
@@ -74,9 +88,14 @@ export async function generateSceneImageOpenRouter(params: {
 
   const dataUrl = images[0]!.image_url.url;
 
-  const base64Match = dataUrl.match(/^data:image\/\w+;base64,(.+)$/);
-  if (base64Match?.[1]) {
-    return { base64: base64Match[1] };
+  const inlineBase64 = parseDataUrlBase64(dataUrl);
+  if (inlineBase64) {
+    return { base64: inlineBase64 };
+  }
+
+  if (/^https?:\/\//i.test(dataUrl)) {
+    const fetchedBase64 = await fetchImageAsBase64(dataUrl);
+    return { base64: fetchedBase64 };
   }
 
   return { base64: dataUrl };

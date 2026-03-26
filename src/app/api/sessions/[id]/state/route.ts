@@ -14,13 +14,20 @@ import {
   characters,
   memorySummaries,
   narrativeEvents,
+  npcStates,
   players,
   sceneSnapshots,
   sessions,
   turns,
 } from "@/lib/db/schema";
+import { mapNpcRowToCombatantView } from "@/lib/state/npc-combatant-mapper";
 import { CharacterStatsSchema } from "@/lib/schemas/domain";
-import type { FeedEntry, GamePlayerView, GameSessionView } from "@/lib/state/game-store";
+import type {
+  FeedEntry,
+  GamePlayerView,
+  GameSessionView,
+  NpcCombatantView,
+} from "@/lib/state/game-store";
 import { getQuestState } from "@/server/services/quest-service";
 
 const DEFAULT_STATS = {
@@ -63,6 +70,15 @@ function mapPlayerRow(
     isDm: p.is_dm,
   };
   if (c) {
+    const visualProfile =
+      c.visual_profile && typeof c.visual_profile === "object" && !Array.isArray(c.visual_profile)
+        ? (c.visual_profile as Record<string, unknown>)
+        : {};
+    const portraitRaw = visualProfile.portrait_url;
+    const portraitUrl =
+      typeof portraitRaw === "string" && portraitRaw.trim().length > 0
+        ? portraitRaw
+        : undefined;
     const statsParsed = CharacterStatsSchema.safeParse(c.stats);
     const stats = statsParsed.success ? statsParsed.data : { ...DEFAULT_STATS };
     const inventory = Array.isArray(c.inventory)
@@ -86,6 +102,7 @@ function mapPlayerRow(
       inventory,
       abilities,
       conditions,
+      portraitUrl,
     };
   }
   return base;
@@ -183,8 +200,8 @@ export async function GET(
       latestScene?.image_status === "generating";
     const scenePending = Boolean(rawSceneImage) ? false : sceneStatusPending;
     const sceneTitle =
-      latestScene?.summary.split("\n")[0]?.trim() ??
-      sessionRow.campaign_title ??
+      sessionRow.campaign_title?.trim() ||
+      latestScene?.summary.split("\n")[0]?.trim() ||
       null;
 
     const [dmAwaitingRow] = await db
@@ -251,9 +268,16 @@ export async function GET(
         createdAt: r.created_at.toISOString(),
       }));
 
+    const npcRows = await db
+      .select()
+      .from(npcStates)
+      .where(eq(npcStates.session_id, sessionId));
+    const npcs: NpcCombatantView[] = npcRows.map(mapNpcRowToCombatantView);
+
     return NextResponse.json({
       session: mappedSession,
       players: mappedPlayers,
+      npcs,
       feed,
       sceneImage,
       sceneTitle,

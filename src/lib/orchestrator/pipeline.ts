@@ -1,8 +1,8 @@
-import { and, eq } from "drizzle-orm";
+import { and, desc, eq } from "drizzle-orm";
 
 import { getAIProvider } from "@/lib/ai";
 import { db } from "@/lib/db";
-import { actions, narrativeEvents, npcStates, turns } from "@/lib/db/schema";
+import { actions, narrativeEvents, npcStates, sceneSnapshots, turns } from "@/lib/db/schema";
 import { broadcastToSession } from "@/lib/socket/server";
 import { buildTurnContext } from "@/lib/orchestrator/context-builder";
 import { commitStatePatches } from "@/lib/orchestrator/apply-state";
@@ -300,6 +300,58 @@ async function updateNpcStatesFromNarrative(
   }
 }
 
+async function unlockNpcPortraitsFromLatestScene(params: {
+  sessionId: string;
+  sceneText: string;
+  visibleChanges: string[];
+}): Promise<void> {
+  const [latestScene] = await db
+    .select({ id: sceneSnapshots.id, image_url: sceneSnapshots.image_url })
+    .from(sceneSnapshots)
+    .where(eq(sceneSnapshots.session_id, params.sessionId))
+    .orderBy(desc(sceneSnapshots.created_at))
+    .limit(1);
+  if (!latestScene?.image_url) return;
+
+  const portraitUrl = `/api/sessions/${params.sessionId}/scene-image/${latestScene.id}`;
+  const textForMatch = `${params.sceneText}\n${params.visibleChanges.join(" ")}`.toLowerCase();
+
+  const npcRows = await db
+    .select({
+      id: npcStates.id,
+      name: npcStates.name,
+      visual_profile: npcStates.visual_profile,
+    })
+    .from(npcStates)
+    .where(eq(npcStates.session_id, params.sessionId));
+
+  for (const npc of npcRows) {
+    const name = npc.name.trim();
+    if (!name || !textForMatch.includes(name.toLowerCase())) continue;
+
+    const rawVp = npc.visual_profile;
+    const vp =
+      rawVp && typeof rawVp === "object" && !Array.isArray(rawVp)
+        ? (rawVp as Record<string, unknown>)
+        : {};
+    const hasPortrait =
+      typeof vp.portrait_url === "string" && vp.portrait_url.trim().length > 0;
+    if (hasPortrait) continue;
+
+    await db
+      .update(npcStates)
+      .set({
+        visual_profile: {
+          ...vp,
+          portrait_url: portraitUrl,
+          portrait_status: "ready",
+        },
+        updated_at: new Date(),
+      })
+      .where(eq(npcStates.id, npc.id));
+  }
+}
+
 function rollDc(roll: { dice: string; dc?: number }): number {
   if (roll.dc !== undefined) return roll.dc;
   return roll.dice === "d20" ? 10 : 1;
@@ -466,6 +518,7 @@ export async function runTurnPipeline(params: {
 
   const questUpdate = await applyTurnQuestProgress({
     sessionId,
+    turnId,
     round: ctx.session.currentRound,
     objectiveFallback:
       ctx.session.adventurePrompt?.trim() ||
@@ -473,6 +526,9 @@ export async function runTurnPipeline(params: {
       "Complete the mission and survive.",
     actionType: intent.action_type,
     diceRolls,
+    actionText: rawInput,
+    recentNarrative: ctx.recentEvents[ctx.recentEvents.length - 1],
+    provider,
   });
   await logTrace({
     sessionId,
@@ -565,6 +621,7 @@ export async function runTurnPipeline(params: {
     characterPronouns: ctx.character.pronouns,
     characterTraits: ctx.character.traits,
     characterBackstory: ctx.character.backstory,
+    characterAppearance: ctx.character.appearance,
     nextPlayerName: nextActorName,
     recentNarrative: memoryBundle.recentEventWindow,
     sceneContext,
@@ -608,6 +665,17 @@ export async function runTurnPipeline(params: {
       await updateNpcStatesFromNarrative(sessionId, ctx.npcIds, narration.visible_changes, narration.scene_text);
     } catch (err) {
       console.error("[pipeline] NPC state update failed, continuing:", err);
+    }
+  }
+  if (ctx.npcIds.length > 0) {
+    try {
+      await unlockNpcPortraitsFromLatestScene({
+        sessionId,
+        sceneText: narration.scene_text,
+        visibleChanges: narration.visible_changes,
+      });
+    } catch (err) {
+      console.error("[pipeline] NPC portrait unlock fallback failed, continuing:", err);
     }
   }
 

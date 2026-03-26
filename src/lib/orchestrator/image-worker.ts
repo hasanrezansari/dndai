@@ -5,6 +5,7 @@ import { db } from "@/lib/db";
 import {
   characters,
   imageJobs,
+  npcStates,
   players,
   sceneSnapshots,
   sessions,
@@ -214,6 +215,36 @@ export async function runImagePipeline(params: {
       .returning();
 
     const servingUrl = `/api/sessions/${sessionId}/scene-image/${snap!.id}`;
+
+    // Unlock NPC portraits progressively when they become relevant in narration.
+    try {
+      const npcRows = await db
+        .select({ id: npcStates.id, name: npcStates.name, visual_profile: npcStates.visual_profile })
+        .from(npcStates)
+        .where(eq(npcStates.session_id, sessionId));
+      const textForMatch = `${narrativeText}\n${sceneContext}`.toLowerCase();
+      for (const npc of npcRows) {
+        const name = npc.name.trim();
+        if (!name) continue;
+        if (!textForMatch.includes(name.toLowerCase())) continue;
+        const rawVp = npc.visual_profile;
+        const vp =
+          rawVp && typeof rawVp === "object" && !Array.isArray(rawVp)
+            ? (rawVp as Record<string, unknown>)
+            : {};
+        const nextVp: Record<string, unknown> = {
+          ...vp,
+          portrait_url: servingUrl,
+          portrait_status: "ready",
+        };
+        await db
+          .update(npcStates)
+          .set({ visual_profile: nextVp, updated_at: new Date() })
+          .where(eq(npcStates.id, npc.id));
+      }
+    } catch (err) {
+      console.error("[image] npc portrait unlock update failed:", err);
+    }
 
     await db.insert(imageJobs).values({
       session_id: sessionId,

@@ -92,9 +92,18 @@ export function CharacterSheet({ viewPlayerId = null }: CharacterSheetProps) {
       {/* Hero Header */}
       <div className="flex items-start gap-5">
         <div className="w-20 h-20 rounded-[var(--radius-avatar)] bg-[var(--surface-high)] border-2 border-[var(--outline-variant)]/30 flex items-center justify-center shrink-0">
-          <span className="text-4xl select-none" aria-hidden>
-            {classIcon(character.class)}
-          </span>
+          {character.portraitUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={character.portraitUrl}
+              alt={`${character.name} portrait`}
+              className="h-full w-full rounded-[var(--radius-avatar)] object-cover"
+            />
+          ) : (
+            <span className="text-4xl select-none" aria-hidden>
+              {classIcon(character.class)}
+            </span>
+          )}
         </div>
         <div className="min-w-0 flex-1">
           <h3 className="text-fantasy text-2xl font-black tracking-tight text-[var(--color-silver-muted)]">

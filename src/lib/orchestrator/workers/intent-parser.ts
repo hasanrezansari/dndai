@@ -56,10 +56,22 @@ function detectTargets(raw: string): ActionIntent["targets"] {
   return targets;
 }
 
+function shouldRequireRollHeuristic(
+  actionType: ActionIntent["action_type"],
+  raw: string,
+): boolean {
+  if (actionType !== "talk") return true;
+  const text = raw.trim().toLowerCase();
+  // Only skip a roll for very simple, low-stakes social beats.
+  const trivialSocial =
+    /^(hi|hello|hey|greet|wave|smile|nod|thanks|thank you)[.!?]*$/.test(text);
+  return !trivialSocial;
+}
+
 function buildHeuristicFallback(raw: string): ActionIntent {
   const actionType = classifyActionHeuristic(raw);
   const skill = guessStat(actionType, raw);
-  const needsRoll = actionType !== "talk";
+  const needsRoll = shouldRequireRollHeuristic(actionType, raw);
   const targets = detectTargets(raw);
 
   const contextMap: Partial<Record<ActionIntent["action_type"], string>> = {

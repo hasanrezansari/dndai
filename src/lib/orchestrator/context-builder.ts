@@ -53,6 +53,7 @@ export interface TurnContext {
     pronouns: string;
     traits: string[];
     backstory: string;
+    appearance: string;
   };
   recentEvents: string[];
   currentSceneDescription: string | null;
@@ -188,6 +189,14 @@ export async function buildTurnContext({
   const pronouns = typeof vp.pronouns === "string" ? vp.pronouns : "they/them";
   const traits = Array.isArray(vp.traits) ? vp.traits.map(String) : [];
   const backstory = typeof vp.backstory === "string" ? vp.backstory : "";
+  const appearance =
+    typeof vp.appearance === "string"
+      ? vp.appearance
+      : Array.isArray(vp.look)
+        ? vp.look.map(String).join(", ")
+        : typeof vp.description === "string"
+          ? vp.description
+          : "";
 
   const allCharacterSummaries = playerCharacterPairs.map((row) => {
     const c = row.character;
@@ -264,6 +273,7 @@ export async function buildTurnContext({
       pronouns,
       traits,
       backstory,
+      appearance,
     },
     recentEvents,
     currentSceneDescription,

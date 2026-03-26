@@ -71,6 +71,14 @@ export const VisualDeltaOutputSchema = z.object({
 });
 export type VisualDeltaOutput = output<typeof VisualDeltaOutputSchema>;
 
+export const QuestSignalOutputSchema = z.object({
+  signal_text: z.string().min(12).max(140),
+  focus_term: z.string().min(2).max(40),
+  suggested_sub_objective: z.string().min(6).max(80).optional(),
+  confidence: z.number().min(0).max(1).default(0.65),
+});
+export type QuestSignalOutput = output<typeof QuestSignalOutputSchema>;
+
 export const CampaignSeedNpcSchema = z.object({
   name: z.string(),
   role: z.string(),

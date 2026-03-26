@@ -95,6 +95,31 @@ export function QuestPill({
 
       {expanded ? (
         <div className="mt-2 space-y-3 border-t border-[rgba(77,70,53,0.12)] pt-3">
+          {quest.objectiveLeads?.length ? (
+            <details open className="rounded-[var(--radius-card)] bg-[var(--color-deep-void)]/40 px-3 py-2">
+              <summary className="cursor-pointer text-[10px] font-bold text-[var(--outline)] select-none uppercase tracking-wider">
+                Signals ({quest.objectiveLeads.length})
+              </summary>
+              <ul className="mt-2 ml-2 space-y-1.5 text-[10px] text-[var(--outline)]">
+                {quest.objectiveLeads.map((lead) => (
+                  <li key={lead.id} className="flex items-start gap-2">
+                    <span
+                      className="material-symbols-outlined mt-px shrink-0 text-[10px] text-[var(--color-gold-rare)]"
+                      aria-hidden
+                    >
+                      explore
+                    </span>
+                    <span className="line-clamp-2">
+                      {lead.text}
+                      <span className="ml-1 text-[9px] uppercase tracking-wider text-[var(--outline)]">
+                        ({Math.round(lead.confidence * 100)}%)
+                      </span>
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </details>
+          ) : null}
           {quest.subObjectives?.length ? (
             <details open className="rounded-[var(--radius-card)] bg-[var(--color-deep-void)]/40 px-3 py-2">
               <summary className="cursor-pointer text-[10px] font-bold text-[var(--outline)] select-none uppercase tracking-wider">
