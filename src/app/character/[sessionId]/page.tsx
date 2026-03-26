@@ -45,6 +45,7 @@ export default function CharacterCreationPage() {
   const [pronouns, setPronouns] = useState("they/them");
   const [traits, setTraits] = useState("");
   const [backstory, setBackstory] = useState("");
+  const [appearance, setAppearance] = useState("");
   const [stats, setStats] = useState<CharacterStats | null>(null);
   const [statsShakeKey, setStatsShakeKey] = useState(0);
   const [initialRollDone, setInitialRollDone] = useState(false);
@@ -157,6 +158,7 @@ export default function CharacterCreationPage() {
                 .filter(Boolean)
             : undefined,
           backstory: backstory.trim() || undefined,
+          appearance: appearance.trim() || undefined,
         }),
       });
       if (!res.ok) {
@@ -276,6 +278,28 @@ export default function CharacterCreationPage() {
         </div>
       </section>
 
+
+      {/* Appearance */}
+      <section className="flex flex-col gap-3">
+        <label
+          htmlFor="hero-appearance"
+          className="text-[10px] font-black uppercase tracking-[0.2em] text-[var(--outline)]"
+        >
+          Appearance
+          <span className="text-[var(--outline)]/40 normal-case tracking-normal ml-2 font-normal">
+            optional
+          </span>
+        </label>
+        <textarea
+          id="hero-appearance"
+          value={appearance}
+          onChange={(e) => setAppearance(e.target.value)}
+          maxLength={220}
+          rows={2}
+          className="w-full rounded-[var(--radius-button)] bg-[var(--color-deep-void)] border border-[rgba(77,70,53,0.2)] px-4 py-3 text-sm text-[var(--color-silver-muted)] placeholder:text-[var(--outline)]/40 focus:outline-none focus:border-[var(--color-gold-rare)]/40 resize-none transition-colors leading-relaxed"
+          placeholder="e.g. scarred jaw, raven cloak, silver-trim armor, amber eyes"
+        />
+      </section>
       {/* Backstory */}
       <section className="flex flex-col gap-3">
         <label

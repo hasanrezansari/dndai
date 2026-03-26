@@ -29,6 +29,7 @@ const CreateBodySchema = z.object({
   pronouns: z.string().max(20).optional(),
   traits: z.array(z.string().max(40)).max(5).optional(),
   backstory: z.string().max(500).optional(),
+  appearance: z.string().max(220).optional(),
 });
 
 export async function POST(request: NextRequest) {
@@ -40,7 +41,7 @@ export async function POST(request: NextRequest) {
     if (!parsed.success) {
       return apiError("Invalid body", 400);
     }
-    const { playerId, sessionId, name, characterClass, race, stats, pronouns, traits, backstory } =
+    const { playerId, sessionId, name, characterClass, race, stats, pronouns, traits, backstory, appearance } =
       parsed.data;
     if (!(await isPlayerForUser(playerId, sessionId, user.id))) {
       return apiError("Forbidden", 403);
@@ -68,6 +69,7 @@ export async function POST(request: NextRequest) {
       pronouns,
       traits,
       backstory,
+      appearance,
     });
     try {
       await broadcastToSession(sessionId, "player-ready", {
