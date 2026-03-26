@@ -1,5 +1,6 @@
 interface ClassCardProps {
   icon: string;
+  imageUrl?: string;
   label: string;
   role: string;
   selected: boolean;
@@ -8,6 +9,7 @@ interface ClassCardProps {
 
 export function ClassCard({
   icon,
+  imageUrl,
   label,
   role,
   selected,
@@ -26,7 +28,7 @@ export function ClassCard({
     >
       <div
         className={`
-          flex flex-col items-center justify-center gap-2 px-3 py-4 h-[120px] w-[104px]
+          relative flex flex-col items-center justify-end gap-1.5 px-3 py-3 h-[124px] w-[108px]
           rounded-[var(--radius-card)] border transition-all duration-300
           ${
             selected
@@ -35,11 +37,22 @@ export function ClassCard({
           }
         `.trim()}
       >
-        <span className="text-3xl leading-none select-none" aria-hidden>
+        {imageUrl ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={imageUrl}
+            alt=""
+            className="absolute inset-0 h-full w-full object-cover opacity-70"
+            loading="lazy"
+            decoding="async"
+          />
+        ) : null}
+        <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-[var(--color-obsidian)] via-[var(--color-obsidian)]/35 to-transparent" />
+        <span className="relative text-2xl leading-none select-none drop-shadow-[0_2px_6px_rgba(0,0,0,0.75)]" aria-hidden>
           {icon}
         </span>
         <span
-          className={`text-xs font-bold text-center leading-tight ${
+          className={`relative text-xs font-bold text-center leading-tight ${
             selected
               ? "text-[var(--color-gold-rare)]"
               : "text-[var(--color-silver-muted)]"
@@ -47,7 +60,7 @@ export function ClassCard({
         >
           {label}
         </span>
-        <span className="text-[9px] uppercase tracking-[0.15em] text-[var(--outline)] text-center font-bold">
+        <span className="relative text-[9px] uppercase tracking-[0.15em] text-[var(--outline)] text-center font-bold">
           {role}
         </span>
       </div>
