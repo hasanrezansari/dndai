@@ -52,6 +52,12 @@ export interface GameSessionView {
 }
 
 export interface QuestProgressView {
+  objectiveLeads?: Array<{
+    id: string;
+    text: string;
+    confidence: number;
+    updatedRound: number;
+  }>;
   objective: string;
   subObjectives?: string[];
   progress: number;
@@ -93,6 +99,7 @@ export interface GamePlayerView {
     inventory: Array<Record<string, unknown>>;
     abilities: Array<Record<string, unknown>>;
     conditions: string[];
+    portraitUrl?: string;
   };
 }
 
@@ -109,6 +116,8 @@ export interface NpcCombatantView {
   hp?: number;
   maxHp?: number;
   attacks?: string;
+  portraitUrl?: string;
+  portraitStatus?: "locked" | "ready";
 }
 
 export interface RollingMemoryView {

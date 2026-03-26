@@ -22,9 +22,17 @@ export type EndingVoteState = {
   votes: Record<string, EndingVoteChoice>;
 };
 
+export type ObjectiveLead = {
+  id: string;
+  text: string;
+  confidence: number;
+  updatedRound: number;
+};
+
 export type QuestState = {
   objective: string;
   subObjectives?: string[];
+  objectiveLeads?: ObjectiveLead[];
   progress: number;
   risk: number;
   status: QuestStatus;
@@ -40,6 +48,18 @@ function clamp(v: number, min: number, max: number): number {
 function isQuestState(value: unknown): value is QuestState {
   if (!value || typeof value !== "object") return false;
   const v = value as Partial<QuestState>;
+  const objectiveLeadsValid =
+    v.objectiveLeads === undefined ||
+    (Array.isArray(v.objectiveLeads) &&
+      v.objectiveLeads.every(
+        (lead) =>
+          lead &&
+          typeof lead === "object" &&
+          typeof (lead as ObjectiveLead).id === "string" &&
+          typeof (lead as ObjectiveLead).text === "string" &&
+          typeof (lead as ObjectiveLead).confidence === "number" &&
+          typeof (lead as ObjectiveLead).updatedRound === "number",
+      ));
   const endingVote =
     v.endingVote === null ||
     (typeof v.endingVote === "object" && v.endingVote !== null);
@@ -47,6 +67,7 @@ function isQuestState(value: unknown): value is QuestState {
     typeof v.objective === "string" &&
     typeof v.progress === "number" &&
     typeof v.risk === "number" &&
+    objectiveLeadsValid &&
     (v.status === "active" || v.status === "ready_to_end" || v.status === "failed") &&
     endingVote &&
     typeof v.updatedAt === "string"
@@ -71,12 +92,91 @@ export function defaultQuestState(objective: string): QuestState {
   return {
     objective: normalizeObjective(objective),
     subObjectives: subs.length > 0 ? subs : undefined,
+    objectiveLeads: [],
     progress: 0,
     risk: 0,
     status: "active",
     endingVote: null,
     updatedAt: new Date().toISOString(),
   };
+}
+
+function leadTemplate(actionType: string, result: DiceRoll["result"] | undefined): string {
+  const outcome =
+    result === "critical_success" || result === "success"
+      ? "promising"
+      : result === "critical_failure" || result === "failure"
+        ? "dangerous"
+        : "uncertain";
+  switch (actionType) {
+    case "inspect":
+      return `Fresh clues appear. Keep following what feels ${outcome}.`;
+    case "talk":
+      return `Social pressure shifts. A ${outcome} conversation may open the next path.`;
+    case "attack":
+    case "cast_spell":
+      return `Force changed the board. A ${outcome} opening may exist if pursued quickly.`;
+    case "move":
+      return `Positioning matters now. The safer route may also be the slower one.`;
+    case "use_item":
+      return `Resources are shaping momentum. Consider timing your next tool carefully.`;
+    default:
+      return `The situation evolves. Follow what seems ${outcome}, then reassess.`;
+  }
+}
+
+function leadConfidence(result: DiceRoll["result"] | undefined): number {
+  switch (result) {
+    case "critical_success":
+      return 0.9;
+    case "success":
+      return 0.75;
+    case "failure":
+      return 0.55;
+    case "critical_failure":
+      return 0.4;
+    default:
+      return 0.6;
+  }
+}
+
+function updateObjectiveLeads(params: {
+  current: ObjectiveLead[] | undefined;
+  actionType: string;
+  rollResult: DiceRoll["result"] | undefined;
+  round: number;
+  risk: number;
+}): ObjectiveLead[] {
+  const now = Math.max(1, params.round);
+  const existing = (params.current ?? []).filter((lead) => now - lead.updatedRound <= 4);
+  const id = `lead:${params.actionType}`;
+  const text = leadTemplate(params.actionType, params.rollResult);
+  const confidenceBase = leadConfidence(params.rollResult);
+  const confidence =
+    params.risk >= 80
+      ? Math.max(0.35, confidenceBase - 0.15)
+      : confidenceBase;
+
+  const idx = existing.findIndex((lead) => lead.id === id);
+  if (idx >= 0) {
+    existing[idx] = {
+      ...existing[idx],
+      text,
+      confidence,
+      updatedRound: now,
+    };
+  } else {
+    existing.push({
+      id,
+      text,
+      confidence,
+      updatedRound: now,
+    });
+  }
+
+  return existing
+    .sort((a, b) => b.updatedRound - a.updatedRound || b.confidence - a.confidence)
+    .slice(0, 3);
 }
 
 export async function getQuestState(sessionId: string): Promise<QuestState | null> {
@@ -356,6 +456,13 @@ export async function applyTurnQuestProgress(params: {
   const nextState: QuestState = {
     objective: current.objective,
     subObjectives: current.subObjectives,
+    objectiveLeads: updateObjectiveLeads({
+      current: current.objectiveLeads,
+      actionType: params.actionType,
+      rollResult: params.diceRolls[0]?.result,
+      round: params.round,
+      risk,
+    }),
     progress,
     risk,
     status,

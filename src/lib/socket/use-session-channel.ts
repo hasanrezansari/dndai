@@ -86,6 +86,12 @@ async function refetchPlayersFromState(sessionId: string) {
     sceneImage?: string | null;
     quest?: {
       objective: string;
+      objectiveLeads?: Array<{
+        id: string;
+        text: string;
+        confidence: number;
+        updatedRound: number;
+      }>;
       progress: number;
       risk: number;
       status: "active" | "ready_to_end" | "failed";

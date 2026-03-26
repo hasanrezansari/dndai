@@ -1,20 +1,25 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 
-import { NarrativeTypewriter } from "@/components/game/narrative-typewriter";
 import { COPY } from "@/lib/copy/ashveil";
 
 export interface NarrativeCardProps {
-  text: string | null;
   isThinking: boolean;
+  roundNumber: number;
+  currentPlayerName: string | null;
+  phaseLabel?: string | null;
 }
 
-export function NarrativeCard({ text, isThinking }: NarrativeCardProps) {
+export function NarrativeCard({
+  isThinking,
+  roundNumber,
+  currentPlayerName,
+  phaseLabel,
+}: NarrativeCardProps) {
   const [thinkingIdx, setThinkingIdx] = useState(0);
-  const [accentNew, setAccentNew] = useState(false);
-  const prevTextRef = useRef<string | null | undefined>(undefined);
+  const [accentPulse, setAccentPulse] = useState(false);
 
   useEffect(() => {
     if (!isThinking) return;
@@ -26,20 +31,11 @@ export function NarrativeCard({ text, isThinking }: NarrativeCardProps) {
   }, [isThinking]);
 
   useEffect(() => {
-    if (isThinking) return;
-    const t = text?.trim() ?? "";
-    const prev = prevTextRef.current;
-    prevTextRef.current = text;
-    if (prev !== undefined && t.length > 0 && t !== (prev?.trim() ?? "")) {
-      const show = window.setTimeout(() => setAccentNew(true), 0);
-      const hide = window.setTimeout(() => setAccentNew(false), 3000);
-      return () => {
-        window.clearTimeout(show);
-        window.clearTimeout(hide);
-      };
-    }
-    return undefined;
-  }, [text, isThinking]);
+    if (!isThinking) return;
+    setAccentPulse(true);
+    const t = window.setTimeout(() => setAccentPulse(false), 1200);
+    return () => window.clearTimeout(t);
+  }, [isThinking]);
 
   const thinkingLine = COPY.thinking[thinkingIdx % COPY.thinking.length]!;
 
@@ -48,7 +44,7 @@ export function NarrativeCard({ text, isThinking }: NarrativeCardProps) {
       className={`relative z-10 -mt-[20px] bg-[var(--color-obsidian)]/90 backdrop-blur-lg rounded-[var(--radius-card)] border border-[rgba(77,70,53,0.2)] px-5 py-4 shadow-[0_8px_32px_rgba(0,0,0,0.4)] transition-all duration-500 ${
         isThinking ? "border-[var(--color-gold-rare)]/30 shadow-[0_0_20px_rgba(242,202,80,0.1)]" : ""
       } ${
-        accentNew
+        accentPulse
           ? "border-l-[3px] border-l-[var(--color-gold-rare)]"
           : ""
       }`}
@@ -61,7 +57,7 @@ export function NarrativeCard({ text, isThinking }: NarrativeCardProps) {
           auto_stories
         </span>
         <p className="text-[9px] font-black uppercase tracking-[0.2em] text-[var(--color-gold-rare)]">
-          Narrative
+          Current Beat
         </p>
       </div>
       {isThinking ? (
@@ -80,13 +76,17 @@ export function NarrativeCard({ text, isThinking }: NarrativeCardProps) {
           </AnimatePresence>
         </div>
       ) : (
-        <div className="min-h-[4.5rem]">
-          <NarrativeTypewriter
-            key={text?.trim() ?? ""}
-            text={text?.trim() || "The tale begins…"}
-            groupSize={2}
-            delayPerGroup={0.08}
-          />
+        <div className="min-h-[4.5rem] space-y-2">
+          <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[var(--outline)]">
+            Whose turn
+          </p>
+          <p className="text-fantasy text-[15px] font-semibold leading-snug text-[var(--color-silver-muted)]">
+            {currentPlayerName ? `${currentPlayerName}` : "Awaiting player"}
+          </p>
+          <p className="text-[10px] uppercase tracking-[0.12em] text-[var(--outline)]">
+            Round {roundNumber}
+            {phaseLabel?.trim() ? ` · ${phaseLabel}` : ""}
+          </p>
         </div>
       )}
     </div>

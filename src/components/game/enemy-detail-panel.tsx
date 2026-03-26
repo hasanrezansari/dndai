@@ -30,7 +30,18 @@ export function EnemyDetailPanel({ npc }: EnemyDetailPanelProps) {
           }`}
           aria-hidden
         >
-          {npc.name.trim().charAt(0).toUpperCase() || "?"}
+          {npc.portraitStatus === "ready" && npc.portraitUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={npc.portraitUrl}
+              alt={`${npc.name} portrait`}
+              className="h-full w-full rounded-[var(--radius-avatar)] object-cover"
+            />
+          ) : (
+            <span className="grayscale opacity-70">
+              {npc.name.trim().charAt(0).toUpperCase() || "?"}
+            </span>
+          )}
         </div>
         <div className="min-w-0 flex-1">
           <h3 className="text-fantasy text-xl font-black tracking-tight text-[var(--color-silver-muted)]">

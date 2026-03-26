@@ -546,7 +546,6 @@ export default function SessionGameplayPage() {
           sceneImage={sceneImage}
           previousSceneImage={previousSceneImage}
           sceneTitle={sceneTitle}
-          narrativeText={narrativeText}
         />
       </BottomSheet>
       <BottomSheet
@@ -585,7 +584,12 @@ export default function SessionGameplayPage() {
       </div>
 
       <div className="relative z-[2] shrink-0 space-y-2 px-4">
-        <NarrativeCard text={narrativeText} isThinking={isThinking} />
+        <NarrativeCard
+          isThinking={isThinking}
+          roundNumber={session?.currentRound ?? 1}
+          currentPlayerName={currentPlayerName}
+          phaseLabel={phaseLabel}
+        />
         <div className="rounded-[var(--radius-card)] border border-[rgba(77,70,53,0.18)] bg-[var(--surface-container)]/30 px-3 py-2.5">
           <p className="mb-2 text-[9px] font-black uppercase tracking-[0.2em] text-[var(--outline)]">
             Table layout

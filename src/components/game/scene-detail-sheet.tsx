@@ -4,7 +4,6 @@ export interface SceneDetailPanelProps {
   sceneImage: string | null;
   previousSceneImage: string | null;
   sceneTitle: string | null;
-  narrativeText: string | null;
 }
 
 /**
@@ -14,7 +13,6 @@ export function SceneDetailPanel({
   sceneImage,
   previousSceneImage,
   sceneTitle,
-  narrativeText,
 }: SceneDetailPanelProps) {
   const src = sceneImage ?? previousSceneImage;
 
@@ -45,15 +43,10 @@ export function SceneDetailPanel({
         <h2 className="text-fantasy text-xl font-black leading-tight tracking-tight text-[var(--color-silver-muted)]">
           {sceneTitle ?? "The world awaits…"}
         </h2>
-        {narrativeText?.trim() ? (
-          <p className="mt-3 text-[15px] leading-relaxed text-[var(--color-silver-dim)]">
-            {narrativeText}
-          </p>
-        ) : (
-          <p className="mt-3 text-sm italic text-[var(--outline)]">
-            The tale unfolds at the table…
-          </p>
-        )}
+        <p className="mt-3 text-sm leading-relaxed text-[var(--color-silver-dim)]">
+          Scene story is shown in the top header. Use Chronicle below for
+          turn-by-turn narration, dice, and world shifts.
+        </p>
       </div>
     </div>
   );

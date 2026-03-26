@@ -43,6 +43,12 @@ export function mapNpcRowToCombatantView(row: NpcRow): NpcCombatantView {
   const hp = readNumericProfile(vp, ["hp", "current_hp", "currentHp", "hit_points"]);
   const maxHp = readNumericProfile(vp, ["max_hp", "maxHp", "max_hit_points"]);
   const attacks = readAttacksProfile(vp);
+  const portraitRaw = vp.portrait_url;
+  const portraitUrl =
+    typeof portraitRaw === "string" && portraitRaw.trim().length > 0
+      ? portraitRaw
+      : undefined;
+  const portraitStatus = portraitUrl ? "ready" : "locked";
 
   return {
     id: row.id,
@@ -56,5 +62,7 @@ export function mapNpcRowToCombatantView(row: NpcRow): NpcCombatantView {
     hp,
     maxHp,
     attacks,
+    portraitUrl,
+    portraitStatus,
   };
 }

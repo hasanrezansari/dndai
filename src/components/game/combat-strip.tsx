@@ -77,7 +77,20 @@ export function CombatStrip({
                       } ${flash === "damage" ? "animate-hp-flash-damage" : flash === "heal" ? "animate-hp-flash-heal" : ""}`}
                       aria-label={`Open character sheet for ${displayName}`}
                     >
-                      {p.isConnected ? avatarLetterPlayer(p) : "…"}
+                      {p.isConnected ? (
+                        p.character?.portraitUrl ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img
+                            src={p.character.portraitUrl}
+                            alt={`${displayName} portrait`}
+                            className="h-full w-full rounded-[var(--radius-avatar)] object-cover"
+                          />
+                        ) : (
+                          avatarLetterPlayer(p)
+                        )
+                      ) : (
+                        "…"
+                      )}
                     </button>
                   ) : (
                     <div
@@ -87,7 +100,20 @@ export function CombatStrip({
                           : "border border-[rgba(77,70,53,0.2)] bg-[var(--color-midnight)] text-[var(--color-silver-dim)]"
                       } ${flash === "damage" ? "animate-hp-flash-damage" : flash === "heal" ? "animate-hp-flash-heal" : ""}`}
                     >
-                      {p.isConnected ? avatarLetterPlayer(p) : "…"}
+                      {p.isConnected ? (
+                        p.character?.portraitUrl ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img
+                            src={p.character.portraitUrl}
+                            alt={`${displayName} portrait`}
+                            className="h-full w-full rounded-[var(--radius-avatar)] object-cover"
+                          />
+                        ) : (
+                          avatarLetterPlayer(p)
+                        )
+                      ) : (
+                        "…"
+                      )}
                     </div>
                   )}
                   <div
@@ -149,11 +175,33 @@ export function CombatStrip({
                           className="relative flex h-12 w-12 items-center justify-center rounded-[var(--radius-avatar)] border border-[color-mix(in_srgb,var(--atmosphere-combat)_40%,transparent)] bg-[var(--color-deep-void)] text-sm font-black text-[var(--color-silver-dim)] transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--atmosphere-combat)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--color-obsidian)] hover:border-[var(--atmosphere-combat)]/55"
                           aria-label={`Open details for ${n.name}`}
                         >
-                          {avatarLetterNpc(n)}
+                          {n.portraitStatus === "ready" && n.portraitUrl ? (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img
+                              src={n.portraitUrl}
+                              alt={`${n.name} portrait`}
+                              className="h-full w-full rounded-[var(--radius-avatar)] object-cover"
+                            />
+                          ) : (
+                            <span className="opacity-65 grayscale">
+                              {avatarLetterNpc(n)}
+                            </span>
+                          )}
                         </button>
                       ) : (
                         <div className="relative flex h-12 w-12 items-center justify-center rounded-[var(--radius-avatar)] border border-[color-mix(in_srgb,var(--atmosphere-combat)_40%,transparent)] bg-[var(--color-deep-void)] text-sm font-black text-[var(--color-silver-dim)]">
-                          {avatarLetterNpc(n)}
+                          {n.portraitStatus === "ready" && n.portraitUrl ? (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img
+                              src={n.portraitUrl}
+                              alt={`${n.name} portrait`}
+                              className="h-full w-full rounded-[var(--radius-avatar)] object-cover"
+                            />
+                          ) : (
+                            <span className="opacity-65 grayscale">
+                              {avatarLetterNpc(n)}
+                            </span>
+                          )}
                         </div>
                       )}
                       {hpPct !== null ? (
