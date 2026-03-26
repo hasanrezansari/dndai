@@ -525,6 +525,8 @@ export async function runTurnPipeline(params: {
       "Complete the mission and survive.",
     actionType: intent.action_type,
     diceRolls,
+    actionText: rawInput,
+    recentNarrative: ctx.recentEvents[ctx.recentEvents.length - 1],
   });
   await logTrace({
     sessionId,

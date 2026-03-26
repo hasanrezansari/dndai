@@ -140,24 +140,124 @@ function leadConfidence(result: DiceRoll["result"] | undefined): number {
   }
 }
 
+const SIGNAL_STOPWORDS = new Set([
+  "the", "and", "with", "from", "that", "this", "into", "your", "their",
+  "they", "them", "then", "there", "have", "been", "were", "while", "what",
+  "where", "when", "will", "would", "could", "should", "about", "around",
+  "through", "toward", "towards", "before", "after", "under", "over", "portal",
+  "attack", "cast", "talk", "move", "inspect", "item",
+]);
+
+function pickByHash(seed: string, options: string[]): string {
+  let h = 0;
+  for (let i = 0; i < seed.length; i++) {
+    h = ((h << 5) - h + seed.charCodeAt(i)) | 0;
+  }
+  return options[Math.abs(h) % options.length]!;
+}
+
+function topTerms(text: string, max = 2): string[] {
+  const words = text
+    .toLowerCase()
+    .replace(/[^a-z0-9\s-]/g, " ")
+    .split(/\s+/)
+    .filter((w) => w.length >= 4 && !SIGNAL_STOPWORDS.has(w));
+  const uniq = Array.from(new Set(words));
+  return uniq.slice(0, max);
+}
+
+function buildContextAwareLead(params: {
+  objective: string;
+  actionType: string;
+  rollResult: DiceRoll["result"] | undefined;
+  actionText?: string;
+  recentNarrative?: string;
+  round: number;
+}): string {
+  const objectiveTerms = topTerms(params.objective, 2);
+  const actionTerms = topTerms(params.actionText ?? "", 2);
+  const narrativeTerms = topTerms(params.recentNarrative ?? "", 2);
+  const focus =
+    actionTerms[0] ??
+    narrativeTerms[0] ??
+    objectiveTerms[0] ??
+    "the trail";
+
+  const outcomeWord =
+    params.rollResult === "critical_success" || params.rollResult === "success"
+      ? "opens"
+      : params.rollResult === "critical_failure" || params.rollResult === "failure"
+        ? "complicates"
+        : "shifts";
+
+  const starts = [
+    `Signal ${params.round}:`,
+    "New read:",
+    "Current read:",
+    "Thread update:",
+  ];
+  const nudges = [
+    `Pressure around ${focus} ${outcomeWord}.`,
+    `${focus} now feels like the most responsive thread.`,
+    `Keep probing ${focus} before the situation cools.`,
+    `${focus} may connect directly to the core objective.`,
+  ];
+  const caution = [
+    "Avoid overcommitting until the next reveal lands.",
+    "Cross-check this with the next narration beat.",
+    "If this stalls, pivot to social or inspection pressure.",
+    "Use the next roll to confirm or reject this lead.",
+  ];
+
+  const start = pickByHash(`${focus}:${params.round}:start`, starts);
+  const nudge = pickByHash(`${focus}:${params.round}:nudge`, nudges);
+  const tail = pickByHash(`${focus}:${params.round}:tail`, caution);
+  return `${start} ${nudge} ${tail}`;
+}
+
+function dedupeLeads(leads: ObjectiveLead[]): ObjectiveLead[] {
+  const out: ObjectiveLead[] = [];
+  for (const lead of leads) {
+    const norm = lead.text.toLowerCase().replace(/[^a-z0-9\s]/g, "").trim();
+    const isDuplicate = out.some((x) => {
+      const other = x.text.toLowerCase().replace(/[^a-z0-9\s]/g, "").trim();
+      return norm === other || norm.includes(other) || other.includes(norm);
+    });
+    if (!isDuplicate) out.push(lead);
+  }
+  return out;
+}
+
 function updateObjectiveLeads(params: {
   current: ObjectiveLead[] | undefined;
+  objective: string;
   actionType: string;
   rollResult: DiceRoll["result"] | undefined;
   round: number;
   risk: number;
+  actionText?: string;
+  recentNarrative?: string;
 }): ObjectiveLead[] {
   const now = Math.max(1, params.round);
   const existing = (params.current ?? []).filter((lead) => now - lead.updatedRound <= 4);
-  const id = `lead:${params.actionType}`;
-  const text = leadTemplate(params.actionType, params.rollResult);
+  const id = `lead:${params.actionType}:${now}`;
+  const baseline = leadTemplate(params.actionType, params.rollResult);
+  const contextAware = buildContextAwareLead({
+    objective: params.objective,
+    actionType: params.actionType,
+    rollResult: params.rollResult,
+    actionText: params.actionText,
+    recentNarrative: params.recentNarrative,
+    round: now,
+  });
+  const text = `${contextAware} ${baseline}`;
   const confidenceBase = leadConfidence(params.rollResult);
   const confidence =
     params.risk >= 80
       ? Math.max(0.35, confidenceBase - 0.15)
       : confidenceBase;
 
-  const idx = existing.findIndex((lead) => lead.id === id);
+  const idx = existing.findIndex((lead) => lead.id.startsWith(`lead:${params.actionType}:`));
   if (idx >= 0) {
     const previous = existing[idx]!;
     existing[idx] = {
@@ -175,7 +275,7 @@ function updateObjectiveLeads(params: {
     });
   }
 
-  return existing
+  return dedupeLeads(existing)
     .sort((a, b) => b.updatedRound - a.updatedRound || b.confidence - a.confidence)
     .slice(0, 3);
 }
@@ -415,6 +515,8 @@ export async function applyTurnQuestProgress(params: {
   objectiveFallback: string;
   actionType: string;
   diceRolls: DiceRoll[];
+  actionText?: string;
+  recentNarrative?: string;
 }): Promise<{
   state: QuestState;
   visibleChanges: string[];
@@ -459,10 +561,13 @@ export async function applyTurnQuestProgress(params: {
     subObjectives: current.subObjectives,
     objectiveLeads: updateObjectiveLeads({
       current: current.objectiveLeads,
+      objective: current.objective,
       actionType: params.actionType,
       rollResult: params.diceRolls[0]?.result,
       round: params.round,
       risk,
+      actionText: params.actionText,
+      recentNarrative: params.recentNarrative,
     }),
     progress,
     risk,
