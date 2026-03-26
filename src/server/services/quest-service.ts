@@ -1,6 +1,8 @@
 import { and, desc, eq, sql } from "drizzle-orm";
 
+import type { AIProvider } from "@/lib/ai/types";
 import { db } from "@/lib/db";
+import { generateQuestSignal } from "@/lib/orchestrator/workers/quest-signaler";
 import { characters, memorySummaries, players, sessions } from "@/lib/db/schema";
 import type { DiceRoll } from "@/lib/schemas/domain";
 
@@ -173,7 +175,7 @@ function buildContextAwareLead(params: {
   actionText?: string;
   recentNarrative?: string;
   round: number;
-}): string {
+}): { text: string; focus: string } {
   const objectiveTerms = topTerms(params.objective, 2);
   const actionTerms = topTerms(params.actionText ?? "", 2);
   const narrativeTerms = topTerms(params.recentNarrative ?? "", 2);
@@ -202,6 +204,29 @@ function buildContextAwareLead(params: {
     `Keep probing ${focus} before the situation cools.`,
     `${focus} may connect directly to the core objective.`,
   ];
+  const lanes = {
+    inspect: "investigate hidden details",
+    talk: "pressure social leverage",
+    attack: "break immediate threats",
+    cast_spell: "reshape the battlefield with magic",
+    move: "claim better position",
+    use_item: "spend tools for advantage",
+    defend: "stabilize before pushing",
+    heal: "recover tempo before committing",
+    other: "test the safest thread",
+  } as const;
+  const lane =
+    lanes[params.actionType as keyof typeof lanes] ?? lanes.other;
+  const nextMoveHints = [
+    `Best next move: ${lane}.`,
+    `Best next move: probe ${focus} with a higher-signal action.`,
+    `Best next move: force a reveal tied to ${focus}.`,
+  ];
+  const urgencyLine =
+    params.round > 2 &&
+    (params.rollResult === "failure" || params.rollResult === "critical_failure")
+      ? "Urgency is rising; avoid repeating the same failed pattern."
+      : "Keep momentum; confirm this thread before it drifts.";
   const caution = [
     "Avoid overcommitting until the next reveal lands.",
     "Cross-check this with the next narration beat.",
@@ -211,8 +236,12 @@ function buildContextAwareLead(params: {
 
   const start = pickByHash(`${focus}:${params.round}:start`, starts);
   const nudge = pickByHash(`${focus}:${params.round}:nudge`, nudges);
+  const nextMove = pickByHash(`${focus}:${params.round}:next`, nextMoveHints);
   const tail = pickByHash(`${focus}:${params.round}:tail`, caution);
-  return `${start} ${nudge} ${tail}`;
+  return {
+    text: `${start} ${nudge} ${nextMove} ${urgencyLine} ${tail}`,
+    focus,
+  };
 }
 
 function dedupeLeads(leads: ObjectiveLead[]): ObjectiveLead[] {
@@ -237,6 +266,10 @@ function updateObjectiveLeads(params: {
   risk: number;
   actionText?: string;
   recentNarrative?: string;
+  aiSignal?: {
+    text: string;
+    confidence: number;
+  };
 }): ObjectiveLead[] {
   const now = Math.max(1, params.round);
   const existing = (params.current ?? []).filter((lead) => now - lead.updatedRound <= 4);
@@ -250,10 +283,14 @@ function updateObjectiveLeads(params: {
     recentNarrative: params.recentNarrative,
     round: now,
   });
-  const text = `${contextAware} ${baseline}`;
+  const text = params.aiSignal?.text?.trim()
+    ? params.aiSignal.text.trim()
+    : `${contextAware.text} ${baseline}`;
   const confidenceBase = leadConfidence(params.rollResult);
   const confidence =
-    params.risk >= 80
+    params.aiSignal?.confidence !== undefined
+      ? clamp(params.aiSignal.confidence, 0, 1)
+      : params.risk >= 80
       ? Math.max(0.35, confidenceBase - 0.15)
       : confidenceBase;
 
@@ -278,6 +315,47 @@ function updateObjectiveLeads(params: {
   return dedupeLeads(existing)
     .sort((a, b) => b.updatedRound - a.updatedRound || b.confidence - a.confidence)
     .slice(0, 3);
+}
+
+function updateSubObjectivesFromSignal(params: {
+  current: string[] | undefined;
+  objective: string;
+  actionType: string;
+  focus: string;
+  aiSuggestion?: string;
+}): string[] | undefined {
+  const existing = [...(params.current ?? [])];
+  if (params.aiSuggestion?.trim()) {
+    const suggested = params.aiSuggestion.trim();
+    const suggestedNorm = suggested.toLowerCase().replace(/[^a-z0-9\s]/g, "").trim();
+    const hasSimilarSuggestion = existing.some((s) => {
+      const other = s.toLowerCase().replace(/[^a-z0-9\s]/g, "").trim();
+      return other.includes(suggestedNorm) || suggestedNorm.includes(other);
+    });
+    if (!hasSimilarSuggestion) existing.push(suggested);
+  }
+  const actionLabel =
+    params.actionType === "cast_spell"
+      ? "Use magic to influence"
+      : params.actionType === "talk"
+        ? "Leverage dialogue around"
+        : params.actionType === "attack"
+          ? "Pressure threats around"
+          : params.actionType === "move"
+            ? "Reposition around"
+            : params.actionType === "inspect"
+              ? "Investigate"
+              : "Advance";
+  const candidate = `${actionLabel} ${params.focus}`.trim();
+  const normalized = candidate.toLowerCase().replace(/[^a-z0-9\s]/g, "").trim();
+  if (!normalized || normalized.length < 6) return existing.length ? existing : undefined;
+  const hasSimilar = existing.some((s) => {
+    const other = s.toLowerCase().replace(/[^a-z0-9\s]/g, "").trim();
+    return other.includes(normalized) || normalized.includes(other);
+  });
+  if (!hasSimilar) existing.push(candidate);
+  const compact = existing.slice(0, 5);
+  return compact.length ? compact : undefined;
 }
 
 export async function getQuestState(sessionId: string): Promise<QuestState | null> {
@@ -511,12 +589,14 @@ export function intentWeight(actionType: string): number {
 
 export async function applyTurnQuestProgress(params: {
   sessionId: string;
+  turnId?: string | null;
   round: number;
   objectiveFallback: string;
   actionType: string;
   diceRolls: DiceRoll[];
   actionText?: string;
   recentNarrative?: string;
+  provider?: AIProvider;
 }): Promise<{
   state: QuestState;
   visibleChanges: string[];
@@ -556,9 +636,50 @@ export async function applyTurnQuestProgress(params: {
     risk = MAX_RISK;
   }
 
+  const contextLead = buildContextAwareLead({
+    objective: current.objective,
+    actionType: params.actionType,
+    rollResult: params.diceRolls[0]?.result,
+    round: params.round,
+    actionText: params.actionText,
+    recentNarrative: params.recentNarrative,
+  });
+  let aiSignal:
+    | {
+        text: string;
+        confidence: number;
+        suggestedSubObjective?: string;
+      }
+    | undefined;
+  if (params.provider) {
+    const ai = await generateQuestSignal({
+      sessionId: params.sessionId,
+      turnId: params.turnId ?? null,
+      objective: current.objective,
+      actionType: params.actionType,
+      actionText: params.actionText,
+      recentNarrative: params.recentNarrative,
+      round: params.round,
+      rollResult: params.diceRolls[0]?.result,
+      risk,
+      progress,
+      provider: params.provider,
+    });
+    aiSignal = {
+      text: ai.data.signal_text,
+      confidence: ai.data.confidence,
+      suggestedSubObjective: ai.data.suggested_sub_objective,
+    };
+  }
   const nextState: QuestState = {
     objective: current.objective,
-    subObjectives: current.subObjectives,
+    subObjectives: updateSubObjectivesFromSignal({
+      current: current.subObjectives,
+      objective: current.objective,
+      actionType: params.actionType,
+      focus: contextLead.focus,
+      aiSuggestion: aiSignal?.suggestedSubObjective,
+    }),
     objectiveLeads: updateObjectiveLeads({
       current: current.objectiveLeads,
       objective: current.objective,
@@ -568,6 +689,13 @@ export async function applyTurnQuestProgress(params: {
       risk,
       actionText: params.actionText,
       recentNarrative: params.recentNarrative,
+      aiSignal:
+        aiSignal?.text?.trim()
+          ? {
+              text: aiSignal.text,
+              confidence: aiSignal.confidence,
+            }
+          : undefined,
     }),
     progress,
     risk,

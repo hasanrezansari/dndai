@@ -518,6 +518,7 @@ export async function runTurnPipeline(params: {
 
   const questUpdate = await applyTurnQuestProgress({
     sessionId,
+    turnId,
     round: ctx.session.currentRound,
     objectiveFallback:
       ctx.session.adventurePrompt?.trim() ||
@@ -527,6 +528,7 @@ export async function runTurnPipeline(params: {
     diceRolls,
     actionText: rawInput,
     recentNarrative: ctx.recentEvents[ctx.recentEvents.length - 1],
+    provider,
   });
   await logTrace({
     sessionId,
