@@ -546,6 +546,7 @@ export default function SessionGameplayPage() {
           sceneImage={sceneImage}
           previousSceneImage={previousSceneImage}
           sceneTitle={sceneTitle}
+          narrativeText={narrativeText}
         />
       </BottomSheet>
       <BottomSheet

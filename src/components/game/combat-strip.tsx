@@ -14,6 +14,8 @@ export interface CombatStripProps {
 function avatarLetterPlayer(p: GamePlayerView) {
   const n = p.character?.name?.trim();
   if (n && n.length > 0) return n[0]!.toUpperCase();
+  const d = p.displayName?.trim();
+  if (d && d.length > 0) return d[0]!.toUpperCase();
   return "?";
 }
 
