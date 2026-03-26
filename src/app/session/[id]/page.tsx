@@ -554,7 +554,7 @@ export default function SessionGameplayPage() {
         onClose={() => setChronicleOpen(false)}
         title="Chronicle"
       >
-        <div className="flex h-[min(70vh,560px)] min-h-[240px] flex-col overflow-hidden">
+        <div className="flex h-full min-h-0 flex-1 flex-col overflow-hidden">
           <ChronicleFeed entries={feed} className="min-h-0 flex-1" />
         </div>
       </BottomSheet>

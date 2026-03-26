@@ -73,21 +73,6 @@ export function ActionBar({
       <div
         className={`bg-[var(--color-obsidian)] border-t border-[rgba(77,70,53,0.15)] space-y-3 px-4 py-3 ${safeBottom}`}
       >
-        {showGuided ? (
-          <div
-            className="rounded-[var(--radius-card)] border border-[rgba(77,70,53,0.2)] bg-[var(--surface-container)]/40 px-3 py-2.5"
-            role="status"
-          >
-            <p className="text-[11px] font-bold uppercase tracking-[0.12em] text-[var(--color-gold-support)]">
-              Your turn
-            </p>
-            <p className="mt-1 text-sm leading-snug text-[var(--color-silver-muted)]">
-              Describe what you do in your own words — chips only prefill the
-              text field.
-            </p>
-          </div>
-        ) : null}
-
         <div className="grid grid-cols-3 gap-2">
           <button
             type="button"
