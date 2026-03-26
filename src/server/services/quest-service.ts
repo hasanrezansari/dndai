@@ -159,8 +159,9 @@ function updateObjectiveLeads(params: {
 
   const idx = existing.findIndex((lead) => lead.id === id);
   if (idx >= 0) {
+    const previous = existing[idx]!;
     existing[idx] = {
-      ...existing[idx],
+      id: previous.id,
       text,
       confidence,
       updatedRound: now,
