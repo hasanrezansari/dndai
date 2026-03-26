@@ -2,40 +2,41 @@
 
 import { useCallback, useState } from "react";
 
+import { BottomSheet } from "@/components/sheets/bottom-sheet";
 import { GoldButton } from "@/components/ui/gold-button";
+import { GhostButton } from "@/components/ui/ghost-button";
+import type { NpcCombatantView } from "@/lib/state/game-store";
 import { useGameStore } from "@/lib/state/game-store";
 
-const CHIPS = [
-  { key: "Attack", icon: "swords" },
-  { key: "Spell", icon: "auto_awesome" },
-  { key: "Talk", icon: "chat_bubble" },
-  { key: "Inspect", icon: "search" },
-  { key: "Move", icon: "directions_walk" },
-  { key: "Item", icon: "inventory_2" },
+const GUIDED_CHIPS = [
+  { key: "Attack", icon: "swords", insert: "I attack " },
+  { key: "Cast", icon: "auto_awesome", insert: "I cast " },
+  { key: "Talk", icon: "chat_bubble", insert: "I talk to " },
+  { key: "Other", icon: "edit_note", insert: "I " },
 ] as const;
-
-const CHIP_TEXT: Record<(typeof CHIPS)[number]["key"], string> = {
-  Attack: "I attack ",
-  Spell: "I cast ",
-  Talk: "I want to talk: ",
-  Inspect: "I inspect ",
-  Move: "I move ",
-  Item: "I use an item: ",
-};
 
 export interface ActionBarProps {
   isMyTurn: boolean;
   currentPlayerName: string | null;
   onSubmitAction: (text: string) => void | Promise<void>;
+  /** When false, hide hint chips and target sheet affordances (power-user / fast path). */
+  guidedTurnUi: boolean;
+  onToggleGuidedTurnUi: () => void;
+  /** Hostiles for optional target picker (M3); empty hides target button. */
+  npcs: NpcCombatantView[];
 }
 
 export function ActionBar({
   isMyTurn,
   currentPlayerName,
   onSubmitAction,
+  guidedTurnUi,
+  onToggleGuidedTurnUi,
+  npcs,
 }: ActionBarProps) {
   const [value, setValue] = useState("");
   const [busy, setBusy] = useState(false);
+  const [targetOpen, setTargetOpen] = useState(false);
   const openSheet = useGameStore((s) => s.openSheet);
 
   const submit = useCallback(async () => {
@@ -50,6 +51,14 @@ export function ActionBar({
     }
   }, [value, onSubmitAction, busy]);
 
+  const appendToInput = useCallback((fragment: string) => {
+    setValue((v) => {
+      const cur = v.trim();
+      if (!cur) return fragment;
+      return `${cur} ${fragment}`;
+    });
+  }, []);
+
   const safeBottom =
     "pb-[max(0.75rem,env(safe-area-inset-bottom,0px))]";
 
@@ -57,11 +66,28 @@ export function ActionBar({
     "min-h-[44px] flex items-center justify-center gap-1.5 rounded-[var(--radius-chip)] bg-[var(--surface-high)] border border-[rgba(77,70,53,0.15)] px-3 text-[10px] font-bold uppercase tracking-[0.1em] text-[var(--color-silver-dim)] transition-colors hover:text-[var(--color-gold-rare)] hover:border-[var(--color-gold-rare)]/30 active:scale-[0.97]";
 
   if (isMyTurn) {
+    const showGuided = guidedTurnUi;
+    const hasFoes = npcs.length > 0;
+
     return (
       <div
         className={`bg-[var(--color-obsidian)] border-t border-[rgba(77,70,53,0.15)] space-y-3 px-4 py-3 ${safeBottom}`}
       >
-        {/* Sheet shortcuts */}
+        {showGuided ? (
+          <div
+            className="rounded-[var(--radius-card)] border border-[rgba(77,70,53,0.2)] bg-[var(--surface-container)]/40 px-3 py-2.5"
+            role="status"
+          >
+            <p className="text-[11px] font-bold uppercase tracking-[0.12em] text-[var(--color-gold-support)]">
+              Your turn
+            </p>
+            <p className="mt-1 text-sm leading-snug text-[var(--color-silver-muted)]">
+              Describe what you do in your own words — chips only prefill the
+              text field.
+            </p>
+          </div>
+        ) : null}
+
         <div className="grid grid-cols-3 gap-2">
           <button
             type="button"
@@ -89,7 +115,6 @@ export function ActionBar({
           </button>
         </div>
 
-        {/* Input */}
         <input
           type="text"
           value={value}
@@ -101,30 +126,38 @@ export function ActionBar({
           }}
         />
 
-        {/* Quick action chips */}
-        <div className="scrollbar-hide -mx-1 flex gap-2 overflow-x-auto px-1 pb-0.5">
-          {CHIPS.map((c) => (
-            <button
-              key={c.key}
-              type="button"
-              onClick={() =>
-                setValue((v) => {
-                  const insert = CHIP_TEXT[c.key];
-                  if (!v.trim()) return insert;
-                  return `${v.trim()} ${insert}`;
-                })
-              }
-              className="min-h-[40px] shrink-0 flex items-center gap-1.5 rounded-[var(--radius-pill)] bg-[var(--surface-high)] border border-[rgba(77,70,53,0.1)] px-4 text-[11px] font-bold uppercase tracking-wider text-[var(--color-silver-dim)] transition-all hover:text-[var(--color-gold-rare)] hover:border-[var(--color-gold-rare)]/20 active:scale-[0.95]"
-            >
-              <span className="material-symbols-outlined text-sm">
-                {c.icon}
-              </span>
-              {c.key}
-            </button>
-          ))}
-        </div>
+        {showGuided ? (
+          <div className="flex flex-col gap-2">
+            <div className="scrollbar-hide -mx-1 flex gap-2 overflow-x-auto px-1 pb-0.5">
+              {GUIDED_CHIPS.map((c) => (
+                <button
+                  key={c.key}
+                  type="button"
+                  onClick={() => appendToInput(c.insert)}
+                  className="min-h-[40px] shrink-0 flex items-center gap-1.5 rounded-[var(--radius-pill)] bg-[var(--surface-high)] border border-[rgba(77,70,53,0.1)] px-4 text-[11px] font-bold uppercase tracking-wider text-[var(--color-silver-dim)] transition-all hover:text-[var(--color-gold-rare)] hover:border-[var(--color-gold-rare)]/20 active:scale-[0.95]"
+                >
+                  <span className="material-symbols-outlined text-sm">
+                    {c.icon}
+                  </span>
+                  {c.key}
+                </button>
+              ))}
+            </div>
+            {hasFoes ? (
+              <button
+                type="button"
+                onClick={() => setTargetOpen(true)}
+                className="min-h-[40px] w-full rounded-[var(--radius-card)] border border-[color-mix(in_srgb,var(--atmosphere-combat)_35%,transparent)] bg-[var(--color-deep-void)]/80 px-4 text-[10px] font-black uppercase tracking-[0.15em] text-[var(--color-silver-dim)] transition-colors hover:border-[var(--atmosphere-combat)]/50 hover:text-[var(--color-silver-muted)]"
+              >
+                <span className="material-symbols-outlined mr-2 align-middle text-base text-[var(--atmosphere-combat)]">
+                  target
+                </span>
+                Choose target (text only)
+              </button>
+            ) : null}
+          </div>
+        ) : null}
 
-        {/* Submit */}
         <GoldButton
           type="button"
           size="lg"
@@ -135,6 +168,50 @@ export function ActionBar({
           <span className="material-symbols-outlined text-lg">casino</span>
           {busy ? "Rolling…" : "Roll + Confirm"}
         </GoldButton>
+
+        <div className="flex justify-center pt-0.5">
+          <GhostButton
+            type="button"
+            size="sm"
+            onClick={onToggleGuidedTurnUi}
+            className="text-[10px] font-bold uppercase tracking-[0.12em] text-[var(--outline)]"
+          >
+            {guidedTurnUi ? "Fast table mode" : "Guided hints"}
+          </GhostButton>
+        </div>
+
+        <BottomSheet
+          isOpen={targetOpen}
+          onClose={() => setTargetOpen(false)}
+          title="Suggest a target"
+        >
+          <p className="mb-3 text-xs text-[var(--outline)]">
+            Pick a foe to insert their name into your action — same{" "}
+            <span className="text-[var(--color-silver-dim)]">POST</span> as a
+            free-text action.
+          </p>
+          <ul className="flex max-h-[min(50vh,400px)] flex-col gap-2 overflow-y-auto pb-4">
+            {npcs.map((n) => (
+              <li key={n.id}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    appendToInput(`${n.name}: `);
+                    setTargetOpen(false);
+                  }}
+                  className="flex min-h-[48px] w-full items-center justify-between gap-3 rounded-[var(--radius-card)] border border-[rgba(77,70,53,0.2)] bg-[var(--surface-container)]/50 px-4 py-2 text-left transition-colors hover:border-[var(--atmosphere-combat)]/40"
+                >
+                  <span className="text-fantasy text-sm font-bold text-[var(--color-silver-muted)]">
+                    {n.name}
+                  </span>
+                  <span className="shrink-0 text-[9px] font-bold uppercase tracking-wider text-[var(--outline)]">
+                    {n.status}
+                  </span>
+                </button>
+              </li>
+            ))}
+          </ul>
+        </BottomSheet>
       </div>
     );
   }
@@ -174,6 +251,18 @@ export function ActionBar({
           <span className="material-symbols-outlined text-sm">menu_book</span>
           Journal
         </button>
+      </div>
+      <div className="flex justify-center pt-1">
+        <GhostButton
+          type="button"
+          size="sm"
+          onClick={onToggleGuidedTurnUi}
+          className="text-[10px] font-bold uppercase tracking-[0.12em] text-[var(--outline)]"
+        >
+          {guidedTurnUi
+            ? "Use fast table on your turn"
+            : "Use guided hints on your turn"}
+        </GhostButton>
       </div>
     </div>
   );

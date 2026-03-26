@@ -21,7 +21,14 @@ import {
   StateUpdateEventSchema,
   TurnStartedEventSchema,
 } from "@/lib/schemas/events";
-import type { GamePlayerView, GameSessionView, RollingMemoryView, StatEffect, StatPopup } from "@/lib/state/game-store";
+import type {
+  GamePlayerView,
+  GameSessionView,
+  NpcCombatantView,
+  RollingMemoryView,
+  StatEffect,
+  StatPopup,
+} from "@/lib/state/game-store";
 import { useGameStore } from "@/lib/state/game-store";
 
 import { getPusherClient, getSessionChannel } from "./client";
@@ -74,6 +81,7 @@ async function refetchPlayersFromState(sessionId: string) {
   const data = (await res.json()) as {
     session?: GameSessionView;
     players: GamePlayerView[];
+    npcs?: NpcCombatantView[];
     sceneTitle?: string | null;
     sceneImage?: string | null;
     quest?: {
@@ -96,6 +104,9 @@ async function refetchPlayersFromState(sessionId: string) {
   };
   if (Array.isArray(data.players)) {
     useGameStore.getState().setPlayers(data.players);
+  }
+  if (Array.isArray(data.npcs)) {
+    useGameStore.getState().setNpcs(data.npcs);
   }
   if (data.session) {
     useGameStore.getState().setSession(data.session);

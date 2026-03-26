@@ -79,7 +79,7 @@ Deliver a **cooler, more game-native** presentation of Ashveil sessions by:
 
 - **Route:** [`src/app/session/[id]/page.tsx`](../src/app/session/[id]/page.tsx)  
 - **Rough vertical order today:**  
-  `SceneTransition` → `ConnectionStatus` → sheets → `DiceOverlay` / `StatPopupOverlay` → **SceneHeader** (~42vh) → **NarrativeCard** → quest block → **FeedList** → **PlayerStrip** → **TurnBanner** + **ActionBar** / **DmActionBar**
+  `SceneTransition` → `ConnectionStatus` → sheets → `DiceOverlay` / `StatPopupOverlay` → **SceneHeader** (compact hero) → **NarrativeCard** → quest block → **FeedList** / **BeatStrip** (Spotlight) → **CombatStrip** (party + foes) → **TurnBanner** + **ActionBar** / **DmActionBar**
 
 ### 3.2 Feed model
 
@@ -153,7 +153,7 @@ Derive **display-only** fields (no new server fields in Phase 1):
 3. Quest (if any) — unchanged  
 4. **BeatStrip** (new) — short, thumb-friendly  
 5. **Chronicle affordance** — button opens `BottomSheet` or expands inline with `FeedList` inside  
-6. PlayerStrip  
+6. CombatStrip (party + optional NPC segment; replaces standalone PlayerStrip in session shell)  
 7. TurnBanner + ActionBar / DmActionBar  
 
 ### 6.3 Empty / edge states
@@ -317,7 +317,7 @@ Use this as the **authoritative todo list**. Check boxes in PR description or pr
 - [ ] **P1E.1** In [`session/[id]/page.tsx`](../src/app/session/[id]/page.tsx), branch on `uiMode`:  
   - **Spotlight:** insert `BeatStrip` after quest / before Chronicle trigger; **hide** inline `FeedList` or replace with single “Open Chronicle” CTA.  
   - **Classic:** keep **inline** `FeedList` as today; **optional** still show BeatStrip **collapsed** or hide — **pick one** and document in PR (recommend: Classic = no BeatStrip to avoid duplication).  
-- [ ] **P1E.2** **Do not** duplicate `PlayerStrip`, `ActionBar`, `DmActionBar`, or `DiceOverlay`.  
+- [ ] **P1E.2** **Do not** duplicate `CombatStrip` / party+foe strip, `ActionBar`, `DmActionBar`, or `DiceOverlay`.  
 - [ ] **P1E.3** Verify **human_dm** + **isDm** branch still shows `DmActionBar` correctly in both modes.  
 - [ ] **P1E.4** Verify **quest** ending vote block remains usable in both modes.
 

@@ -14,13 +14,20 @@ import {
   characters,
   memorySummaries,
   narrativeEvents,
+  npcStates,
   players,
   sceneSnapshots,
   sessions,
   turns,
 } from "@/lib/db/schema";
+import { mapNpcRowToCombatantView } from "@/lib/state/npc-combatant-mapper";
 import { CharacterStatsSchema } from "@/lib/schemas/domain";
-import type { FeedEntry, GamePlayerView, GameSessionView } from "@/lib/state/game-store";
+import type {
+  FeedEntry,
+  GamePlayerView,
+  GameSessionView,
+  NpcCombatantView,
+} from "@/lib/state/game-store";
 import { getQuestState } from "@/server/services/quest-service";
 
 const DEFAULT_STATS = {
@@ -251,9 +258,16 @@ export async function GET(
         createdAt: r.created_at.toISOString(),
       }));
 
+    const npcRows = await db
+      .select()
+      .from(npcStates)
+      .where(eq(npcStates.session_id, sessionId));
+    const npcs: NpcCombatantView[] = npcRows.map(mapNpcRowToCombatantView);
+
     return NextResponse.json({
       session: mappedSession,
       players: mappedPlayers,
+      npcs,
       feed,
       sceneImage,
       sceneTitle,

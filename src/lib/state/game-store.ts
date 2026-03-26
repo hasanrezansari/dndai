@@ -96,6 +96,21 @@ export interface GamePlayerView {
   };
 }
 
+/** Client-facing hostile / NPC row from `npc_states` (+ optional `visual_profile` combat hints). */
+export interface NpcCombatantView {
+  id: string;
+  name: string;
+  role: string;
+  attitude: string;
+  status: string;
+  location: string;
+  notes: string;
+  ac?: number;
+  hp?: number;
+  maxHp?: number;
+  attacks?: string;
+}
+
 export interface RollingMemoryView {
   id: string;
   turnRangeStart: number;
@@ -142,10 +157,12 @@ interface GameState {
   hpFlash: Record<string, "damage" | "heal">;
   /** Latest turn from `turn-started` — fallback when events omit `turn_id`. */
   activeTurnId: string | null;
+  npcs: NpcCombatantView[];
 
   setSessionId: (id: string) => void;
   setSession: (session: GameState["session"]) => void;
   setPlayers: (players: GameState["players"]) => void;
+  setNpcs: (npcs: NpcCombatantView[]) => void;
   setCurrentPlayerId: (id: string) => void;
   updatePlayer: (
     playerId: string,
@@ -175,6 +192,7 @@ interface GameState {
     dmAwaiting?: { turnId: string; actingPlayerId: string } | null;
     quest?: QuestProgressView | null;
     rollingMemories?: RollingMemoryView[];
+    npcs?: NpcCombatantView[];
   }) => void;
   reset: () => void;
   openSheet: (sheet: ActiveSheet) => void;
@@ -215,6 +233,7 @@ const emptyState = {
   statPopups: [] as StatPopup[],
   hpFlash: {} as Record<string, "damage" | "heal">,
   activeTurnId: null as string | null,
+  npcs: [] as NpcCombatantView[],
 };
 
 export const useGameStore = create<GameState>((set) => ({
@@ -225,6 +244,8 @@ export const useGameStore = create<GameState>((set) => ({
   setSession: (session) => set({ session }),
 
   setPlayers: (players) => set({ players }),
+
+  setNpcs: (npcs) => set({ npcs }),
 
   setCurrentPlayerId: (id) => set({ currentPlayerId: id }),
 
@@ -313,6 +334,7 @@ export const useGameStore = create<GameState>((set) => ({
       dmAwaiting: data.dmAwaiting ?? null,
       quest: data.quest ?? null,
       rollingMemories: data.rollingMemories ?? [],
+      npcs: data.npcs ?? [],
     }),
 
   reset: () => set({ ...emptyState, activeTurnId: null }),

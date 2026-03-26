@@ -18,7 +18,8 @@ import { CharacterSheet } from "@/components/sheets/character-sheet";
 import { JournalSheet } from "@/components/sheets/journal-sheet";
 import { PartySheet } from "@/components/sheets/party-sheet";
 import { NarrativeCard } from "@/components/game/narrative-card";
-import { PlayerStrip } from "@/components/game/player-strip";
+import { CombatStrip } from "@/components/game/combat-strip";
+import { EnemyDetailPanel } from "@/components/game/enemy-detail-panel";
 import { QuestPill } from "@/components/game/quest-pill";
 import { SceneDetailPanel } from "@/components/game/scene-detail-sheet";
 import { SceneHeader } from "@/components/game/scene-header";
@@ -29,6 +30,7 @@ import { ChronicleFeed } from "@/components/feed/chronicle-feed";
 import { FeedList } from "@/components/feed/feed-list";
 import { BeatStrip } from "@/components/game/beat-strip";
 import { SessionViewModeToggle } from "@/components/game/session-view-mode-toggle";
+import { useGuidedTurnUi } from "@/hooks/use-guided-turn-ui";
 import { useSessionUiMode } from "@/hooks/use-session-ui-mode";
 import { useSessionChannel } from "@/lib/socket/use-session-channel";
 import { useGameStore } from "@/lib/state/game-store";
@@ -138,6 +140,7 @@ export default function SessionGameplayPage() {
   const isDm = useGameStore((s) => s.isDm);
   const waitingForDm = useGameStore((s) => s.waitingForDm);
   const quest = useGameStore((s) => s.quest);
+  const npcs = useGameStore((s) => s.npcs);
   const setIsDm = useGameStore((s) => s.setIsDm);
   const setDmDc = useGameStore((s) => s.setDmDc);
 
@@ -158,7 +161,11 @@ export default function SessionGameplayPage() {
   const [partyInspectPlayerId, setPartyInspectPlayerId] = useState<
     string | null
   >(null);
+  const [enemyInspectNpcId, setEnemyInspectNpcId] = useState<string | null>(
+    null,
+  );
   const { mode: sessionUiMode, setMode: setSessionUiMode } = useSessionUiMode();
+  const { guidedTurnUi, toggleGuidedTurnUi } = useGuidedTurnUi();
 
   const phaseLabel = useMemo(
     () => formatPhaseLabel(session?.phase),
@@ -174,6 +181,11 @@ export default function SessionGameplayPage() {
       `Seat ${(p?.seatIndex ?? 0) + 1}`
     );
   }, [partyInspectPlayerId, players]);
+
+  const inspectedEnemy = useMemo(
+    () => npcs.find((n) => n.id === enemyInspectNpcId) ?? null,
+    [npcs, enemyInspectNpcId],
+  );
 
   useEffect(() => {
     setHydrated(false);
@@ -516,6 +528,15 @@ export default function SessionGameplayPage() {
           <CharacterSheet viewPlayerId={partyInspectPlayerId} />
         </BottomSheet>
       ) : null}
+      {inspectedEnemy ? (
+        <BottomSheet
+          isOpen
+          onClose={() => setEnemyInspectNpcId(null)}
+          title={inspectedEnemy.name}
+        >
+          <EnemyDetailPanel npc={inspectedEnemy} />
+        </BottomSheet>
+      ) : null}
       <BottomSheet
         isOpen={sceneDetailOpen}
         onClose={() => setSceneDetailOpen(false)}
@@ -613,10 +634,18 @@ export default function SessionGameplayPage() {
         ) : (
           <FeedList entries={feed} className="min-h-0 flex-1" />
         )}
-        <PlayerStrip
+        <CombatStrip
           players={players}
+          npcs={npcs}
           currentTurnPlayerId={currentTurnPlayerId}
-          onInspectPlayer={(playerId) => setPartyInspectPlayerId(playerId)}
+          onInspectPlayer={(playerId) => {
+            setEnemyInspectNpcId(null);
+            setPartyInspectPlayerId(playerId);
+          }}
+          onInspectEnemy={(npcId) => {
+            setPartyInspectPlayerId(null);
+            setEnemyInspectNpcId(npcId);
+          }}
         />
         <div className="sticky bottom-0 z-20 mt-auto shrink-0 pt-1">
           <TurnBanner visible={isMyTurn && !(session?.mode === "human_dm" && isDm)} />
@@ -635,6 +664,9 @@ export default function SessionGameplayPage() {
               isMyTurn={isMyTurn}
               currentPlayerName={currentPlayerName}
               onSubmitAction={handleSubmitAction}
+              guidedTurnUi={guidedTurnUi}
+              onToggleGuidedTurnUi={toggleGuidedTurnUi}
+              npcs={npcs}
             />
           )}
         </div>
