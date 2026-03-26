@@ -565,6 +565,7 @@ export async function runTurnPipeline(params: {
     characterPronouns: ctx.character.pronouns,
     characterTraits: ctx.character.traits,
     characterBackstory: ctx.character.backstory,
+    characterAppearance: ctx.character.appearance,
     nextPlayerName: nextActorName,
     recentNarrative: memoryBundle.recentEventWindow,
     sceneContext,
