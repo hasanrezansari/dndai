@@ -23,7 +23,11 @@ import { SceneHeader } from "@/components/game/scene-header";
 import { TurnBanner } from "@/components/game/turn-banner";
 import { SceneTransition } from "@/components/game/scene-transition";
 import { StatPopupOverlay } from "@/components/game/stat-popup";
+import { ChronicleFeed } from "@/components/feed/chronicle-feed";
 import { FeedList } from "@/components/feed/feed-list";
+import { BeatStrip } from "@/components/game/beat-strip";
+import { SessionViewModeToggle } from "@/components/game/session-view-mode-toggle";
+import { useSessionUiMode } from "@/hooks/use-session-ui-mode";
 import { useSessionChannel } from "@/lib/socket/use-session-channel";
 import { useGameStore } from "@/lib/state/game-store";
 
@@ -145,6 +149,8 @@ export default function SessionGameplayPage() {
   const [chapterBusy, setChapterBusy] = useState(false);
   const [sceneTransitionTrigger, setSceneTransitionTrigger] = useState(false);
   const [prevSceneTitle, setPrevSceneTitle] = useState<string | null>(null);
+  const [chronicleOpen, setChronicleOpen] = useState(false);
+  const { mode: sessionUiMode, setMode: setSessionUiMode } = useSessionUiMode();
 
   useEffect(() => {
     setHydrated(false);
@@ -478,6 +484,15 @@ export default function SessionGameplayPage() {
           <JournalSheet />
         </BottomSheet>
       )}
+      <BottomSheet
+        isOpen={chronicleOpen}
+        onClose={() => setChronicleOpen(false)}
+        title="Chronicle"
+      >
+        <div className="flex h-[min(70vh,560px)] min-h-[240px] flex-col overflow-hidden">
+          <ChronicleFeed entries={feed} className="min-h-0 flex-1" />
+        </div>
+      </BottomSheet>
       <DiceOverlay />
       <StatPopupOverlay />
       <div className="relative z-[1] h-[42vh] w-full shrink-0 overflow-hidden">
@@ -499,8 +514,17 @@ export default function SessionGameplayPage() {
         />
       </div>
 
-      <div className="relative z-[2] shrink-0 px-4">
+      <div className="relative z-[2] shrink-0 space-y-2 px-4">
         <NarrativeCard text={narrativeText} isThinking={isThinking} />
+        <div className="rounded-[var(--radius-card)] border border-[rgba(77,70,53,0.18)] bg-[var(--surface-container)]/30 px-3 py-2.5">
+          <p className="mb-2 text-[9px] font-black uppercase tracking-[0.2em] text-[var(--outline)]">
+            Table layout
+          </p>
+          <SessionViewModeToggle
+            mode={sessionUiMode}
+            onChange={setSessionUiMode}
+          />
+        </div>
       </div>
 
       <div className="flex min-h-0 flex-1 flex-col gap-[var(--void-gap)] px-4 pb-2 pt-[var(--void-gap)]">
@@ -603,7 +627,24 @@ export default function SessionGameplayPage() {
             ) : null}
           </div>
         ) : null}
-        <FeedList entries={feed} className="min-h-0 flex-1" />
+        {sessionUiMode === "spotlight" ? (
+          <div className="flex min-h-0 flex-1 flex-col gap-3">
+            <BeatStrip />
+            <button
+              type="button"
+              onClick={() => setChronicleOpen(true)}
+              className="flex min-h-[44px] shrink-0 items-center justify-center gap-2 rounded-[var(--radius-card)] border border-[rgba(77,70,53,0.25)] bg-[var(--surface-high)]/80 px-4 py-2 text-[10px] font-black uppercase tracking-[0.15em] text-[var(--color-gold-support)] transition-colors hover:border-[var(--color-gold-rare)]/35 hover:text-[var(--color-gold-rare)]"
+            >
+              <span className="material-symbols-outlined text-base">menu_book</span>
+              Open Chronicle
+            </button>
+            <div className="min-h-0 flex-1" aria-hidden />
+          </div>
+        ) : sessionUiMode === "chronicle" ? (
+          <ChronicleFeed entries={feed} className="min-h-0 flex-1" />
+        ) : (
+          <FeedList entries={feed} className="min-h-0 flex-1" />
+        )}
         <PlayerStrip
           players={players}
           currentTurnPlayerId={currentTurnPlayerId}

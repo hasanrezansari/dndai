@@ -38,12 +38,16 @@ export type TurnStartedEvent = output<typeof TurnStartedEventSchema>;
 export const ActionSubmittedEventSchema = z.object({
   player_id: z.string().uuid(),
   raw_input: z.string(),
+  turn_id: z.string().uuid().optional(),
+  round_number: z.number().int().min(1).optional(),
 });
 export type ActionSubmittedEvent = output<typeof ActionSubmittedEventSchema>;
 
 export const DiceRollingEventSchema = z.object({
   roll_context: z.string(),
   dice_type: DiceTypeSchema,
+  turn_id: z.string().uuid().optional(),
+  round_number: z.number().int().min(1).optional(),
 });
 export type DiceRollingEvent = output<typeof DiceRollingEventSchema>;
 
@@ -54,6 +58,8 @@ export const DiceResultEventSchema = z.object({
   total: z.number().int(),
   result: RollResultSchema,
   context: z.string().optional(),
+  turn_id: z.string().uuid().optional(),
+  round_number: z.number().int().min(1).optional(),
 });
 export type DiceResultEvent = output<typeof DiceResultEventSchema>;
 
@@ -66,6 +72,8 @@ export const NarrationUpdateEventSchema = z.object({
   visible_changes: z.array(z.string()),
   next_actor: NarrationNextActorSchema,
   event_type: z.enum(["narration", "dm_event"]).optional(),
+  turn_id: z.string().uuid().optional(),
+  round_number: z.number().int().min(1).optional(),
 });
 export type NarrationUpdateEvent = output<typeof NarrationUpdateEventSchema>;
 
@@ -77,6 +85,8 @@ export type AwaitingDmEvent = output<typeof AwaitingDmEventSchema>;
 
 export const DmNoticeEventSchema = z.object({
   message: z.string(),
+  turn_id: z.string().uuid().optional(),
+  round_number: z.number().int().min(1).optional(),
 });
 export type DmNoticeEvent = output<typeof DmNoticeEventSchema>;
 
@@ -84,12 +94,16 @@ export const StateUpdateEventSchema = z.object({
   changes: z.array(StatePatchSchema),
   state_version: z.number().int().min(0),
   dismiss_scene_pending: z.boolean().optional(),
+  turn_id: z.string().uuid().optional(),
+  round_number: z.number().int().min(1).optional(),
 });
 export type StateUpdateEvent = output<typeof StateUpdateEventSchema>;
 
 export const SceneImagePendingEventSchema = z.object({
   scene_id: z.string().uuid(),
   label: z.string(),
+  turn_id: z.string().uuid().optional(),
+  round_number: z.number().int().min(1).optional(),
 });
 export type SceneImagePendingEvent = output<typeof SceneImagePendingEventSchema>;
 
@@ -117,11 +131,14 @@ export const StatChangeEffectSchema = z.object({
 
 export const StatChangeEventSchema = z.object({
   effects: z.array(StatChangeEffectSchema),
+  turn_id: z.string().uuid().optional(),
+  round_number: z.number().int().min(1).optional(),
 });
 export type StatChangeEvent = output<typeof StatChangeEventSchema>;
 
 export const RoundSummaryEventSchema = z.object({
   summary_text: z.string(),
   round_number: z.number().int().min(1),
+  turn_id: z.string().uuid().optional(),
 });
 export type RoundSummaryEvent = output<typeof RoundSummaryEventSchema>;

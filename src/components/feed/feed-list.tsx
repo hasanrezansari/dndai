@@ -1,8 +1,10 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
+import { filterStaleScenePendingRows } from "@/lib/feed/display-feed-filters";
 import type { FeedEntry } from "@/lib/state/game-store";
+import { useGameStore } from "@/lib/state/game-store";
 
 import { FeedEntryRow } from "./feed-entry";
 
@@ -14,6 +16,11 @@ export interface FeedListProps {
 }
 
 export function FeedList({ entries, className = "" }: FeedListProps) {
+  const scenePending = useGameStore((s) => s.scenePending);
+  const visibleEntries = useMemo(
+    () => filterStaleScenePendingRows(entries, scenePending),
+    [entries, scenePending],
+  );
   const scrollRef = useRef<HTMLDivElement>(null);
   const endRef = useRef<HTMLDivElement>(null);
   const [pinnedToBottom, setPinnedToBottom] = useState(true);
@@ -42,7 +49,7 @@ export function FeedList({ entries, className = "" }: FeedListProps) {
     requestAnimationFrame(() => {
       el.scrollTop = el.scrollHeight;
     });
-  }, [entries, pinnedToBottom]);
+  }, [visibleEntries, pinnedToBottom]);
 
   useEffect(() => {
     const el = scrollRef.current;
@@ -57,7 +64,7 @@ export function FeedList({ entries, className = "" }: FeedListProps) {
 
   return (
     <div className={`relative flex min-h-0 flex-1 flex-col ${className}`}>
-      {!pinnedToBottom && entries.length > 0 && (
+      {!pinnedToBottom && visibleEntries.length > 0 && (
         <div
           className="mb-2 flex shrink-0 items-center gap-2 rounded-[var(--radius-chip)] border border-white/[0.06] border-l-[3px] border-l-[var(--color-gold-support)]/50 bg-[var(--color-deep-void)]/75 px-3 py-2 backdrop-blur-sm"
           role="status"
@@ -73,18 +80,18 @@ export function FeedList({ entries, className = "" }: FeedListProps) {
       <div
         ref={scrollRef}
         onScroll={onScroll}
-        className="scrollbar-hide flex min-h-0 flex-1 flex-col gap-[var(--void-gap)] overflow-y-auto overflow-x-hidden pb-16"
+        className="scrollbar-hide flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto overflow-x-hidden pb-16 sm:gap-4"
       >
-        {entries.length === 0 ? (
+        {visibleEntries.length === 0 ? (
           <p className="text-center text-sm text-[var(--color-silver-dim)]">
             No events yet.
           </p>
         ) : (
-          entries.map((e) => <FeedEntryRow key={e.id} entry={e} />)
+          visibleEntries.map((e) => <FeedEntryRow key={e.id} entry={e} />)
         )}
         <div ref={endRef} className="h-px w-full shrink-0" aria-hidden />
       </div>
-      {!pinnedToBottom && entries.length > 0 && (
+      {!pinnedToBottom && visibleEntries.length > 0 && (
         <div className="pointer-events-none absolute bottom-3 left-0 right-0 z-10 flex justify-center">
           <button
             type="button"

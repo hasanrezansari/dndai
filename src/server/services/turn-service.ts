@@ -284,6 +284,8 @@ export async function submitAction(params: {
     await broadcastToSession(params.sessionId, "action-submitted", {
       player_id: params.playerId,
       raw_input: params.rawInput,
+      turn_id: validated.turn.id,
+      round_number: validated.turn.round_number,
     });
   } catch (err) {
     console.error(err);

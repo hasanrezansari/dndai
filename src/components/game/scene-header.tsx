@@ -27,6 +27,10 @@ export function SceneHeader({
 
   const showBackdrop = !sceneImage && !previousSceneImage;
 
+  /** Full-screen “painting” only when we have nothing to show yet — never cover a real scene. */
+  const showBlockingPaintOverlay =
+    scenePending && !sceneImage && !previousSceneImage;
+
   return (
     <div className="relative h-full w-full overflow-hidden">
       <div className="absolute inset-0">
@@ -78,7 +82,7 @@ export function SceneHeader({
 
       <div className="absolute inset-0 bg-gradient-to-t from-[var(--color-obsidian)] via-[var(--color-obsidian)]/50 to-transparent" />
 
-      {scenePending && (
+      {showBlockingPaintOverlay ? (
         <div
           className="pointer-events-none absolute inset-0 z-[3] flex flex-col items-center justify-center overflow-hidden"
           aria-busy
@@ -88,7 +92,7 @@ export function SceneHeader({
             {COPY.scenePending}
           </p>
         </div>
-      )}
+      ) : null}
 
       {/* Turn indicator */}
       <div className="absolute right-4 top-4 z-[2]">

@@ -43,6 +43,31 @@ function playerDisplayName(
   return p.character?.name ?? p.displayName ?? `Seat ${p.seatIndex + 1}`;
 }
 
+/** Use for rows tied to the live turn when the server omits `turn_id` (legacy). */
+function feedTurnFieldsWithFallback(data: {
+  turn_id?: string;
+  round_number?: number;
+  player_id?: string;
+}): { turnId?: string; roundNumber?: number; playerId?: string } {
+  const active = useGameStore.getState().activeTurnId ?? undefined;
+  const turnId = data.turn_id ?? active;
+  const o: { turnId?: string; roundNumber?: number; playerId?: string } = {};
+  if (turnId) o.turnId = turnId;
+  if (data.round_number !== undefined) o.roundNumber = data.round_number;
+  if (data.player_id) o.playerId = data.player_id;
+  return o;
+}
+
+function feedTurnFieldsExplicit(data: {
+  turn_id?: string;
+  round_number?: number;
+}): { turnId?: string; roundNumber?: number } {
+  const o: { turnId?: string; roundNumber?: number } = {};
+  if (data.turn_id) o.turnId = data.turn_id;
+  if (data.round_number !== undefined) o.roundNumber = data.round_number;
+  return o;
+}
+
 async function refetchPlayersFromState(sessionId: string) {
   const res = await fetch(`/api/sessions/${sessionId}/state`);
   if (!res.ok) return;
@@ -169,6 +194,7 @@ export function useSessionChannel(sessionId: string | null) {
     const onTurnStarted = (raw: unknown) => {
       const parsed = TurnStartedEventSchema.safeParse(raw);
       if (!parsed.success) return;
+      useGameStore.getState().setActiveTurnId(parsed.data.turn_id);
       const players = useGameStore.getState().players;
       const name = playerDisplayName(players, parsed.data.player_id);
       useGameStore.getState().setWaitingForDm(false);
@@ -187,6 +213,9 @@ export function useSessionChannel(sessionId: string | null) {
         text: `Round ${parsed.data.round_number} — ${name}'s turn`,
         timestamp: nowIso(),
         highlight: true,
+        turnId: parsed.data.turn_id,
+        roundNumber: parsed.data.round_number,
+        playerId: parsed.data.player_id,
       });
     };
 
@@ -201,6 +230,11 @@ export function useSessionChannel(sessionId: string | null) {
         playerName: name,
         text: parsed.data.raw_input,
         timestamp: nowIso(),
+        ...feedTurnFieldsWithFallback({
+          turn_id: parsed.data.turn_id,
+          round_number: parsed.data.round_number,
+          player_id: parsed.data.player_id,
+        }),
       });
       useGameStore.getState().setIsThinking(true);
     };
@@ -214,6 +248,10 @@ export function useSessionChannel(sessionId: string | null) {
         text: parsed.data.roll_context,
         detail: parsed.data.dice_type,
         timestamp: nowIso(),
+        ...feedTurnFieldsWithFallback({
+          turn_id: parsed.data.turn_id,
+          round_number: parsed.data.round_number,
+        }),
       });
     };
 
@@ -231,6 +269,10 @@ export function useSessionChannel(sessionId: string | null) {
         detail: result,
         timestamp: nowIso(),
         highlight,
+        ...feedTurnFieldsWithFallback({
+          turn_id: parsed.data.turn_id,
+          round_number: parsed.data.round_number,
+        }),
       });
       useGameStore.getState().showDiceOverlay({
         context: context ?? "Roll",
@@ -264,6 +306,10 @@ export function useSessionChannel(sessionId: string | null) {
         detail: changes || undefined,
         timestamp: nowIso(),
         highlight: true,
+        ...feedTurnFieldsExplicit({
+          turn_id: parsed.data.turn_id,
+          round_number: parsed.data.round_number,
+        }),
       });
     };
 
@@ -284,6 +330,10 @@ export function useSessionChannel(sessionId: string | null) {
         text: `State v${parsed.data.state_version}`,
         detail: `${parsed.data.changes.length} change(s)`,
         timestamp: nowIso(),
+        ...feedTurnFieldsWithFallback({
+          turn_id: parsed.data.turn_id,
+          round_number: parsed.data.round_number,
+        }),
       });
     };
 
@@ -328,6 +378,10 @@ export function useSessionChannel(sessionId: string | null) {
           text: parts.join(" | "),
           timestamp: nowIso(),
           statEffects: effects,
+          ...feedTurnFieldsWithFallback({
+            turn_id: parsed.data.turn_id,
+            round_number: parsed.data.round_number,
+          }),
         });
       }
 
@@ -409,6 +463,10 @@ export function useSessionChannel(sessionId: string | null) {
         type: "system",
         text: parsed.data.label,
         timestamp: nowIso(),
+        ...feedTurnFieldsWithFallback({
+          turn_id: parsed.data.turn_id,
+          round_number: parsed.data.round_number,
+        }),
       });
       startScenePoll();
     };
@@ -432,6 +490,7 @@ export function useSessionChannel(sessionId: string | null) {
     const onAwaitingDm = (raw: unknown) => {
       const parsed = AwaitingDmEventSchema.safeParse(raw);
       if (!parsed.success) return;
+      useGameStore.getState().setActiveTurnId(parsed.data.turn_id);
       useGameStore.getState().setWaitingForDm(true);
       useGameStore.getState().setDmAwaiting({
         turnId: parsed.data.turn_id,
@@ -447,6 +506,10 @@ export function useSessionChannel(sessionId: string | null) {
         type: "system",
         text: parsed.data.message,
         timestamp: nowIso(),
+        ...feedTurnFieldsWithFallback({
+          turn_id: parsed.data.turn_id,
+          round_number: parsed.data.round_number,
+        }),
       });
     };
 
@@ -460,6 +523,10 @@ export function useSessionChannel(sessionId: string | null) {
         detail: `Round ${parsed.data.round_number}`,
         timestamp: nowIso(),
         highlight: true,
+        ...feedTurnFieldsExplicit({
+          turn_id: parsed.data.turn_id,
+          round_number: parsed.data.round_number,
+        }),
       });
     };
 

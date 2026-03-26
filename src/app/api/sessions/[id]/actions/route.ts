@@ -15,7 +15,7 @@ import {
   unauthorizedResponse,
 } from "@/lib/auth/guards";
 import { db } from "@/lib/db";
-import { sessions } from "@/lib/db/schema";
+import { sessions, turns } from "@/lib/db/schema";
 import { runTurnPipeline } from "@/lib/orchestrator/pipeline";
 import { runImagePipeline } from "@/lib/orchestrator/image-worker";
 import { broadcastToSession } from "@/lib/socket/server";
@@ -75,6 +75,13 @@ export async function POST(
     });
     lockHeld = true;
 
+    const [completedTurnRow] = await db
+      .select({ round_number: turns.round_number })
+      .from(turns)
+      .where(eq(turns.id, turnId))
+      .limit(1);
+    const completedTurnRound = completedTurnRow?.round_number ?? 1;
+
     const pipelineResult = await runTurnPipeline({
       sessionId,
       turnId,
@@ -92,6 +99,8 @@ export async function POST(
           total: diceRoll.total,
           result: diceRoll.result,
           context: diceRoll.context,
+          turn_id: turnId,
+          round_number: completedTurnRound,
         });
       } catch (err) {
         console.error(err);
@@ -105,6 +114,8 @@ export async function POST(
         try {
           await broadcastToSession(sessionId, "dm-notice", {
             message: "The campaign reaches its conclusion.",
+            turn_id: turnId,
+            round_number: completedTurnRound,
           });
         } catch (err) {
           console.error(err);
@@ -113,6 +124,8 @@ export async function POST(
           await broadcastToSession(sessionId, "state-update", {
             changes: pipelineResult.statePatches,
             state_version: stateVersion,
+            turn_id: turnId,
+            round_number: completedTurnRound,
           });
         } catch (err) {
           console.error(err);
@@ -121,6 +134,8 @@ export async function POST(
           try {
             await broadcastToSession(sessionId, "stat-change", {
               effects: pipelineResult.consequenceEffects,
+              turn_id: turnId,
+              round_number: completedTurnRound,
             });
           } catch (err) {
             console.error("[actions] stat-change broadcast failed:", err);
@@ -140,6 +155,8 @@ export async function POST(
         await broadcastToSession(sessionId, "state-update", {
           changes: pipelineResult.statePatches,
           state_version: sessionRow?.state_version ?? 0,
+          turn_id: turnId,
+          round_number: completedTurnRound,
         });
       } catch (err) {
         console.error(err);
@@ -148,6 +165,8 @@ export async function POST(
         try {
           await broadcastToSession(sessionId, "stat-change", {
             effects: pipelineResult.consequenceEffects,
+            turn_id: turnId,
+            round_number: completedTurnRound,
           });
         } catch (err) {
           console.error("[actions] stat-change broadcast failed:", err);
@@ -168,6 +187,8 @@ export async function POST(
           scene_text: pipelineResult.narrativeEvent.scene_text,
           visible_changes: pipelineResult.narrativeEvent.visible_changes,
           next_actor: { player_id: parsed.data.playerId },
+          turn_id: turnId,
+          round_number: completedTurnRound,
         });
       } catch (err) {
         console.error(err);
@@ -175,6 +196,8 @@ export async function POST(
       try {
         await broadcastToSession(sessionId, "dm-notice", {
           message: "The campaign reaches its conclusion.",
+          turn_id: turnId,
+          round_number: completedTurnRound,
         });
       } catch (err) {
         console.error(err);
@@ -183,6 +206,8 @@ export async function POST(
         await broadcastToSession(sessionId, "state-update", {
           changes: pipelineResult.statePatches,
           state_version: stateVersion,
+          turn_id: turnId,
+          round_number: completedTurnRound,
         });
       } catch (err) {
         console.error(err);
@@ -202,6 +227,8 @@ export async function POST(
           scene_text: pipelineResult.narrativeEvent.scene_text,
           visible_changes: pipelineResult.narrativeEvent.visible_changes,
           next_actor: { player_id: parsed.data.playerId },
+          turn_id: turnId,
+          round_number: completedTurnRound,
         });
       } catch (err) {
         console.error(err);
@@ -209,6 +236,8 @@ export async function POST(
       try {
         await broadcastToSession(sessionId, "dm-notice", {
           message: "The party has fallen. The adventure ends here.",
+          turn_id: turnId,
+          round_number: completedTurnRound,
         });
       } catch (err) {
         console.error(err);
@@ -217,6 +246,8 @@ export async function POST(
         await broadcastToSession(sessionId, "state-update", {
           changes: pipelineResult.statePatches,
           state_version: stateVersion,
+          turn_id: turnId,
+          round_number: completedTurnRound,
         });
       } catch (err) {
         console.error(err);
@@ -225,6 +256,8 @@ export async function POST(
         try {
           await broadcastToSession(sessionId, "stat-change", {
             effects: pipelineResult.consequenceEffects,
+            turn_id: turnId,
+            round_number: completedTurnRound,
           });
         } catch (err) {
           console.error("[actions] stat-change broadcast failed:", err);
@@ -247,6 +280,7 @@ export async function POST(
         await broadcastToSession(sessionId, "round-summary", {
           summary_text: `Round ${completedRound} complete. The party presses onward into round ${sessionAfterAdvance.current_round}.`,
           round_number: completedRound,
+          turn_id: turnId,
         });
       } catch (err) {
         console.error("[actions] round-summary broadcast failed:", err);
@@ -258,6 +292,8 @@ export async function POST(
         scene_text: pipelineResult.narrativeEvent.scene_text,
         visible_changes: pipelineResult.narrativeEvent.visible_changes,
         next_actor: { player_id: nextPlayerId },
+        turn_id: turnId,
+        round_number: completedTurnRound,
       });
     } catch (err) {
       console.error(err);
@@ -267,6 +303,8 @@ export async function POST(
       await broadcastToSession(sessionId, "state-update", {
         changes: pipelineResult.statePatches,
         state_version: sessionAfterAdvance?.state_version ?? 0,
+        turn_id: turnId,
+        round_number: completedTurnRound,
       });
     } catch (err) {
       console.error(err);
@@ -276,6 +314,8 @@ export async function POST(
       try {
         await broadcastToSession(sessionId, "stat-change", {
           effects: pipelineResult.consequenceEffects,
+          turn_id: turnId,
+          round_number: completedTurnRound,
         });
       } catch (err) {
         console.error("[actions] stat-change broadcast failed:", err);
@@ -288,6 +328,8 @@ export async function POST(
         await broadcastToSession(sessionId, "scene-image-pending", {
           scene_id: sceneImageId,
           label: COPY.scenePending,
+          turn_id: turnId,
+          round_number: completedTurnRound,
         });
       } catch (err) {
         console.error(err);

@@ -1,11 +1,11 @@
-import { eq } from "drizzle-orm";
+import { and, desc, eq, inArray } from "drizzle-orm";
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 
 import { apiError, handleApiError } from "@/lib/api/errors";
 import { requireUser, unauthorizedResponse } from "@/lib/auth/guards";
 import { db } from "@/lib/db";
-import { narrativeEvents, sessions } from "@/lib/db/schema";
+import { narrativeEvents, sessions, turns } from "@/lib/db/schema";
 import { broadcastToSession } from "@/lib/socket/server";
 import { assertHumanSessionDm, DmAuthError } from "@/server/services/dm-auth";
 
@@ -84,12 +84,27 @@ export async function POST(
       return apiError("Failed to record event", 500);
     }
 
+    const [openTurn] = await db
+      .select({ id: turns.id, round_number: turns.round_number })
+      .from(turns)
+      .where(
+        and(
+          eq(turns.session_id, sessionId),
+          inArray(turns.status, ["awaiting_input", "processing", "awaiting_dm"]),
+        ),
+      )
+      .orderBy(desc(turns.started_at))
+      .limit(1);
+
     try {
       await broadcastToSession(sessionId, "narration-update", {
         scene_text: text,
         visible_changes: [],
         next_actor: { player_id: actorId },
         event_type: "dm_event",
+        ...(openTurn
+          ? { turn_id: openTurn.id, round_number: openTurn.round_number }
+          : {}),
       });
     } catch (err) {
       console.error(err);

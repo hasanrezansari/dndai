@@ -394,6 +394,8 @@ export async function runTurnPipeline(params: {
         await broadcastToSession(sessionId, "dice-rolling", {
           roll_context: roll.context,
           dice_type: roll.dice,
+          turn_id: turnId,
+          round_number: ctx.session.currentRound,
         });
       } catch (err) {
         console.error("[pipeline] dice-rolling broadcast failed:", err);
