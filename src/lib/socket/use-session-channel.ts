@@ -437,7 +437,8 @@ export function useSessionChannel(sessionId: string | null) {
     }
 
     async function pollSceneImage() {
-      if (!useGameStore.getState().scenePending) {
+      const before = useGameStore.getState();
+      if (!before.scenePending) {
         stopScenePoll();
         return;
       }
@@ -449,7 +450,7 @@ export function useSessionChannel(sessionId: string | null) {
           scenePending?: boolean;
         };
         if (data.sceneImage && !useGameStore.getState().scenePending) return;
-        if (data.sceneImage) {
+        if (data.sceneImage && data.sceneImage !== before.sceneImage) {
           useGameStore.getState().setSceneImage(data.sceneImage);
           useGameStore.getState().attachImageToLatestNarration(data.sceneImage);
         }
@@ -485,8 +486,11 @@ export function useSessionChannel(sessionId: string | null) {
     const onSceneImageReady = (raw: unknown) => {
       const parsed = SceneImageReadyEventSchema.safeParse(raw);
       if (!parsed.success) return;
-      useGameStore.getState().setSceneImage(parsed.data.image_url);
-      useGameStore.getState().attachImageToLatestNarration(parsed.data.image_url);
+      const currentScene = useGameStore.getState().sceneImage;
+      if (parsed.data.image_url !== currentScene) {
+        useGameStore.getState().setSceneImage(parsed.data.image_url);
+        useGameStore.getState().attachImageToLatestNarration(parsed.data.image_url);
+      }
       useGameStore.getState().setScenePending(false);
       stopScenePoll();
     };

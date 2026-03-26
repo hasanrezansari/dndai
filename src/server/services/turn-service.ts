@@ -391,6 +391,18 @@ export async function advanceTurn(
     throw new Error("Session state version conflict");
   }
 
+  if (roundAdvanced) {
+    try {
+      await broadcastToSession(sessionId, "round-summary", {
+        summary_text: `Round ${processingTurn.round_number} complete. The party presses onward into round ${nextRound}.`,
+        round_number: processingTurn.round_number,
+        turn_id: processingTurn.id,
+      });
+    } catch (err) {
+      console.error("[turn-service] round-summary broadcast failed:", err);
+    }
+  }
+
   try {
     await broadcastToSession(sessionId, "turn-started", {
       turn_id: newTurn.id,
