@@ -5,36 +5,47 @@ import { useEffect } from "react";
 
 import { useGameStore } from "@/lib/state/game-store";
 
+const OVERLAY_MS = 3200;
+
 function resultAccent(result: string): {
   label: string;
-  glow: string;
-  text: string;
+  glowVar: string;
+  textClass: string;
+  panelClass: string;
 } {
   if (result === "critical_success") {
     return {
-      label: "Critical!",
-      glow: "rgba(123, 45, 142, 0.55)",
-      text: "#E8D4FF",
+      label: "Critical hit",
+      glowVar: "var(--color-critical)",
+      textClass: "text-[var(--color-silver-muted)]",
+      panelClass:
+        "border-[color-mix(in_srgb,var(--color-critical)_40%,transparent)]",
     };
   }
   if (result === "critical_failure") {
     return {
       label: "Critical fail",
-      glow: "rgba(123, 45, 142, 0.45)",
-      text: "#E8D4FF",
+      glowVar: "var(--color-critical)",
+      textClass: "text-[var(--color-silver-muted)]",
+      panelClass:
+        "border-[color-mix(in_srgb,var(--color-critical)_35%,transparent)]",
     };
   }
   if (result === "success") {
     return {
       label: "Success",
-      glow: "rgba(212, 175, 55, 0.45)",
-      text: "#D4AF37",
+      glowVar: "var(--color-gold-rare)",
+      textClass: "text-[var(--color-gold-support)]",
+      panelClass:
+        "border-[color-mix(in_srgb,var(--color-gold-rare)_35%,transparent)]",
     };
   }
   return {
     label: "Failure",
-    glow: "rgba(139, 37, 0, 0.5)",
-    text: "#FF8888",
+    glowVar: "var(--color-failure)",
+    textClass: "text-[var(--color-failure)]",
+    panelClass:
+      "border-[color-mix(in_srgb,var(--color-failure)_40%,transparent)]",
   };
 }
 
@@ -46,11 +57,12 @@ export function DiceOverlay() {
     if (diceOverlay === null) return;
     const t = window.setTimeout(() => {
       hideDiceOverlay();
-    }, 2500);
+    }, OVERLAY_MS);
     return () => window.clearTimeout(t);
   }, [diceOverlay, hideDiceOverlay]);
 
   const accent = diceOverlay ? resultAccent(diceOverlay.result) : null;
+  const diceUpper = diceOverlay?.diceType.toUpperCase() ?? "";
 
   return (
     <AnimatePresence>
@@ -64,14 +76,14 @@ export function DiceOverlay() {
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
           transition={{ duration: 0.22 }}
-          className="fixed inset-0 z-50 flex flex-col items-center justify-center px-6"
+          className="fixed inset-0 z-50 flex flex-col items-center justify-center px-5"
           style={{
             backdropFilter: "blur(14px)",
             WebkitBackdropFilter: "blur(14px)",
-            background: "rgba(10, 10, 10, 0.72)",
+            background: "var(--glass-bg-heavy)",
           }}
         >
-          <p className="mb-8 text-center font-sans text-sm uppercase tracking-[0.2em] text-[var(--color-silver-dim)]">
+          <p className="mb-2 max-w-[20rem] text-center text-[11px] font-bold uppercase tracking-[0.22em] text-[var(--outline)]">
             {diceOverlay.context}
           </p>
 
@@ -83,32 +95,43 @@ export function DiceOverlay() {
               stiffness: 260,
               damping: 20,
             }}
-            className="relative mb-10 flex h-36 w-36 items-center justify-center rounded-2xl border border-white/10 bg-[var(--color-midnight)]/90 shadow-2xl"
+            className={`relative mb-8 flex h-40 w-40 items-center justify-center rounded-2xl border-2 bg-[var(--color-midnight)]/92 shadow-2xl ${accent.panelClass} ${
+              diceOverlay.result === "critical_success" ||
+              diceOverlay.result === "critical_failure"
+                ? "animate-pulse-glow"
+                : ""
+            }`}
             style={{
-              boxShadow: `0 0 48px ${accent.glow}`,
+              boxShadow: `0 0 56px color-mix(in srgb, ${accent.glowVar} 45%, transparent)`,
             }}
           >
             <span
-              className="font-mono text-5xl font-semibold tabular-nums"
-              style={{ color: accent.text }}
+              className={`text-data text-6xl font-black tabular-nums ${accent.textClass}`}
             >
               {diceOverlay.rollValue}
             </span>
           </motion.div>
 
-          <p
-            className="font-mono text-lg tabular-nums text-[var(--color-silver-muted)]"
-          >
-            {diceOverlay.diceType.toUpperCase()}{" "}
-            <span className="text-[var(--color-silver-dim)]">+</span>{" "}
-            {diceOverlay.modifier}{" "}
-            <span className="text-[var(--color-silver-dim)]">=</span>{" "}
-            <span className="font-semibold text-white">{diceOverlay.total}</span>
-          </p>
+          <div className="flex flex-col items-center gap-1 text-center">
+            <p className="text-[10px] font-black uppercase tracking-[0.2em] text-[var(--outline)]">
+              {diceUpper} check
+            </p>
+            <p className="text-data text-lg tabular-nums text-[var(--color-silver-muted)]">
+              <span className="text-[var(--color-silver-dim)]">{diceUpper}</span>{" "}
+              <span className="font-black text-[var(--color-silver-muted)]">
+                {diceOverlay.rollValue}
+              </span>
+              <span className="text-[var(--color-silver-dim)]"> + </span>
+              <span className="font-semibold">{diceOverlay.modifier}</span>
+              <span className="text-[var(--color-silver-dim)]"> = </span>
+              <span className="text-xl font-black text-[var(--color-silver-muted)]">
+                {diceOverlay.total}
+              </span>
+            </p>
+          </div>
 
           <p
-            className="mt-4 text-center font-sans text-base"
-            style={{ color: accent.text }}
+            className={`mt-6 text-center text-lg font-black uppercase tracking-[0.12em] ${accent.textClass}`}
           >
             {accent.label}
           </p>

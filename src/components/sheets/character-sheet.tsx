@@ -53,15 +53,22 @@ function abilityBody(row: Record<string, unknown>) {
   return typeof d === "string" && d.trim() ? d.trim() : "";
 }
 
-export function CharacterSheet() {
+export interface CharacterSheetProps {
+  /** When set, show this party member&apos;s character instead of the current user&apos;s seat. */
+  viewPlayerId?: string | null;
+}
+
+export function CharacterSheet({ viewPlayerId = null }: CharacterSheetProps) {
   const currentPlayerId = useGameStore((s) => s.currentPlayerId);
   const players = useGameStore((s) => s.players);
 
+  const effectivePlayerId = viewPlayerId ?? currentPlayerId;
+
   const character = useMemo(() => {
-    if (!currentPlayerId) return null;
-    const p = players.find((x) => x.id === currentPlayerId);
+    if (!effectivePlayerId) return null;
+    const p = players.find((x) => x.id === effectivePlayerId);
     return p?.character ?? null;
-  }, [currentPlayerId, players]);
+  }, [effectivePlayerId, players]);
 
   if (!character) {
     return (

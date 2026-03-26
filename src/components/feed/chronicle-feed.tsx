@@ -1,14 +1,20 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 
 import { filterStaleScenePendingRows } from "@/lib/feed/display-feed-filters";
+import {
+  filterFeedBySemantic,
+  type FeedSemanticFilter,
+} from "@/lib/feed/feed-semantic-filter";
 import {
   groupFeedIntoSegments,
   type FeedTurnSegment,
 } from "@/lib/feed/group-feed-into-segments";
 import type { FeedEntry, GamePlayerView, StatEffect } from "@/lib/state/game-store";
 import { useGameStore } from "@/lib/state/game-store";
+
+import { FeedSemanticChips } from "./feed-semantic-chips";
 
 const ROUND_DETAIL = /^Round \d+$/;
 
@@ -261,15 +267,22 @@ export interface ChronicleFeedProps {
 export function ChronicleFeed({ entries, className = "" }: ChronicleFeedProps) {
   const players = useGameStore((s) => s.players);
   const scenePending = useGameStore((s) => s.scenePending);
+  const [semanticFilter, setSemanticFilter] =
+    useState<FeedSemanticFilter>("all");
 
   const filtered = useMemo(
     () => filterStaleScenePendingRows(entries, scenePending),
     [entries, scenePending],
   );
 
+  const semanticsFiltered = useMemo(
+    () => filterFeedBySemantic(filtered, semanticFilter),
+    [filtered, semanticFilter],
+  );
+
   const segments = useMemo(
-    () => groupFeedIntoSegments(filtered),
-    [filtered],
+    () => groupFeedIntoSegments(semanticsFiltered),
+    [semanticsFiltered],
   );
 
   return (
@@ -278,9 +291,16 @@ export function ChronicleFeed({ entries, className = "" }: ChronicleFeedProps) {
       role="feed"
       aria-label="Chronicle"
     >
+      <FeedSemanticChips
+        value={semanticFilter}
+        onChange={setSemanticFilter}
+        className="sticky top-0 z-[1] -mx-1 bg-[var(--color-obsidian)]/90 px-1 pb-2 pt-0 backdrop-blur-sm"
+      />
       {segments.length === 0 ? (
         <p className="text-center text-sm text-[var(--color-silver-dim)]">
-          No events yet.
+          {filtered.length === 0
+            ? "No events yet."
+            : "Nothing in this filter."}
         </p>
       ) : (
         segments.map((segment, i) => {

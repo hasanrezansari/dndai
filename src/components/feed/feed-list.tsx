@@ -1,11 +1,16 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { filterStaleScenePendingRows } from "@/lib/feed/display-feed-filters";
+import {
+  filterFeedBySemantic,
+  type FeedSemanticFilter,
+} from "@/lib/feed/feed-semantic-filter";
 import type { FeedEntry } from "@/lib/state/game-store";
 import { useGameStore } from "@/lib/state/game-store";
 
+import { FeedSemanticChips } from "./feed-semantic-chips";
 import { FeedEntryRow } from "./feed-entry";
 
 const PIN_THRESHOLD = 48;
@@ -20,6 +25,12 @@ export function FeedList({ entries, className = "" }: FeedListProps) {
   const visibleEntries = useMemo(
     () => filterStaleScenePendingRows(entries, scenePending),
     [entries, scenePending],
+  );
+  const [semanticFilter, setSemanticFilter] =
+    useState<FeedSemanticFilter>("all");
+  const filteredEntries = useMemo(
+    () => filterFeedBySemantic(visibleEntries, semanticFilter),
+    [visibleEntries, semanticFilter],
   );
   const scrollRef = useRef<HTMLDivElement>(null);
   const endRef = useRef<HTMLDivElement>(null);
@@ -49,7 +60,7 @@ export function FeedList({ entries, className = "" }: FeedListProps) {
     requestAnimationFrame(() => {
       el.scrollTop = el.scrollHeight;
     });
-  }, [visibleEntries, pinnedToBottom]);
+  }, [filteredEntries, pinnedToBottom]);
 
   useEffect(() => {
     const el = scrollRef.current;
@@ -64,7 +75,12 @@ export function FeedList({ entries, className = "" }: FeedListProps) {
 
   return (
     <div className={`relative flex min-h-0 flex-1 flex-col ${className}`}>
-      {!pinnedToBottom && visibleEntries.length > 0 && (
+      <FeedSemanticChips
+        value={semanticFilter}
+        onChange={setSemanticFilter}
+        className="mb-2"
+      />
+      {!pinnedToBottom && filteredEntries.length > 0 && (
         <div
           className="mb-2 flex shrink-0 items-center gap-2 rounded-[var(--radius-chip)] border border-white/[0.06] border-l-[3px] border-l-[var(--color-gold-support)]/50 bg-[var(--color-deep-void)]/75 px-3 py-2 backdrop-blur-sm"
           role="status"
@@ -82,16 +98,42 @@ export function FeedList({ entries, className = "" }: FeedListProps) {
         onScroll={onScroll}
         className="scrollbar-hide flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto overflow-x-hidden pb-16 sm:gap-4"
       >
-        {visibleEntries.length === 0 ? (
+        {filteredEntries.length === 0 ? (
           <p className="text-center text-sm text-[var(--color-silver-dim)]">
-            No events yet.
+            {visibleEntries.length === 0
+              ? "No events yet."
+              : "Nothing in this filter."}
           </p>
         ) : (
-          visibleEntries.map((e) => <FeedEntryRow key={e.id} entry={e} />)
+          filteredEntries.map((e, i) => {
+            const prev = i > 0 ? filteredEntries[i - 1] : null;
+            const showTurnBreak =
+              Boolean(e.turnId) &&
+              Boolean(prev?.turnId) &&
+              e.turnId !== prev!.turnId;
+            return (
+              <Fragment key={e.id}>
+                {showTurnBreak ? (
+                  <div
+                    className="flex items-center gap-2 py-2"
+                    role="separator"
+                    aria-hidden
+                  >
+                    <span className="h-px flex-1 bg-gradient-to-r from-transparent via-[var(--outline-variant)]/45 to-transparent" />
+                    <span className="shrink-0 text-[8px] font-black uppercase tracking-[0.2em] text-[var(--outline)]">
+                      Next beat
+                    </span>
+                    <span className="h-px flex-1 bg-gradient-to-r from-transparent via-[var(--outline-variant)]/45 to-transparent" />
+                  </div>
+                ) : null}
+                <FeedEntryRow entry={e} />
+              </Fragment>
+            );
+          })
         )}
         <div ref={endRef} className="h-px w-full shrink-0" aria-hidden />
       </div>
-      {!pinnedToBottom && visibleEntries.length > 0 && (
+      {!pinnedToBottom && filteredEntries.length > 0 && (
         <div className="pointer-events-none absolute bottom-3 left-0 right-0 z-10 flex justify-center">
           <button
             type="button"
