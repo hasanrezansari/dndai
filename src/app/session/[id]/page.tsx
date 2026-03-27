@@ -20,7 +20,7 @@ import { PartySheet } from "@/components/sheets/party-sheet";
 import { NarrativeCard } from "@/components/game/narrative-card";
 import { CombatStrip } from "@/components/game/combat-strip";
 import { EnemyDetailPanel } from "@/components/game/enemy-detail-panel";
-import { QuestPill } from "@/components/game/quest-pill";
+import { QuestDock, QuestSheet } from "@/components/game/quest-pill";
 import { SceneDetailPanel } from "@/components/game/scene-detail-sheet";
 import { SceneHeader } from "@/components/game/scene-header";
 import { TurnBanner } from "@/components/game/turn-banner";
@@ -158,6 +158,7 @@ export default function SessionGameplayPage() {
   const [prevSceneTitle, setPrevSceneTitle] = useState<string | null>(null);
   const [chronicleOpen, setChronicleOpen] = useState(false);
   const [sceneDetailOpen, setSceneDetailOpen] = useState(false);
+  const [questOpen, setQuestOpen] = useState(false);
   const [partyInspectPlayerId, setPartyInspectPlayerId] = useState<
     string | null
   >(null);
@@ -294,6 +295,7 @@ export default function SessionGameplayPage() {
           return;
         }
         setIsThinking(false);
+        setQuestOpen(false);
       } catch {
         setIsThinking(false);
         window.alert("Action failed");
@@ -559,6 +561,23 @@ export default function SessionGameplayPage() {
           <ChronicleFeed entries={feed} className="min-h-0 flex-1" />
         </div>
       </BottomSheet>
+      <BottomSheet
+        isOpen={questOpen}
+        onClose={() => setQuestOpen(false)}
+        title="Quest"
+      >
+        {quest ? (
+          <QuestSheet
+            quest={quest}
+            session={session}
+            currentPlayerId={currentPlayerId}
+            voteBusy={voteBusy}
+            chapterBusy={chapterBusy}
+            onEndingVote={(choice) => void handleEndingVote(choice)}
+            onGenerateFinalChapter={() => void handleGenerateFinalChapter()}
+          />
+        ) : null}
+      </BottomSheet>
       <DiceOverlay />
       <StatPopupOverlay />
       <div className="relative z-[1] h-[min(36vh,320px)] w-full shrink-0 overflow-hidden">
@@ -611,17 +630,6 @@ export default function SessionGameplayPage() {
             <span className="h-px w-8 bg-[var(--color-gold-rare)]/30" />
           </div>
         ) : null}
-        {quest ? (
-          <QuestPill
-            quest={quest}
-            session={session}
-            currentPlayerId={currentPlayerId}
-            voteBusy={voteBusy}
-            chapterBusy={chapterBusy}
-            onEndingVote={(choice) => void handleEndingVote(choice)}
-            onGenerateFinalChapter={() => void handleGenerateFinalChapter()}
-          />
-        ) : null}
         {sessionUiMode === "spotlight" ? (
           <div className="flex min-h-0 flex-1 flex-col gap-3">
             <BeatStrip />
@@ -654,6 +662,7 @@ export default function SessionGameplayPage() {
           }}
         />
         <div className="sticky bottom-0 z-20 mt-auto shrink-0 pt-1">
+          {quest ? <QuestDock quest={quest} onOpen={() => setQuestOpen(true)} /> : null}
           <TurnBanner visible={isMyTurn && !(session?.mode === "human_dm" && isDm)} />
           {session?.mode === "human_dm" && isDm && currentPlayerId ? (
             <DmActionBar
