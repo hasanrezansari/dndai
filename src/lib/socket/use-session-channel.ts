@@ -75,62 +75,6 @@ function feedTurnFieldsExplicit(data: {
   return o;
 }
 
-async function refetchPlayersFromState(sessionId: string) {
-  const res = await fetch(`/api/sessions/${sessionId}/state`);
-  if (!res.ok) return;
-  const data = (await res.json()) as {
-    session?: GameSessionView;
-    players: GamePlayerView[];
-    npcs?: NpcCombatantView[];
-    sceneTitle?: string | null;
-    sceneImage?: string | null;
-    quest?: {
-      objective: string;
-      objectiveLeads?: Array<{
-        id: string;
-        text: string;
-        confidence: number;
-        updatedRound: number;
-      }>;
-      progress: number;
-      risk: number;
-      status: "active" | "ready_to_end" | "failed";
-      endingVote?: {
-        open: boolean;
-        reason: "objective_complete" | "party_defeated";
-        initiatedRound: number;
-        cooldownUntilRound: number;
-        failedAttempts: number;
-        requiredYes: number;
-        eligibleVoterIds: string[];
-        votes: Record<string, "end_now" | "continue">;
-      } | null;
-    } | null;
-    rollingMemories?: RollingMemoryView[];
-  };
-  if (Array.isArray(data.players)) {
-    useGameStore.getState().setPlayers(data.players);
-  }
-  if (Array.isArray(data.npcs)) {
-    useGameStore.getState().setNpcs(data.npcs);
-  }
-  if (data.session) {
-    useGameStore.getState().setSession(data.session);
-  }
-  if ("quest" in data) {
-    useGameStore.getState().setQuest(data.quest ?? null);
-  }
-  if (data.rollingMemories) {
-    useGameStore.getState().setRollingMemories(data.rollingMemories);
-  }
-  if (data.sceneTitle) {
-    useGameStore.getState().setSceneTitle(data.sceneTitle);
-  }
-  if (data.sceneImage) {
-    useGameStore.getState().setSceneImage(data.sceneImage);
-  }
-}
-
 export function useSessionChannel(sessionId: string | null) {
   useEffect(() => {
     if (!sessionId) return;
@@ -138,13 +82,102 @@ export function useSessionChannel(sessionId: string | null) {
 
     const client = getPusherClient();
     if (!client) return;
+    const pusherClient = client;
     const channelName = getSessionChannel(sessionId);
-    const channel = client.subscribe(channelName);
+    const channel = pusherClient.subscribe(channelName);
+    let accessForbidden = false;
+    let scenePollTimer: ReturnType<typeof setInterval> | null = null;
+
+    function stopScenePoll() {
+      if (scenePollTimer) {
+        clearInterval(scenePollTimer);
+        scenePollTimer = null;
+      }
+    }
+
+    function markAccessForbidden() {
+      if (accessForbidden) return;
+      accessForbidden = true;
+      stopScenePoll();
+      pusherClient.unsubscribe(channelName);
+      const store = useGameStore.getState();
+      store.setScenePending(false);
+      store.setIsThinking(false);
+      store.setWaitingForDm(false);
+      store.setDmAwaiting(null);
+    }
+
+    async function fetchSessionState() {
+      if (accessForbidden) return null;
+      const res = await fetch(`/api/sessions/${sessionId}/state`);
+      if (res.status === 401 || res.status === 403) {
+        markAccessForbidden();
+        return null;
+      }
+      if (!res.ok) return null;
+      return (await res.json()) as {
+        session?: GameSessionView;
+        players: GamePlayerView[];
+        npcs?: NpcCombatantView[];
+        sceneTitle?: string | null;
+        sceneImage?: string | null;
+        scenePending?: boolean;
+        quest?: {
+          objective: string;
+          objectiveLeads?: Array<{
+            id: string;
+            text: string;
+            confidence: number;
+            updatedRound: number;
+          }>;
+          progress: number;
+          risk: number;
+          status: "active" | "ready_to_end" | "failed";
+          endingVote?: {
+            open: boolean;
+            reason: "objective_complete" | "party_defeated";
+            initiatedRound: number;
+            cooldownUntilRound: number;
+            failedAttempts: number;
+            requiredYes: number;
+            eligibleVoterIds: string[];
+            votes: Record<string, "end_now" | "continue">;
+          } | null;
+        } | null;
+        rollingMemories?: RollingMemoryView[];
+      };
+    }
+
+    async function refetchPlayersFromState() {
+      const data = await fetchSessionState();
+      if (!data) return;
+      if (Array.isArray(data.players)) {
+        useGameStore.getState().setPlayers(data.players);
+      }
+      if (Array.isArray(data.npcs)) {
+        useGameStore.getState().setNpcs(data.npcs);
+      }
+      if (data.session) {
+        useGameStore.getState().setSession(data.session);
+      }
+      if ("quest" in data) {
+        useGameStore.getState().setQuest(data.quest ?? null);
+      }
+      if (data.rollingMemories) {
+        useGameStore.getState().setRollingMemories(data.rollingMemories);
+      }
+      if (data.sceneTitle) {
+        useGameStore.getState().setSceneTitle(data.sceneTitle);
+      }
+      if (data.sceneImage) {
+        useGameStore.getState().setSceneImage(data.sceneImage);
+      }
+    }
 
     const onPlayerJoined = (raw: unknown) => {
       const parsed = PlayerJoinedEventSchema.safeParse(raw);
       if (!parsed.success) return;
-      void refetchPlayersFromState(sessionId);
+      void refetchPlayersFromState();
       useGameStore.getState().addFeedEntry({
         id: feedId(),
         type: "system",
@@ -178,16 +211,7 @@ export function useSessionChannel(sessionId: string | null) {
       useGameStore.getState().updatePlayer(parsed.data.player_id, {
         isConnected: false,
       });
-      const name = playerDisplayName(
-        useGameStore.getState().players,
-        parsed.data.player_id,
-      );
-      useGameStore.getState().addFeedEntry({
-        id: feedId(),
-        type: "system",
-        text: `${name} disconnected`,
-        timestamp: nowIso(),
-      });
+      // Presence still updates in player-strip/state; feed spam is intentionally suppressed.
     };
 
     const onSessionStarted = (raw: unknown) => {
@@ -309,7 +333,10 @@ export function useSessionChannel(sessionId: string | null) {
       useGameStore.getState().setIsThinking(false);
       useGameStore.getState().setWaitingForDm(false);
       useGameStore.getState().setDmAwaiting(null);
-      if (parsed.data.event_type !== "dm_event") {
+      const activeTurnId = useGameStore.getState().activeTurnId;
+      const isFreshTurnNarration =
+        !!parsed.data.turn_id && parsed.data.turn_id === activeTurnId;
+      if (parsed.data.event_type !== "dm_event" && isFreshTurnNarration) {
         useGameStore.getState().updateSessionField(
           "currentPlayerId",
           parsed.data.next_actor.player_id,
@@ -333,7 +360,7 @@ export function useSessionChannel(sessionId: string | null) {
     const onStateUpdate = (raw: unknown) => {
       const parsed = StateUpdateEventSchema.safeParse(raw);
       if (!parsed.success) return;
-      void refetchPlayersFromState(sessionId);
+      void refetchPlayersFromState();
       if (parsed.data.dismiss_scene_pending) {
         useGameStore.getState().setScenePending(false);
       }
@@ -433,28 +460,19 @@ export function useSessionChannel(sessionId: string | null) {
       }
     };
 
-    let scenePollTimer: ReturnType<typeof setInterval> | null = null;
-
-    function stopScenePoll() {
-      if (scenePollTimer) {
-        clearInterval(scenePollTimer);
-        scenePollTimer = null;
-      }
-    }
-
     async function pollSceneImage() {
+      if (accessForbidden) {
+        stopScenePoll();
+        return;
+      }
       const before = useGameStore.getState();
       if (!before.scenePending) {
         stopScenePoll();
         return;
       }
       try {
-        const res = await fetch(`/api/sessions/${sessionId}/state`);
-        if (!res.ok) return;
-        const data = (await res.json()) as {
-          sceneImage?: string | null;
-          scenePending?: boolean;
-        };
+        const data = await fetchSessionState();
+        if (!data) return;
         if (data.sceneImage && !useGameStore.getState().scenePending) return;
         if (data.sceneImage && data.sceneImage !== before.sceneImage) {
           useGameStore.getState().setSceneImage(data.sceneImage);
@@ -586,10 +604,11 @@ export function useSessionChannel(sessionId: string | null) {
     }
 
     window.addEventListener("beforeunload", signalDisconnect);
+    window.addEventListener("pagehide", signalDisconnect);
 
     return () => {
-      signalDisconnect();
       window.removeEventListener("beforeunload", signalDisconnect);
+      window.removeEventListener("pagehide", signalDisconnect);
       stopScenePoll();
       channel.unbind("player-joined", onPlayerJoined);
       channel.unbind("player-ready", onPlayerReady);
@@ -608,7 +627,7 @@ export function useSessionChannel(sessionId: string | null) {
       channel.unbind("round-summary", onRoundSummary);
       channel.unbind("awaiting-dm", onAwaitingDm);
       channel.unbind("dm-notice", onDmNotice);
-      client.unsubscribe(channelName);
+      pusherClient.unsubscribe(channelName);
     };
   }, [sessionId]);
 }
