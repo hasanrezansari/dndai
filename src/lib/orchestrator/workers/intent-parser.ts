@@ -109,8 +109,11 @@ function buildHeuristicFallback(raw: string): ActionIntent {
     ...tagged.targets,
   ];
 
+  const selfHarmAttack = targets.some(
+    (t) => t.kind === "player" && t.label === "self",
+  );
   const contextMap: Partial<Record<ActionIntent["action_type"], string>> = {
-    attack: `Attack roll${targets.some(t => t.label === "self") ? " (self-harm)" : ""}`,
+    attack: `Attack roll${selfHarmAttack ? " (self-harm)" : ""}`,
     cast_spell: "Spell attack",
     heal: "Healing check",
     defend: "Defense check",
