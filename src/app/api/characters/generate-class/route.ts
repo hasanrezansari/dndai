@@ -40,7 +40,9 @@ export async function POST(request: NextRequest) {
         msg.includes("429") ||
         msg.includes("quota") ||
         msg.includes("credit balance is too low") ||
-        msg.includes("insufficient credits")
+        msg.includes("insufficient credits") ||
+        msg.includes("zoderror") ||
+        msg.includes("invalid input")
       ) {
         return apiError("Class generation is temporarily unavailable. Try again.", 503);
       }

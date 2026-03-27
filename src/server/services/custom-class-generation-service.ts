@@ -3,6 +3,137 @@ import { z } from "zod";
 import { getAIProvider } from "@/lib/ai";
 import { ClassProfileRoleSchema, ClassProfileSchema } from "@/lib/schemas/domain";
 
+const RoleValues = ClassProfileRoleSchema.options;
+type Role = z.infer<typeof ClassProfileRoleSchema>;
+
+const LooseClassProfileSchema = z.object({
+  source: z.string().optional(),
+  display_name: z.string().optional(),
+  name: z.string().optional(),
+  class_name: z.string().optional(),
+  title: z.string().optional(),
+  concept_prompt: z.string().optional(),
+  fantasy: z.string().optional(),
+  description: z.string().optional(),
+  combat_role: z.string().optional(),
+  role: z.string().optional(),
+  archetype: z.string().optional(),
+  resource_model: z.string().optional(),
+  resource: z.string().optional(),
+  stat_bias: z
+    .object({
+      str: z.coerce.number().optional(),
+      dex: z.coerce.number().optional(),
+      con: z.coerce.number().optional(),
+      int: z.coerce.number().optional(),
+      wis: z.coerce.number().optional(),
+      cha: z.coerce.number().optional(),
+    })
+    .partial()
+    .optional(),
+  abilities: z
+    .array(
+      z.object({
+        name: z.string().optional(),
+        type: z.string().optional(),
+        effect_kind: z.string().optional(),
+        effect: z.string().optional(),
+        kind: z.string().optional(),
+        resource_cost: z.coerce.number().optional(),
+        cooldown: z.coerce.number().optional(),
+        power_cost: z.coerce.number().optional(),
+      }),
+    )
+    .optional(),
+  powers: z.array(z.record(z.string(), z.unknown())).optional(),
+  skills: z.array(z.record(z.string(), z.unknown())).optional(),
+  starting_gear: z
+    .array(
+      z.object({
+        name: z.string().optional(),
+        type: z.string().optional(),
+        power_cost: z.coerce.number().optional(),
+      }),
+    )
+    .optional(),
+  gear: z.array(z.record(z.string(), z.unknown())).optional(),
+  equipment: z.array(z.record(z.string(), z.unknown())).optional(),
+  visual_tags: z.union([z.array(z.string()), z.string()]).optional(),
+});
+
+function clampInt(value: unknown, min: number, max: number, fallback: number): number {
+  const n = typeof value === "number" ? value : Number(value);
+  if (!Number.isFinite(n)) return fallback;
+  return Math.max(min, Math.min(max, Math.round(n)));
+}
+
+function normalizeRole(value: string | undefined, preferred?: Role): Role {
+  const raw = (value ?? "").trim().toLowerCase();
+  if (RoleValues.includes(raw as Role)) return raw as Role;
+  if (raw.includes("tank")) return "guardian";
+  if (raw.includes("front")) return "frontline";
+  if (raw.includes("support") || raw.includes("heal")) return "support";
+  if (raw.includes("arcane") || raw.includes("mage") || raw.includes("caster")) return "arcane";
+  if (raw.includes("skirm") || raw.includes("rogue")) return "skirmisher";
+  if (raw.includes("guard")) return "guardian";
+  return preferred ?? "specialist";
+}
+
+function normalizeResource(value: string | undefined, role: Role): "none" | "mana" | "energy" | "focus" | "stamina" {
+  const raw = (value ?? "").trim().toLowerCase();
+  if (["none", "mana", "energy", "focus", "stamina"].includes(raw)) {
+    return raw as "none" | "mana" | "energy" | "focus" | "stamina";
+  }
+  if (raw.includes("rage")) return "stamina";
+  if (raw.includes("spirit")) return "focus";
+  if (role === "arcane") return "mana";
+  if (role === "guardian" || role === "frontline") return "stamina";
+  if (role === "support") return "focus";
+  return "energy";
+}
+
+function normalizeAbilityType(value: string | undefined, idx: number): "active" | "passive" {
+  const raw = (value ?? "").trim().toLowerCase();
+  if (raw === "active" || raw === "passive") return raw;
+  return idx === 2 ? "passive" : "active";
+}
+
+function normalizeEffectKind(value: string | undefined): "damage" | "heal" | "shield" | "buff" | "debuff" | "mobility" | "utility" {
+  const raw = (value ?? "").trim().toLowerCase();
+  if (["damage", "heal", "shield", "buff", "debuff", "mobility", "utility"].includes(raw)) {
+    return raw as "damage" | "heal" | "shield" | "buff" | "debuff" | "mobility" | "utility";
+  }
+  if (raw.includes("move") || raw.includes("dash") || raw.includes("teleport")) return "mobility";
+  if (raw.includes("heal") || raw.includes("restore")) return "heal";
+  if (raw.includes("shield") || raw.includes("ward") || raw.includes("guard")) return "shield";
+  if (raw.includes("buff") || raw.includes("boost")) return "buff";
+  if (raw.includes("debuff") || raw.includes("curse")) return "debuff";
+  if (raw.includes("utility") || raw.includes("trick")) return "utility";
+  return "damage";
+}
+
+function normalizeGearType(value: string | undefined): "weapon" | "armor" | "focus" | "tool" | "cyberware" {
+  const raw = (value ?? "").trim().toLowerCase();
+  if (["weapon", "armor", "focus", "tool", "cyberware"].includes(raw)) {
+    return raw as "weapon" | "armor" | "focus" | "tool" | "cyberware";
+  }
+  if (raw.includes("arm")) return "armor";
+  if (raw.includes("focus") || raw.includes("relic")) return "focus";
+  if (raw.includes("kit") || raw.includes("tool")) return "tool";
+  if (raw.includes("cyber")) return "cyberware";
+  return "weapon";
+}
+
+function normalizeVisualTags(value: z.infer<typeof LooseClassProfileSchema>["visual_tags"], concept: string, role: Role): string[] {
+  const source =
+    typeof value === "string"
+      ? value.split(",")
+      : Array.isArray(value)
+        ? value
+        : concept.split(/\s+/);
+  return [...new Set(source.map((s) => s.trim().toLowerCase()).filter(Boolean).concat([role]))].slice(0, 10);
+}
+
 export async function generateCustomClassProfileFromAI(params: {
   concept: string;
   rolePreference?: z.infer<typeof ClassProfileRoleSchema>;
@@ -38,23 +169,91 @@ Balance requirements:
     model: "light",
     systemPrompt,
     userPrompt,
-    schema: ClassProfileSchema,
+    schema: LooseClassProfileSchema,
     maxTokens: 700,
     temperature: 0.35,
   });
 
-  // AI-first path: successful generation must come from model output,
-  // then be bounded by schema and normalized fields.
+  const data = result.data;
+  const role = normalizeRole(data.combat_role ?? data.role ?? data.archetype, params.rolePreference);
+  const resource = normalizeResource(data.resource_model ?? data.resource, role);
+  const rawAbilities = data.abilities ?? data.powers ?? data.skills ?? [];
+  const rawGear = data.starting_gear ?? data.gear ?? data.equipment ?? [];
+
+  const abilities = rawAbilities.slice(0, 3).map((ability, idx) => {
+    const rec = ability as Record<string, unknown>;
+    const name = typeof rec.name === "string" ? rec.name : `Ability ${idx + 1}`;
+    return {
+      name: name.trim().slice(0, 40) || `Ability ${idx + 1}`,
+      type: normalizeAbilityType(typeof rec.type === "string" ? rec.type : undefined, idx),
+      effect_kind: normalizeEffectKind(
+        typeof rec.effect_kind === "string"
+          ? rec.effect_kind
+          : typeof rec.effect === "string"
+            ? rec.effect
+            : typeof rec.kind === "string"
+              ? rec.kind
+              : undefined,
+      ),
+      resource_cost: clampInt(rec.resource_cost, 0, 6, idx === 2 ? 0 : 2),
+      cooldown: clampInt(rec.cooldown, 0, 6, idx === 2 ? 0 : 1),
+      power_cost: clampInt(rec.power_cost, 1, 6, idx === 0 ? 4 : idx === 1 ? 3 : 2),
+    };
+  });
+  while (abilities.length < 3) {
+    const idx = abilities.length;
+    abilities.push({
+      name: `Ability ${idx + 1}`,
+      type: normalizeAbilityType(undefined, idx),
+      effect_kind: idx === 1 ? "shield" : idx === 2 ? "utility" : "damage",
+      resource_cost: idx === 2 ? 0 : 2,
+      cooldown: idx === 2 ? 0 : 1,
+      power_cost: idx === 0 ? 4 : idx === 1 ? 3 : 2,
+    });
+  }
+
+  const startingGear = rawGear.slice(0, 3).map((item, idx) => {
+    const rec = item as Record<string, unknown>;
+    const name = typeof rec.name === "string" ? rec.name : `Gear ${idx + 1}`;
+    return {
+      name: name.trim().slice(0, 40) || `Gear ${idx + 1}`,
+      type: normalizeGearType(typeof rec.type === "string" ? rec.type : undefined),
+      power_cost: clampInt(rec.power_cost, 1, 4, idx === 0 ? 3 : 2),
+    };
+  });
+  while (startingGear.length < 3) {
+    const idx = startingGear.length;
+    startingGear.push({
+      name: `Gear ${idx + 1}`,
+      type: idx === 1 ? "armor" : idx === 2 ? "tool" : "weapon",
+      power_cost: idx === 0 ? 3 : 2,
+    });
+  }
+
   return ClassProfileSchema.parse({
-    ...result.data,
     source: "custom",
     concept_prompt: params.concept,
-    display_name:
-      result.data.display_name?.trim().slice(0, 40) ||
-      params.concept.trim().slice(0, 40),
-    fantasy:
-      result.data.fantasy?.trim().slice(0, 180) ||
-      params.concept.trim().slice(0, 180),
+    display_name: (
+      data.display_name ??
+      data.name ??
+      data.class_name ??
+      data.title ??
+      params.concept
+    ).trim().slice(0, 40),
+    fantasy: (data.fantasy ?? data.description ?? params.concept).trim().slice(0, 180),
+    combat_role: role,
+    resource_model: resource,
+    stat_bias: {
+      str: clampInt(data.stat_bias?.str, -2, 3, 0),
+      dex: clampInt(data.stat_bias?.dex, -2, 3, 0),
+      con: clampInt(data.stat_bias?.con, -2, 3, 0),
+      int: clampInt(data.stat_bias?.int, -2, 3, 0),
+      wis: clampInt(data.stat_bias?.wis, -2, 3, 0),
+      cha: clampInt(data.stat_bias?.cha, -2, 3, 0),
+    },
+    abilities,
+    starting_gear: startingGear,
+    visual_tags: normalizeVisualTags(data.visual_tags, params.concept, role),
   });
 }
 
