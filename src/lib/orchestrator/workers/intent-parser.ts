@@ -68,11 +68,46 @@ function shouldRequireRollHeuristic(
   return !trivialSocial;
 }
 
+function extractTaggedNpcTargets(raw: string): {
+  cleaned: string;
+  targets: Array<{ kind: "npc"; id: string }>;
+} {
+  const targets: Array<{ kind: "npc"; id: string }> = [];
+  const cleaned = raw.replace(
+    /\[target:npc:([0-9a-fA-F-]{36})\]/g,
+    (_full, id: string) => {
+      targets.push({ kind: "npc", id: id.toLowerCase() });
+      return "";
+    },
+  );
+  return { cleaned: cleaned.replace(/\s{2,}/g, " ").trim(), targets };
+}
+
+function mergeExplicitNpcTargets(
+  intent: ActionIntent,
+  explicitNpcTargets: Array<{ kind: "npc"; id: string }>,
+): ActionIntent {
+  if (explicitNpcTargets.length === 0) return intent;
+  const existing = Array.isArray(intent.targets) ? [...intent.targets] : [];
+  for (const target of explicitNpcTargets) {
+    if (existing.some((x) => x.kind === "npc" && x.id === target.id)) continue;
+    existing.push(target);
+  }
+  return ActionIntentSchema.parse({
+    ...intent,
+    targets: existing,
+  });
+}
+
 function buildHeuristicFallback(raw: string): ActionIntent {
-  const actionType = classifyActionHeuristic(raw);
-  const skill = guessStat(actionType, raw);
-  const needsRoll = shouldRequireRollHeuristic(actionType, raw);
-  const targets = detectTargets(raw);
+  const tagged = extractTaggedNpcTargets(raw);
+  const actionType = classifyActionHeuristic(tagged.cleaned);
+  const skill = guessStat(actionType, tagged.cleaned);
+  const needsRoll = shouldRequireRollHeuristic(actionType, tagged.cleaned);
+  const targets = [
+    ...detectTargets(tagged.cleaned),
+    ...tagged.targets,
+  ];
 
   const contextMap: Partial<Record<ActionIntent["action_type"], string>> = {
     attack: `Attack roll${targets.some(t => t.label === "self") ? " (self-harm)" : ""}`,
@@ -91,7 +126,7 @@ function buildHeuristicFallback(raw: string): ActionIntent {
     skill_or_save: skill,
     requires_roll: needsRoll,
     confidence: 0.6,
-    suggested_roll_context: contextMap[actionType] ?? raw.slice(0, 200),
+    suggested_roll_context: contextMap[actionType] ?? tagged.cleaned.slice(0, 200),
   });
 }
 
@@ -129,10 +164,11 @@ export async function parseIntent(params: {
   provider?: AIProvider;
 }): Promise<OrchestrationStepResult<ActionIntent>> {
   const raw = params.rawInput.trim();
+  const tagged = extractTaggedNpcTargets(raw);
   const provider = params.provider ?? getAIProvider();
 
   const userPrompt = JSON.stringify({
-    player_action: raw,
+    player_action: tagged.cleaned,
     character_name: params.characterName,
     character_class: params.characterClass,
     recent_context: params.recentEvents.slice(-2).join("\n").slice(0, 1500),
@@ -156,6 +192,8 @@ export async function parseIntent(params: {
   if (result.data.confidence < LOW_CONFIDENCE_THRESHOLD && !result.data.rephrase_reason) {
     result.data.rephrase_reason = "Low confidence classification — consider rephrasing";
   }
+
+  result.data = mergeExplicitNpcTargets(result.data, tagged.targets);
 
   return result;
 }

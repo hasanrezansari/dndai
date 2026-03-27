@@ -112,9 +112,11 @@ export interface NpcCombatantView {
   status: string;
   location: string;
   notes: string;
+  revealLevel: "none" | "partial" | "full";
   ac?: number;
   hp?: number;
   maxHp?: number;
+  weakPoints?: string[];
   attacks?: string;
   portraitUrl?: string;
   portraitStatus?: "locked" | "ready";

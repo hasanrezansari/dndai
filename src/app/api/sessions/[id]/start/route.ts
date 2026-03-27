@@ -229,6 +229,20 @@ export async function POST(
       if (seed.initial_npcs?.length) {
         for (const npc of seed.initial_npcs) {
           try {
+            const vp: Record<string, unknown> =
+              npc.visual_profile && typeof npc.visual_profile === "object" && !Array.isArray(npc.visual_profile)
+                ? (npc.visual_profile as Record<string, unknown>)
+                : {};
+            const hpRaw = vp.hp ?? vp.current_hp ?? vp.hit_points;
+            const maxHpRaw = vp.max_hp ?? vp.maxHitPoints ?? vp.max_hit_points ?? hpRaw;
+            const acRaw = vp.ac ?? vp.AC ?? vp.armor_class;
+            const hp = Math.max(1, Number.isFinite(Number(hpRaw)) ? Number(hpRaw) : 12);
+            const maxHp = Math.max(hp, Number.isFinite(Number(maxHpRaw)) ? Number(maxHpRaw) : hp);
+            const ac = Math.max(5, Number.isFinite(Number(acRaw)) ? Number(acRaw) : 12);
+            const weakRaw = vp.weak_points;
+            const weakPoints = Array.isArray(weakRaw)
+              ? weakRaw.map((x) => String(x).trim()).filter((x) => x.length > 0)
+              : [];
             await db.insert(npcStates).values({
               session_id: sessionId,
               name: npc.name,
@@ -236,6 +250,11 @@ export async function POST(
               attitude: npc.attitude,
               status: "alive",
               location: seed.first_scene.title || "Unknown",
+              hp,
+              max_hp: maxHp,
+              ac,
+              weak_points: weakPoints,
+              reveal_level: "none",
               visual_profile: npc.visual_profile ?? {},
               notes: npc.hook ?? "",
             });

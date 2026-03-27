@@ -312,11 +312,20 @@ export const npcStates = pgTable(
     attitude: text("attitude").notNull(),
     status: text("status").notNull().default("alive"),
     location: text("location").notNull(),
+    hp: integer("hp").notNull().default(10),
+    max_hp: integer("max_hp").notNull().default(10),
+    ac: integer("ac").notNull().default(10),
+    weak_points: jsonb("weak_points")
+      .$type<string[]>()
+      .notNull()
+      .default(sql`'[]'::jsonb`),
+    reveal_level: text("reveal_level").notNull().default("none"),
     visual_profile: jsonb("visual_profile")
       .$type<Record<string, unknown>>()
       .notNull()
       .default(sql`'{}'::jsonb`),
     notes: text("notes").notNull().default(""),
+    introduced_turn_id: uuid("introduced_turn_id").references(() => turns.id),
     updated_at: timestamp("updated_at", { withTimezone: true })
       .notNull()
       .defaultNow(),
