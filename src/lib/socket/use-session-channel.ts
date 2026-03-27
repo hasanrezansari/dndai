@@ -366,25 +366,27 @@ export function useSessionChannel(sessionId: string | null) {
     const onStateUpdate = (raw: unknown) => {
       const parsed = StateUpdateEventSchema.safeParse(raw);
       if (!parsed.success) return;
-      void refetchPlayersFromState();
-      if (parsed.data.dismiss_scene_pending) {
-        useGameStore.getState().setScenePending(false);
-      }
-      useGameStore.getState().updateSessionField(
-        "stateVersion",
-        parsed.data.state_version,
-      );
-      useGameStore.getState().addFeedEntry({
-        id: feedId(),
-        type: "state_change",
-        text: `State v${parsed.data.state_version}`,
-        detail: `${parsed.data.changes.length} change(s)`,
-        timestamp: nowIso(),
-        ...feedTurnFieldsWithFallback({
-          turn_id: parsed.data.turn_id,
-          round_number: parsed.data.round_number,
-        }),
-      });
+      void (async () => {
+        await refetchPlayersFromState();
+        if (parsed.data.dismiss_scene_pending) {
+          useGameStore.getState().setScenePending(false);
+        }
+        useGameStore.getState().updateSessionField(
+          "stateVersion",
+          parsed.data.state_version,
+        );
+        useGameStore.getState().addFeedEntry({
+          id: feedId(),
+          type: "state_change",
+          text: `State v${parsed.data.state_version}`,
+          detail: `${parsed.data.changes.length} change(s)`,
+          timestamp: nowIso(),
+          ...feedTurnFieldsWithFallback({
+            turn_id: parsed.data.turn_id,
+            round_number: parsed.data.round_number,
+          }),
+        });
+      })();
     };
 
     const onStatChange = (raw: unknown) => {
@@ -483,6 +485,7 @@ export function useSessionChannel(sessionId: string | null) {
         if (data.sceneImage && data.sceneImage !== before.sceneImage) {
           useGameStore.getState().setSceneImage(data.sceneImage);
           useGameStore.getState().attachImageToLatestNarration(data.sceneImage);
+          await refetchPlayersFromState();
         }
         if (!data.scenePending) {
           useGameStore.getState().setScenePending(false);
@@ -523,6 +526,7 @@ export function useSessionChannel(sessionId: string | null) {
       }
       useGameStore.getState().setScenePending(false);
       stopScenePoll();
+      void refetchPlayersFromState();
     };
 
     const onSceneImageFailed = (raw: unknown) => {

@@ -217,11 +217,6 @@ export async function POST(
       return NextResponse.json({ actionId, turnId }, { status: 202 });
     }
 
-    const [sessionBeforeAdvance] = await db
-      .select({ state_version: sessions.state_version })
-      .from(sessions)
-      .where(eq(sessions.id, sessionId))
-      .limit(1);
     const expectedNextPlayerId = pipelineResult.narrativeEvent.next_actor_id;
 
     try {
@@ -229,17 +224,6 @@ export async function POST(
         scene_text: pipelineResult.narrativeEvent.scene_text,
         visible_changes: pipelineResult.narrativeEvent.visible_changes,
         next_actor: { player_id: expectedNextPlayerId ?? parsed.data.playerId },
-        turn_id: turnId,
-        round_number: completedTurnRound,
-      });
-    } catch (err) {
-      console.error(err);
-    }
-
-    try {
-      await broadcastToSession(sessionId, "state-update", {
-        changes: pipelineResult.statePatches,
-        state_version: sessionBeforeAdvance?.state_version ?? 0,
         turn_id: turnId,
         round_number: completedTurnRound,
       });
@@ -284,6 +268,22 @@ export async function POST(
       await releaseTurnLock(sessionId);
       lockHeld = false;
       return NextResponse.json({ actionId, turnId }, { status: 202 });
+    }
+
+    const [sessionAfterAdvance] = await db
+      .select({ state_version: sessions.state_version })
+      .from(sessions)
+      .where(eq(sessions.id, sessionId))
+      .limit(1);
+    try {
+      await broadcastToSession(sessionId, "state-update", {
+        changes: pipelineResult.statePatches,
+        state_version: sessionAfterAdvance?.state_version ?? 0,
+        turn_id: turnId,
+        round_number: completedTurnRound,
+      });
+    } catch (err) {
+      console.error(err);
     }
 
     if (pipelineResult.imageNeeded && pipelineResult.imageJobPayload) {

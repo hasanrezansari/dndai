@@ -19,6 +19,18 @@ function avatarLetterPlayer(p: GamePlayerView) {
   return "?";
 }
 
+/** Deterministic avatar when `visual_profile.portrait_url` was never set (no extra API calls from us). */
+function playerPortraitSrc(p: GamePlayerView): string {
+  const custom = p.character?.portraitUrl?.trim();
+  if (custom) return custom;
+  const displayName =
+    p.character?.name?.trim() ||
+    p.displayName?.trim() ||
+    `seat-${p.seatIndex + 1}`;
+  const seed = encodeURIComponent(displayName.slice(0, 64));
+  return `https://api.dicebear.com/7.x/initials/svg?seed=${seed}&fontWeight=700`;
+}
+
 function avatarLetterNpc(n: NpcCombatantView) {
   const t = n.name.trim();
   if (t.length > 0) return t[0]!.toUpperCase();
@@ -80,16 +92,12 @@ export function CombatStrip({
                       aria-label={`Open character sheet for ${displayName}`}
                     >
                       {p.isConnected ? (
-                        p.character?.portraitUrl ? (
-                          // eslint-disable-next-line @next/next/no-img-element
-                          <img
-                            src={p.character.portraitUrl}
-                            alt={`${displayName} portrait`}
-                            className="h-full w-full rounded-[var(--radius-avatar)] object-cover"
-                          />
-                        ) : (
-                          avatarLetterPlayer(p)
-                        )
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img
+                          src={playerPortraitSrc(p)}
+                          alt={`${displayName} portrait`}
+                          className="h-full w-full rounded-[var(--radius-avatar)] object-cover"
+                        />
                       ) : (
                         "…"
                       )}
@@ -103,16 +111,12 @@ export function CombatStrip({
                       } ${flash === "damage" ? "animate-hp-flash-damage" : flash === "heal" ? "animate-hp-flash-heal" : ""}`}
                     >
                       {p.isConnected ? (
-                        p.character?.portraitUrl ? (
-                          // eslint-disable-next-line @next/next/no-img-element
-                          <img
-                            src={p.character.portraitUrl}
-                            alt={`${displayName} portrait`}
-                            className="h-full w-full rounded-[var(--radius-avatar)] object-cover"
-                          />
-                        ) : (
-                          avatarLetterPlayer(p)
-                        )
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img
+                          src={playerPortraitSrc(p)}
+                          alt={`${displayName} portrait`}
+                          className="h-full w-full rounded-[var(--radius-avatar)] object-cover"
+                        />
                       ) : (
                         "…"
                       )}
