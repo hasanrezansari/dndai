@@ -2,7 +2,6 @@
 
 import { useMemo, useState } from "react";
 
-import { speakNarrationText } from "@/lib/audio/use-narration-tts";
 import { filterStaleScenePendingRows } from "@/lib/feed/display-feed-filters";
 import {
   filterFeedBySemantic,
@@ -16,6 +15,7 @@ import type { FeedEntry, GamePlayerView, StatEffect } from "@/lib/state/game-sto
 import { useGameStore } from "@/lib/state/game-store";
 
 import { FeedSemanticChips } from "./feed-semantic-chips";
+import { NarrationPlaybackButton } from "./narration-playback-button";
 
 const ROUND_DETAIL = /^Round \d+$/;
 
@@ -181,16 +181,7 @@ function ChronicleEntryBlock({
             {entry.text}
           </p>
           <div className="mt-2 flex justify-center">
-            <button
-              type="button"
-              onClick={() => {
-                speakNarrationText(entry.text);
-              }}
-              className="inline-flex min-h-[40px] items-center gap-1.5 rounded-[var(--radius-chip)] border border-[rgba(77,70,53,0.25)] bg-[var(--surface-high)] px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.12em] text-[var(--color-gold-support)] transition-colors hover:border-[var(--color-gold-rare)]/35 hover:text-[var(--color-gold-rare)]"
-            >
-              <span className="material-symbols-outlined text-sm">volume_up</span>
-              Hear narration
-            </button>
+            <NarrationPlaybackButton text={entry.text} />
           </div>
         </div>
       );
@@ -214,16 +205,7 @@ function ChronicleEntryBlock({
           {entry.text}
         </p>
         <div>
-          <button
-            type="button"
-            onClick={() => {
-              speakNarrationText(entry.text);
-            }}
-            className="inline-flex min-h-[40px] items-center gap-1.5 rounded-[var(--radius-chip)] border border-[rgba(77,70,53,0.25)] bg-[var(--surface-high)] px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.12em] text-[var(--color-gold-support)] transition-colors hover:border-[var(--color-gold-rare)]/35 hover:text-[var(--color-gold-rare)]"
-          >
-            <span className="material-symbols-outlined text-sm">volume_up</span>
-            Hear narration
-          </button>
+          <NarrationPlaybackButton text={entry.text} />
         </div>
         {entry.detail ? (
           <p className="text-[11px] leading-relaxed text-[var(--outline)]">

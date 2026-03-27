@@ -3,8 +3,9 @@
 import { type ReactNode } from "react";
 import { motion } from "framer-motion";
 
-import { speakNarrationText } from "@/lib/audio/use-narration-tts";
 import type { FeedEntry, StatEffect } from "@/lib/state/game-store";
+
+import { NarrationPlaybackButton } from "./narration-playback-button";
 
 const ROLL_RESULTS = new Set([
   "success",
@@ -372,16 +373,7 @@ export function FeedEntryRow({ entry }: FeedEntryRowProps) {
             {entry.text}
           </p>
           <div className="mt-2 flex justify-center">
-            <button
-              type="button"
-              onClick={() => {
-                speakNarrationText(entry.text);
-              }}
-              className="inline-flex min-h-[40px] items-center gap-1.5 rounded-[var(--radius-chip)] border border-[rgba(77,70,53,0.25)] bg-[var(--surface-high)] px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.12em] text-[var(--color-gold-support)] transition-colors hover:border-[var(--color-gold-rare)]/35 hover:text-[var(--color-gold-rare)]"
-            >
-              <span className="material-symbols-outlined text-sm">volume_up</span>
-              Hear narration
-            </button>
+            <NarrationPlaybackButton text={entry.text} />
           </div>
           <time
             className={`${timeClass} mt-2 block text-center`}
@@ -430,16 +422,7 @@ export function FeedEntryRow({ entry }: FeedEntryRowProps) {
                 {entry.text}
               </p>
               <div className="mt-3">
-                <button
-                  type="button"
-                  onClick={() => {
-                    speakNarrationText(entry.text);
-                  }}
-                  className="inline-flex min-h-[40px] items-center gap-1.5 rounded-[var(--radius-chip)] border border-[rgba(77,70,53,0.25)] bg-[var(--surface-high)] px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.12em] text-[var(--color-gold-support)] transition-colors hover:border-[var(--color-gold-rare)]/35 hover:text-[var(--color-gold-rare)]"
-                >
-                  <span className="material-symbols-outlined text-sm">volume_up</span>
-                  Hear narration
-                </button>
+                <NarrationPlaybackButton text={entry.text} />
               </div>
               {entry.detail ? (
                 <p className="mt-3 border-l-2 border-[var(--color-gold-support)]/40 pl-3 text-[11px] leading-snug text-[var(--outline)]">
