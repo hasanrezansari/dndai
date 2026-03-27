@@ -23,9 +23,7 @@ import {
 } from "@/lib/schemas/events";
 import type {
   GamePlayerView,
-  GameSessionView,
-  NpcCombatantView,
-  RollingMemoryView,
+  SessionStatePayload,
   StatEffect,
   StatPopup,
 } from "@/lib/state/game-store";
@@ -78,13 +76,11 @@ function feedTurnFieldsExplicit(data: {
 export function useSessionChannel(sessionId: string | null) {
   useEffect(() => {
     if (!sessionId) return;
-    if (!process.env.NEXT_PUBLIC_PUSHER_KEY) return;
 
-    const client = getPusherClient();
-    if (!client) return;
-    const pusherClient = client;
     const channelName = getSessionChannel(sessionId);
-    const channel = pusherClient.subscribe(channelName);
+    const pusherClient = getPusherClient();
+    const channel = pusherClient?.subscribe(channelName) ?? null;
+
     let accessForbidden = false;
     let scenePollTimer: ReturnType<typeof setInterval> | null = null;
 
@@ -99,7 +95,13 @@ export function useSessionChannel(sessionId: string | null) {
       if (accessForbidden) return;
       accessForbidden = true;
       stopScenePoll();
-      pusherClient.unsubscribe(channelName);
+      if (pusherClient) {
+        try {
+          pusherClient.unsubscribe(channelName);
+        } catch {
+          /* no-op */
+        }
+      }
       const store = useGameStore.getState();
       store.setScenePending(false);
       store.setIsThinking(false);
@@ -107,7 +109,7 @@ export function useSessionChannel(sessionId: string | null) {
       store.setDmAwaiting(null);
     }
 
-    async function fetchSessionState() {
+    async function fetchSessionState(): Promise<SessionStatePayload | null> {
       if (accessForbidden) return null;
       const res = await fetch(`/api/sessions/${sessionId}/state`);
       if (res.status === 401 || res.status === 403) {
@@ -115,73 +117,43 @@ export function useSessionChannel(sessionId: string | null) {
         return null;
       }
       if (!res.ok) return null;
-      return (await res.json()) as {
-        session?: GameSessionView;
-        players: GamePlayerView[];
-        npcs?: NpcCombatantView[];
-        activeTurnId?: string | null;
-        sceneTitle?: string | null;
-        sceneImage?: string | null;
-        scenePending?: boolean;
-        quest?: {
-          objective: string;
-          objectiveLeads?: Array<{
-            id: string;
-            text: string;
-            confidence: number;
-            updatedRound: number;
-          }>;
-          progress: number;
-          risk: number;
-          status: "active" | "ready_to_end" | "failed";
-          endingVote?: {
-            open: boolean;
-            reason: "objective_complete" | "party_defeated";
-            initiatedRound: number;
-            cooldownUntilRound: number;
-            failedAttempts: number;
-            requiredYes: number;
-            eligibleVoterIds: string[];
-            votes: Record<string, "end_now" | "continue">;
-          } | null;
-        } | null;
-        rollingMemories?: RollingMemoryView[];
-      };
+      return (await res.json()) as SessionStatePayload;
     }
 
-    async function refetchPlayersFromState() {
+    /** Pusher-driven deltas: keep client feed / overlays; align everything else to DB. */
+    async function applyPatchFromServerState() {
       const data = await fetchSessionState();
-      if (!data) return;
-      if (Array.isArray(data.players)) {
-        useGameStore.getState().setPlayers(data.players);
-      }
-      if (Array.isArray(data.npcs)) {
-        useGameStore.getState().setNpcs(data.npcs);
-      }
-      if (data.session) {
-        useGameStore.getState().setSession(data.session);
-      }
-      if ("activeTurnId" in data) {
-        useGameStore.getState().setActiveTurnId(data.activeTurnId ?? null);
-      }
-      if ("quest" in data) {
-        useGameStore.getState().setQuest(data.quest ?? null);
-      }
-      if (data.rollingMemories) {
-        useGameStore.getState().setRollingMemories(data.rollingMemories);
-      }
-      if (data.sceneTitle) {
-        useGameStore.getState().setSceneTitle(data.sceneTitle);
-      }
-      if (data.sceneImage) {
-        useGameStore.getState().setSceneImage(data.sceneImage);
-      }
+      if (!data?.session) return;
+      useGameStore.getState().patchSessionFromStateApi(data);
+    }
+
+    let fullResyncInFlight: Promise<void> | null = null;
+
+    /**
+     * Full hydrate from `/state` — used when returning from background or after realtime reconnect.
+     * Singleflight so visibility + subscription_succeeded don’t double-fetch.
+     */
+    function scheduleFullResyncFromServer() {
+      if (accessForbidden) return;
+      if (fullResyncInFlight) return;
+      fullResyncInFlight = (async () => {
+        try {
+          const data = await fetchSessionState();
+          if (!data?.session || accessForbidden) return;
+          const store = useGameStore.getState();
+          store.hydrate(data);
+          store.setIsThinking(false);
+          store.hideDiceOverlay();
+        } finally {
+          fullResyncInFlight = null;
+        }
+      })();
     }
 
     const onPlayerJoined = (raw: unknown) => {
       const parsed = PlayerJoinedEventSchema.safeParse(raw);
       if (!parsed.success) return;
-      void refetchPlayersFromState();
+      void applyPatchFromServerState();
       useGameStore.getState().addFeedEntry({
         id: feedId(),
         type: "system",
@@ -367,7 +339,7 @@ export function useSessionChannel(sessionId: string | null) {
       const parsed = StateUpdateEventSchema.safeParse(raw);
       if (!parsed.success) return;
       void (async () => {
-        await refetchPlayersFromState();
+        await applyPatchFromServerState();
         if (parsed.data.dismiss_scene_pending) {
           useGameStore.getState().setScenePending(false);
         }
@@ -480,15 +452,13 @@ export function useSessionChannel(sessionId: string | null) {
       }
       try {
         const data = await fetchSessionState();
-        if (!data) return;
-        if (data.sceneImage && !useGameStore.getState().scenePending) return;
-        if (data.sceneImage && data.sceneImage !== before.sceneImage) {
-          useGameStore.getState().setSceneImage(data.sceneImage);
-          useGameStore.getState().attachImageToLatestNarration(data.sceneImage);
-          await refetchPlayersFromState();
+        if (!data?.session) return;
+        const img = data.sceneImage ?? null;
+        if (img && img !== before.sceneImage) {
+          useGameStore.getState().attachImageToLatestNarration(img);
         }
+        useGameStore.getState().patchSessionFromStateApi(data);
         if (!data.scenePending) {
-          useGameStore.getState().setScenePending(false);
           stopScenePoll();
         }
       } catch { /* best effort */ }
@@ -526,7 +496,7 @@ export function useSessionChannel(sessionId: string | null) {
       }
       useGameStore.getState().setScenePending(false);
       stopScenePoll();
-      void refetchPlayersFromState();
+      void applyPatchFromServerState();
     };
 
     const onSceneImageFailed = (raw: unknown) => {
@@ -579,23 +549,45 @@ export function useSessionChannel(sessionId: string | null) {
       });
     };
 
-    channel.bind("player-joined", onPlayerJoined);
-    channel.bind("player-ready", onPlayerReady);
-    channel.bind("player-disconnected", onPlayerDisconnected);
-    channel.bind("session-started", onSessionStarted);
-    channel.bind("turn-started", onTurnStarted);
-    channel.bind("action-submitted", onActionSubmitted);
-    channel.bind("dice-rolling", onDiceRolling);
-    channel.bind("dice-result", onDiceResult);
-    channel.bind("narration-update", onNarrationUpdate);
-    channel.bind("state-update", onStateUpdate);
-    channel.bind("stat-change", onStatChange);
-    channel.bind("scene-image-pending", onSceneImagePending);
-    channel.bind("scene-image-ready", onSceneImageReady);
-    channel.bind("scene-image-failed", onSceneImageFailed);
-    channel.bind("round-summary", onRoundSummary);
-    channel.bind("awaiting-dm", onAwaitingDm);
-    channel.bind("dm-notice", onDmNotice);
+    const onSubscriptionSucceeded = () => {
+      scheduleFullResyncFromServer();
+    };
+
+    if (channel) {
+      channel.bind("player-joined", onPlayerJoined);
+      channel.bind("player-ready", onPlayerReady);
+      channel.bind("player-disconnected", onPlayerDisconnected);
+      channel.bind("session-started", onSessionStarted);
+      channel.bind("turn-started", onTurnStarted);
+      channel.bind("action-submitted", onActionSubmitted);
+      channel.bind("dice-rolling", onDiceRolling);
+      channel.bind("dice-result", onDiceResult);
+      channel.bind("narration-update", onNarrationUpdate);
+      channel.bind("state-update", onStateUpdate);
+      channel.bind("stat-change", onStatChange);
+      channel.bind("scene-image-pending", onSceneImagePending);
+      channel.bind("scene-image-ready", onSceneImageReady);
+      channel.bind("scene-image-failed", onSceneImageFailed);
+      channel.bind("round-summary", onRoundSummary);
+      channel.bind("awaiting-dm", onAwaitingDm);
+      channel.bind("dm-notice", onDmNotice);
+      channel.bind("pusher:subscription_succeeded", onSubscriptionSucceeded);
+    }
+
+    const onVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        scheduleFullResyncFromServer();
+      }
+    };
+
+    const onPageShow = (ev: Event) => {
+      if ("persisted" in ev && (ev as PageTransitionEvent).persisted) {
+        scheduleFullResyncFromServer();
+      }
+    };
+
+    document.addEventListener("visibilitychange", onVisibilityChange);
+    window.addEventListener("pageshow", onPageShow);
 
     function signalDisconnect() {
       const pid = useGameStore.getState().currentPlayerId;
@@ -617,27 +609,38 @@ export function useSessionChannel(sessionId: string | null) {
     window.addEventListener("pagehide", signalDisconnect);
 
     return () => {
+      document.removeEventListener("visibilitychange", onVisibilityChange);
+      window.removeEventListener("pageshow", onPageShow);
       window.removeEventListener("beforeunload", signalDisconnect);
       window.removeEventListener("pagehide", signalDisconnect);
       stopScenePoll();
-      channel.unbind("player-joined", onPlayerJoined);
-      channel.unbind("player-ready", onPlayerReady);
-      channel.unbind("player-disconnected", onPlayerDisconnected);
-      channel.unbind("session-started", onSessionStarted);
-      channel.unbind("turn-started", onTurnStarted);
-      channel.unbind("action-submitted", onActionSubmitted);
-      channel.unbind("dice-rolling", onDiceRolling);
-      channel.unbind("dice-result", onDiceResult);
-      channel.unbind("narration-update", onNarrationUpdate);
-      channel.unbind("state-update", onStateUpdate);
-      channel.unbind("stat-change", onStatChange);
-      channel.unbind("scene-image-pending", onSceneImagePending);
-      channel.unbind("scene-image-ready", onSceneImageReady);
-      channel.unbind("scene-image-failed", onSceneImageFailed);
-      channel.unbind("round-summary", onRoundSummary);
-      channel.unbind("awaiting-dm", onAwaitingDm);
-      channel.unbind("dm-notice", onDmNotice);
-      pusherClient.unsubscribe(channelName);
+      if (channel) {
+        channel.unbind("player-joined", onPlayerJoined);
+        channel.unbind("player-ready", onPlayerReady);
+        channel.unbind("player-disconnected", onPlayerDisconnected);
+        channel.unbind("session-started", onSessionStarted);
+        channel.unbind("turn-started", onTurnStarted);
+        channel.unbind("action-submitted", onActionSubmitted);
+        channel.unbind("dice-rolling", onDiceRolling);
+        channel.unbind("dice-result", onDiceResult);
+        channel.unbind("narration-update", onNarrationUpdate);
+        channel.unbind("state-update", onStateUpdate);
+        channel.unbind("stat-change", onStatChange);
+        channel.unbind("scene-image-pending", onSceneImagePending);
+        channel.unbind("scene-image-ready", onSceneImageReady);
+        channel.unbind("scene-image-failed", onSceneImageFailed);
+        channel.unbind("round-summary", onRoundSummary);
+        channel.unbind("awaiting-dm", onAwaitingDm);
+        channel.unbind("dm-notice", onDmNotice);
+        channel.unbind("pusher:subscription_succeeded", onSubscriptionSucceeded);
+      }
+      if (pusherClient) {
+        try {
+          pusherClient.unsubscribe(channelName);
+        } catch {
+          /* no-op */
+        }
+      }
     };
   }, [sessionId]);
 }

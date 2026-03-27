@@ -144,6 +144,23 @@ export interface DiceOverlayData {
   result: string;
 }
 
+/** Body shape from `GET /api/sessions/[id]/state` — used for hydrate and incremental sync. */
+export type SessionStatePayload = {
+  session: GameSessionView;
+  players: GamePlayerView[];
+  feed?: FeedEntry[];
+  sceneImage?: string | null;
+  sceneTitle?: string | null;
+  narrativeText?: string | null;
+  scenePending?: boolean;
+  dmAwaiting?: { turnId: string; actingPlayerId: string } | null;
+  quest?: QuestProgressView | null;
+  rollingMemories?: RollingMemoryView[];
+  npcs?: NpcCombatantView[];
+  /** Open turn id for Pusher event matching (`turn-started` / `narration-update`). */
+  activeTurnId?: string | null;
+};
+
 interface GameState {
   sessionId: string | null;
   session: GameSessionView | null;
@@ -192,21 +209,12 @@ interface GameState {
     field: K,
     value: GameSessionView[K],
   ) => void;
-  hydrate: (data: {
-    session: GameSessionView;
-    players: GamePlayerView[];
-    feed?: FeedEntry[];
-    sceneImage?: string | null;
-    sceneTitle?: string | null;
-    narrativeText?: string | null;
-    scenePending?: boolean;
-    dmAwaiting?: { turnId: string; actingPlayerId: string } | null;
-    quest?: QuestProgressView | null;
-    rollingMemories?: RollingMemoryView[];
-    npcs?: NpcCombatantView[];
-    /** Open turn id for Pusher event matching (`turn-started` / `narration-update`). */
-    activeTurnId?: string | null;
-  }) => void;
+  hydrate: (data: SessionStatePayload) => void;
+  /**
+   * Apply canonical session fields from `/state` without replacing `feed` or UI-only
+   * slices (`isThinking`, overlays). Used after Pusher `state-update` and scene polls.
+   */
+  patchSessionFromStateApi: (data: SessionStatePayload) => void;
   reset: () => void;
   openSheet: (sheet: ActiveSheet) => void;
   closeSheet: () => void;
@@ -361,6 +369,25 @@ export const useGameStore = create<GameState>((set) => ({
       activeTurnId:
         data.activeTurnId === undefined ? null : data.activeTurnId,
     }),
+
+  patchSessionFromStateApi: (data) =>
+    set((s) => ({
+      ...s,
+      session: data.session,
+      players: data.players,
+      npcs: data.npcs ?? [],
+      sceneImage: data.sceneImage ?? null,
+      previousSceneImage: null,
+      sceneTitle: data.sceneTitle ?? null,
+      narrativeText: data.narrativeText ?? null,
+      scenePending: data.scenePending ?? false,
+      waitingForDm: Boolean(data.dmAwaiting),
+      dmAwaiting: data.dmAwaiting ?? null,
+      quest: data.quest ?? null,
+      rollingMemories: data.rollingMemories ?? [],
+      activeTurnId:
+        data.activeTurnId === undefined ? null : data.activeTurnId,
+    })),
 
   reset: () => set({ ...emptyState, activeTurnId: null }),
 }));
