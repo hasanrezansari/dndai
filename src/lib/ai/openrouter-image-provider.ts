@@ -14,6 +14,12 @@ interface OpenRouterImageResponse {
   error?: { message?: string; code?: number };
 }
 
+function truncateForLog(value: string, max = 500): string {
+  const clean = value.replace(/\s+/g, " ").trim();
+  if (clean.length <= max) return clean;
+  return `${clean.slice(0, max)}…`;
+}
+
 function parseDataUrlBase64(dataUrl: string): string | null {
   const match = dataUrl.match(/^data:image\/[\w+.-]+;base64,(.+)$/);
   return match?.[1] ?? null;
@@ -72,17 +78,37 @@ export async function generateSceneImageOpenRouter(params: {
 
   if (!res.ok) {
     const errText = await res.text();
-    throw new Error(`OpenRouter Image API ${res.status}: ${errText}`);
+    const requestId =
+      res.headers.get("x-request-id") ??
+      res.headers.get("x-openrouter-request-id") ??
+      "unknown";
+    console.error("[openrouter-image] non-200 response", {
+      status: res.status,
+      requestId,
+      model: IMAGE_MODEL,
+      body: truncateForLog(errText),
+    });
+    throw new Error(`OpenRouter Image API ${res.status}: ${truncateForLog(errText, 240)}`);
   }
 
   const data = (await res.json()) as OpenRouterImageResponse;
 
   if (data.error?.message) {
+    console.error("[openrouter-image] api error payload", {
+      model: IMAGE_MODEL,
+      code: data.error.code ?? null,
+      message: truncateForLog(data.error.message),
+    });
     throw new Error(`OpenRouter Image error: ${data.error.message}`);
   }
 
   const images = data.choices?.[0]?.message?.images;
   if (!images?.length) {
+    const content = data.choices?.[0]?.message?.content ?? "";
+    console.error("[openrouter-image] no images in response", {
+      model: IMAGE_MODEL,
+      contentPreview: truncateForLog(content, 240),
+    });
     throw new Error("OpenRouter returned no images");
   }
 

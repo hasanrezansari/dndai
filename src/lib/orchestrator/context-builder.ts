@@ -1,6 +1,7 @@
 import { asc, desc, eq } from "drizzle-orm";
 
 import { db } from "@/lib/db";
+import { isCustomClassesEnabled } from "@/lib/config/features";
 import {
   authUsers,
   characters,
@@ -11,7 +12,12 @@ import {
   sessions,
 } from "@/lib/db/schema";
 import { computeNextPlayableTurnState } from "@/lib/rules/turn-logic";
-import { CharacterStatsSchema, type CharacterStats } from "@/lib/schemas/domain";
+import {
+  CharacterStatsSchema,
+  ClassProfileSchema,
+  type CharacterStats,
+  type ClassProfile,
+} from "@/lib/schemas/domain";
 import { questProgressForModel } from "@/lib/quest-display";
 import { getQuestState } from "@/server/services/quest-service";
 
@@ -44,6 +50,7 @@ export interface TurnContext {
   character: {
     name: string;
     class: string;
+    mechanicalClass: string;
     race: string;
     stats: CharacterStats;
     hp: number;
@@ -55,6 +62,8 @@ export interface TurnContext {
     traits: string[];
     backstory: string;
     appearance: string;
+    classProfile: ClassProfile | null;
+    classIdentitySummary: string;
   };
   recentEvents: string[];
   currentSceneDescription: string | null;
@@ -99,6 +108,7 @@ export async function buildTurnContext({
   playerId: string;
   turnId: string;
 }): Promise<TurnContext> {
+  const customClassesEnabled = isCustomClassesEnabled();
   void _turnId;
   const [sessionRow] = await db
     .select()
@@ -198,6 +208,19 @@ export async function buildTurnContext({
         : typeof vp.description === "string"
           ? vp.description
           : "";
+  const classProfileRaw = vp.class_profile;
+  const classProfileParsed = ClassProfileSchema.safeParse(classProfileRaw);
+  const classProfile =
+    customClassesEnabled && classProfileParsed.success ? classProfileParsed.data : null;
+  const mechanicalClass =
+    customClassesEnabled &&
+    typeof vp.mechanical_class === "string" &&
+    vp.mechanical_class.trim()
+      ? vp.mechanical_class.trim().toLowerCase()
+      : charRow.class;
+  const classIdentitySummary = classProfile
+    ? `${classProfile.display_name} (${classProfile.combat_role}, ${classProfile.resource_model})`
+    : `${charRow.race} ${charRow.class}`;
 
   const allCharacterSummaries = playerCharacterPairs.map((row) => {
     const c = row.character;
@@ -205,7 +228,11 @@ export async function buildTurnContext({
     if (!c) return `${label} (no character)`;
     const cvp = (c.visual_profile ?? {}) as Record<string, unknown>;
     const cpro = typeof cvp.pronouns === "string" ? cvp.pronouns : "they/them";
-    return `${c.name} (${c.race} ${c.class}, HP ${c.hp}/${c.max_hp}, ${cpro})`;
+    const classProfileParsed = ClassProfileSchema.safeParse(cvp.class_profile);
+    const classLabel = customClassesEnabled && classProfileParsed.success
+      ? classProfileParsed.data.display_name
+      : `${c.race} ${c.class}`;
+    return `${c.name} (${classLabel}, HP ${c.hp}/${c.max_hp}, ${cpro})`;
   });
 
   const quest = await getQuestState(sessionId);
@@ -264,6 +291,7 @@ export async function buildTurnContext({
     character: {
       name: charRow.name,
       class: charRow.class,
+      mechanicalClass,
       race: charRow.race,
       stats,
       hp: charRow.hp,
@@ -275,6 +303,8 @@ export async function buildTurnContext({
       traits,
       backstory,
       appearance,
+      classProfile,
+      classIdentitySummary,
     },
     recentEvents,
     currentSceneDescription,

@@ -1,6 +1,7 @@
 import { and, asc, desc, eq } from "drizzle-orm";
 
 import { db } from "@/lib/db";
+import { isCustomClassesEnabled } from "@/lib/config/features";
 import {
   characters,
   memorySummaries,
@@ -11,6 +12,7 @@ import {
   sessions,
 } from "@/lib/db/schema";
 import { questProgressForModel } from "@/lib/quest-display";
+import { ClassProfileSchema } from "@/lib/schemas/domain";
 import { getQuestState } from "@/server/services/quest-service";
 
 import {
@@ -31,6 +33,7 @@ function truncateToTokenBudget(text: string, budget: number): string {
 }
 
 async function buildCanonicalState(sessionId: string): Promise<string> {
+  const customClassesEnabled = isCustomClassesEnabled();
   const [sess] = await db
     .select()
     .from(sessions)
@@ -55,8 +58,20 @@ async function buildCanonicalState(sessionId: string): Promise<string> {
       const conditions = Array.isArray(c.conditions) && c.conditions.length > 0
         ? ` [${c.conditions.join(", ")}]`
         : "";
+      const vp = (c.visual_profile ?? {}) as Record<string, unknown>;
+      const parsedProfile = ClassProfileSchema.safeParse(vp.class_profile);
+      const classLabel =
+        customClassesEnabled && parsedProfile.success
+          ? parsedProfile.data.display_name
+          : `${c.race} ${c.class}`;
+      const mechanicalClass =
+        customClassesEnabled &&
+          typeof vp.mechanical_class === "string" &&
+          vp.mechanical_class.trim().length > 0
+          ? vp.mechanical_class.trim().toLowerCase()
+          : c.class;
       charParts.push(
-        `${c.name} (${c.race} ${c.class}, HP ${c.hp}/${c.max_hp}, Mana ${c.mana}/${c.max_mana}${conditions})`,
+        `${c.name} (${classLabel}, mechanical ${mechanicalClass}, HP ${c.hp}/${c.max_hp}, Mana ${c.mana}/${c.max_mana}${conditions})`,
       );
     }
   }

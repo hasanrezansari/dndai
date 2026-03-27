@@ -6,7 +6,7 @@ import {
   type ActionIntent,
   type RulesInterpreterOutput,
 } from "@/lib/schemas/ai-io";
-import type { CharacterStats } from "@/lib/schemas/domain";
+import type { CharacterStats, ClassProfile } from "@/lib/schemas/domain";
 
 type StatBlock = CharacterStats;
 
@@ -52,6 +52,10 @@ function dcForAction(intent: ActionIntent): number {
     case "use_item": return 10;
     default: return 12;
   }
+}
+
+function normalizeLabel(value: string | undefined): string {
+  return (value ?? "").trim().toLowerCase();
 }
 
 function buildDeterministicFallback(
@@ -112,10 +116,14 @@ export async function interpretRules(params: {
   intent: ActionIntent;
   characterStats: CharacterStats;
   characterClass: string;
+  mechanicalClass?: string;
+  classProfile?: ClassProfile | null;
   provider?: AIProvider;
 }): Promise<OrchestrationStepResult<RulesInterpreterOutput>> {
   const { intent, characterStats } = params;
   const provider = params.provider ?? getAIProvider();
+  const displayClass = normalizeLabel(params.characterClass);
+  const mechanicalClass = normalizeLabel(params.mechanicalClass ?? params.characterClass);
 
   const userPrompt = JSON.stringify({
     action_type: intent.action_type,
@@ -123,7 +131,33 @@ export async function interpretRules(params: {
     skill_or_save: intent.skill_or_save,
     requires_roll: intent.requires_roll,
     suggested_roll_context: intent.suggested_roll_context,
-    character_class: params.characterClass,
+    character_class: displayClass,
+    mechanical_class: mechanicalClass,
+    character_identity: {
+      display_class: displayClass,
+      mechanical_class: mechanicalClass,
+      source: params.classProfile?.source ?? "preset",
+      display_name: params.classProfile?.display_name ?? displayClass,
+      combat_role: params.classProfile?.combat_role ?? null,
+      resource_model: params.classProfile?.resource_model ?? null,
+    },
+    class_profile_summary: params.classProfile
+      ? {
+          display_name: params.classProfile.display_name,
+          combat_role: params.classProfile.combat_role,
+          resource_model: params.classProfile.resource_model,
+          abilities: params.classProfile.abilities.map((a) => ({
+            name: a.name,
+            effect_kind: a.effect_kind,
+            resource_cost: a.resource_cost,
+            cooldown: a.cooldown,
+          })),
+          starting_gear: params.classProfile.starting_gear.map((g) => ({
+            name: g.name,
+            type: g.type,
+          })),
+        }
+      : null,
     stats: characterStats,
   });
 

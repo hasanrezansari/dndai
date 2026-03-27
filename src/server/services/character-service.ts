@@ -2,7 +2,11 @@ import { and, eq } from "drizzle-orm";
 
 import { db } from "@/lib/db";
 import { characters, players } from "@/lib/db/schema";
-import type { Character, CharacterStats } from "@/lib/schemas/domain";
+import {
+  type Character,
+  type CharacterStats,
+  type ClassProfile,
+} from "@/lib/schemas/domain";
 import {
   calculateAC,
   calculateHP,
@@ -28,6 +32,54 @@ export class CharacterAlreadyExistsError extends Error {
 
 function modifier(score: number): number {
   return Math.floor((score - 10) / 2);
+}
+
+function mapRoleToPresetClass(role: ClassProfile["combat_role"]): string {
+  switch (role) {
+    case "frontline":
+      return "warrior";
+    case "skirmisher":
+      return "ranger";
+    case "arcane":
+      return "mage";
+    case "support":
+      return "cleric";
+    case "guardian":
+      return "paladin";
+    case "specialist":
+      return "rogue";
+    default:
+      return "warrior";
+  }
+}
+
+function resolveMechanicalClass(params: {
+  characterClass: string;
+  classProfile?: ClassProfile;
+}): string {
+  if (params.classProfile?.source === "custom") {
+    return mapRoleToPresetClass(params.classProfile.combat_role);
+  }
+  return params.characterClass;
+}
+
+function profileStartingEquipment(classProfile?: ClassProfile): Character["inventory"] | null {
+  if (!classProfile || classProfile.starting_gear.length === 0) return null;
+  return classProfile.starting_gear.map((gear) => ({
+    name: gear.name,
+    type: gear.type,
+  }));
+}
+
+function profileStartingAbilities(classProfile?: ClassProfile): Character["abilities"] | null {
+  if (!classProfile || classProfile.abilities.length === 0) return null;
+  return classProfile.abilities.map((ability) => ({
+    name: ability.name,
+    type: ability.effect_kind,
+    ability_type: ability.type,
+    resource_cost: ability.resource_cost,
+    cooldown: ability.cooldown,
+  }));
 }
 
 function mapCharacterRow(row: typeof characters.$inferSelect): Character {
@@ -68,6 +120,7 @@ export async function createCharacter(params: {
   traits?: string[];
   backstory?: string;
   appearance?: string;
+  classProfile?: ClassProfile;
 }): Promise<{ characterId: string }> {
   const [player] = await db
     .select()
@@ -86,25 +139,35 @@ export async function createCharacter(params: {
     throw new CharacterAlreadyExistsError();
   }
 
+  const normalizedClass = params.characterClass.trim().toLowerCase();
+  const mechanicalClass = resolveMechanicalClass({
+    characterClass: normalizedClass,
+    classProfile: params.classProfile,
+  });
+
   const conMod = modifier(params.stats.con);
   const dexMod = modifier(params.stats.dex);
   const spellMod =
-    params.characterClass.trim().toLowerCase() === "cleric"
+    mechanicalClass === "cleric"
       ? modifier(params.stats.wis)
       : modifier(params.stats.int);
 
-  const { hp, maxHp } = calculateHP(params.characterClass, conMod);
-  const ac = calculateAC(params.characterClass, dexMod);
-  const { mana, maxMana } = calculateMana(params.characterClass, spellMod);
-  const inventory = getStartingEquipment(params.characterClass);
-  const abilities = getStartingAbilities(params.characterClass);
+  const { hp, maxHp } = calculateHP(mechanicalClass, conMod);
+  const ac = calculateAC(mechanicalClass, dexMod);
+  const { mana, maxMana } = calculateMana(mechanicalClass, spellMod);
+  const inventory =
+    profileStartingEquipment(params.classProfile) ??
+    getStartingEquipment(mechanicalClass);
+  const abilities =
+    profileStartingAbilities(params.classProfile) ??
+    getStartingAbilities(mechanicalClass);
 
   const [created] = await db
     .insert(characters)
     .values({
       player_id: params.playerId,
       name: params.name.trim(),
-      class: params.characterClass.trim().toLowerCase(),
+      class: normalizedClass,
       race: params.race.trim().toLowerCase(),
       level: 1,
       stats: params.stats,
@@ -121,6 +184,8 @@ export async function createCharacter(params: {
         traits: (params.traits ?? []).filter(Boolean).slice(0, 5),
         backstory: (params.backstory ?? "").trim().slice(0, 500),
         appearance: (params.appearance ?? "").trim().slice(0, 220),
+        class_profile: params.classProfile ?? null,
+        mechanical_class: mechanicalClass,
       },
     })
     .returning({ id: characters.id });

@@ -65,6 +65,110 @@ export const CharacterStatsSchema = z.object({
 });
 export type CharacterStats = output<typeof CharacterStatsSchema>;
 
+export const ClassProfileSourceSchema = z.enum(["preset", "custom"]);
+export const ClassProfileRoleSchema = z.enum([
+  "frontline",
+  "skirmisher",
+  "arcane",
+  "support",
+  "guardian",
+  "specialist",
+]);
+export const ClassProfileResourceSchema = z.enum([
+  "none",
+  "mana",
+  "energy",
+  "focus",
+  "stamina",
+]);
+export const ClassProfileAbilityTypeSchema = z.enum(["active", "passive"]);
+export const ClassProfileEffectKindSchema = z.enum([
+  "damage",
+  "heal",
+  "shield",
+  "buff",
+  "debuff",
+  "mobility",
+  "utility",
+]);
+export const ClassProfileGearTypeSchema = z.enum([
+  "weapon",
+  "armor",
+  "focus",
+  "tool",
+  "cyberware",
+]);
+
+export const ClassProfileStatBiasSchema = z.object({
+  str: z.number().int().min(-2).max(3).default(0),
+  dex: z.number().int().min(-2).max(3).default(0),
+  con: z.number().int().min(-2).max(3).default(0),
+  int: z.number().int().min(-2).max(3).default(0),
+  wis: z.number().int().min(-2).max(3).default(0),
+  cha: z.number().int().min(-2).max(3).default(0),
+});
+
+export const ClassProfileAbilitySchema = z.object({
+  name: z.string().trim().min(1).max(40),
+  type: ClassProfileAbilityTypeSchema,
+  effect_kind: ClassProfileEffectKindSchema,
+  resource_cost: z.number().int().min(0).max(6).default(0),
+  cooldown: z.number().int().min(0).max(6).default(0),
+  power_cost: z.number().int().min(1).max(6),
+});
+
+export const ClassProfileGearSchema = z.object({
+  name: z.string().trim().min(1).max(40),
+  type: ClassProfileGearTypeSchema,
+  power_cost: z.number().int().min(1).max(4),
+});
+
+export const ClassProfileSchema = z
+  .object({
+    source: ClassProfileSourceSchema,
+    display_name: z.string().trim().min(1).max(40),
+    concept_prompt: z.string().trim().max(180).default(""),
+    fantasy: z.string().trim().max(180).default(""),
+    combat_role: ClassProfileRoleSchema,
+    resource_model: ClassProfileResourceSchema,
+    stat_bias: ClassProfileStatBiasSchema,
+    abilities: z.array(ClassProfileAbilitySchema).max(6),
+    starting_gear: z.array(ClassProfileGearSchema).max(8),
+    visual_tags: z.array(z.string().trim().min(1).max(30)).max(10).default([]),
+  })
+  .superRefine((value, ctx) => {
+    const abilityBudget = value.abilities.reduce((sum, a) => sum + a.power_cost, 0);
+    const gearBudget = value.starting_gear.reduce((sum, g) => sum + g.power_cost, 0);
+    const statBiasBudget = Object.values(value.stat_bias).reduce(
+      (sum, n) => sum + Math.max(0, n),
+      0,
+    );
+
+    // Guardrails to keep generated/custom kits near preset power.
+    if (abilityBudget > 10) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Ability budget exceeded",
+        path: ["abilities"],
+      });
+    }
+    if (gearBudget > 7) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Starting gear budget exceeded",
+        path: ["starting_gear"],
+      });
+    }
+    if (statBiasBudget > 5) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Stat bias budget exceeded",
+        path: ["stat_bias"],
+      });
+    }
+  });
+export type ClassProfile = output<typeof ClassProfileSchema>;
+
 export const CharacterSchema = z.object({
   id: z.string().uuid(),
   player_id: z.string().uuid(),
