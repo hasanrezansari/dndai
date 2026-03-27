@@ -165,8 +165,9 @@ export function buildNarratorFallback(
   actionSummary: string,
   rollResult: DiceRoll["result"] | undefined,
   nextActorId: string | null,
-  _sceneContext?: string,
+  sceneContext?: string,
 ): NarratorOutput {
+  void sceneContext;
   const action = describeAction("other", actionSummary);
   const text = pickTemplate(rollResult, playerName, action);
 

@@ -98,7 +98,7 @@ export function computeNextPlayableTurnState(params: {
     orderedBySeat,
     playable,
     params.currentPlayerId,
-  );
+  ) ?? playable[0]!.id;
 
   const nextTurnIndex = playable.findIndex((p) => p.id === nextPlayerId);
   const safeTurnIndex = nextTurnIndex >= 0 ? nextTurnIndex : 0;

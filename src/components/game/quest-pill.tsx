@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useMemo, useState } from "react";
 
 import {
   isQuestFinaleThreshold,
@@ -14,16 +14,6 @@ function dangerLabel(risk: number): { label: string; color: string } {
   if (risk >= 61) return { label: "Perilous", color: "#e07c3a" };
   if (risk >= 31) return { label: "Uneasy", color: "var(--color-gold-rare)" };
   return { label: "Calm", color: "var(--color-silver-dim)" };
-}
-
-function questSignature(q: QuestProgressView): string {
-  return JSON.stringify({
-    o: q.objective,
-    p: q.progress,
-    r: q.risk,
-    s: q.status,
-    n: q.subObjectives?.length ?? 0,
-  });
 }
 
 export interface QuestPillProps {
@@ -46,15 +36,6 @@ export function QuestPill({
   onGenerateFinalChapter,
 }: QuestPillProps) {
   const [expanded, setExpanded] = useState(false);
-  const prevSig = useRef<string | null>(null);
-
-  useEffect(() => {
-    const sig = questSignature(quest);
-    if (prevSig.current !== null && prevSig.current !== sig) {
-      setExpanded(true);
-    }
-    prevSig.current = sig;
-  }, [quest]);
 
   const risk = dangerLabel(quest.risk);
   const finaleThreshold = isQuestFinaleThreshold(quest);
