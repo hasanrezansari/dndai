@@ -1,5 +1,6 @@
 import { desc, eq } from "drizzle-orm";
 
+import { generateSceneImage } from "@/lib/ai/image-provider";
 import { generateSceneImageOpenRouter } from "@/lib/ai/openrouter-image-provider";
 import { isCustomClassesEnabled } from "@/lib/config/features";
 import { db } from "@/lib/db";
@@ -390,13 +391,15 @@ export async function runImagePipeline(params: {
   });
 
   const tStart = Date.now();
-  let base64: string;
+  let base64 = "";
+  let generatedBy: "openrouter" | "fal_fallback" | null = null;
   try {
     const out = await generateSceneImageOpenRouter({
       prompt: composedPrompt,
       negativePrompt: composedNegative,
     });
     base64 = out.base64;
+    generatedBy = "openrouter";
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     await logTrace({
@@ -412,21 +415,65 @@ export async function runImagePipeline(params: {
       success: false,
       errorMessage: msg,
     });
-    return { imageUrl: null };
+    try {
+      const falOut = await generateSceneImage({
+        prompt: composedPrompt,
+        negativePrompt: composedNegative,
+        width: 1024,
+        height: 576,
+      });
+      const falRes = await fetch(falOut.imageUrl);
+      if (!falRes.ok) {
+        throw new Error(`FAL image fetch failed ${falRes.status}`);
+      }
+      const falArr = await falRes.arrayBuffer();
+      base64 = Buffer.from(falArr).toString("base64");
+      generatedBy = "fal_fallback";
+      await logTrace({
+        sessionId,
+        turnId,
+        stepName: "scene_image_fal_fallback",
+        input: { prompt_prefix: composedPrompt.slice(0, 120) },
+        output: { has_data: true },
+        modelUsed: "fal-ai/fast-sdxl",
+        tokensIn: 0,
+        tokensOut: 0,
+        latencyMs: Date.now() - tStart,
+        success: true,
+      });
+    } catch (fallbackErr) {
+      const fallbackMsg = fallbackErr instanceof Error ? fallbackErr.message : String(fallbackErr);
+      await logTrace({
+        sessionId,
+        turnId,
+        stepName: "scene_image_fal_fallback",
+        input: { prompt_prefix: composedPrompt.slice(0, 120) },
+        output: {},
+        modelUsed: "fal-ai/fast-sdxl",
+        tokensIn: 0,
+        tokensOut: 0,
+        latencyMs: Date.now() - tStart,
+        success: false,
+        errorMessage: fallbackMsg,
+      });
+      return { imageUrl: null };
+    }
   }
 
-  await logTrace({
-    sessionId,
-    turnId,
-    stepName: "scene_image_openrouter",
-    input: { prompt_prefix: composedPrompt.slice(0, 120) },
-    output: { has_data: true },
-    modelUsed: "gemini-2.5-flash-image",
-    tokensIn: 0,
-    tokensOut: 0,
-    latencyMs: Date.now() - tStart,
-    success: true,
-  });
+  if (generatedBy === "openrouter") {
+    await logTrace({
+      sessionId,
+      turnId,
+      stepName: "scene_image_openrouter",
+      input: { prompt_prefix: composedPrompt.slice(0, 120) },
+      output: { has_data: true },
+      modelUsed: "gemini-2.5-flash-image",
+      tokensIn: 0,
+      tokensOut: 0,
+      latencyMs: Date.now() - tStart,
+      success: true,
+    });
+  }
 
   const summary =
     prevSnap?.summary?.trim() ||

@@ -24,7 +24,7 @@ import {
 } from "@/lib/rules/character";
 
 const CUSTOM_CLASSES_ENABLED =
-  (process.env.NEXT_PUBLIC_CUSTOM_CLASSES_ENABLED ?? "false").toLowerCase() === "true";
+  (process.env.NEXT_PUBLIC_CUSTOM_CLASSES_ENABLED ?? "true").toLowerCase() !== "false";
 const ABILITY_BUDGET_CAP = 10;
 const GEAR_BUDGET_CAP = 7;
 const STAT_BIAS_CAP = 5;
