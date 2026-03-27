@@ -2,6 +2,10 @@
 
 import { useMemo, useState } from "react";
 
+import {
+  isQuestFinaleThreshold,
+  questProgressPrimaryLine,
+} from "@/lib/quest-display";
 import type { FeedEntry } from "@/lib/state/game-store";
 import { useGameStore } from "@/lib/state/game-store";
 import { GhostButton } from "@/components/ui/ghost-button";
@@ -77,8 +81,16 @@ function QuestPins() {
           ))}
         </ul>
       )}
-      <div className="mt-2 flex gap-4 text-[10px] tabular-nums text-[var(--color-silver-dim)]">
-        <span>Progress {quest.progress}%</span>
+      <div className="mt-2 flex flex-wrap gap-4 text-[10px] tabular-nums text-[var(--color-silver-dim)]">
+        <span
+          title={
+            isQuestFinaleThreshold(quest)
+              ? "Finale threshold — session continues until the table votes or keeps playing"
+              : undefined
+          }
+        >
+          Story arc: {questProgressPrimaryLine(quest)}
+        </span>
         <span>Danger {quest.risk}%</span>
         <span className="capitalize">{quest.status.replace(/_/g, " ")}</span>
       </div>

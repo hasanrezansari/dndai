@@ -12,6 +12,7 @@ import {
 } from "@/lib/db/schema";
 import { computeNextPlayableTurnState } from "@/lib/rules/turn-logic";
 import { CharacterStatsSchema, type CharacterStats } from "@/lib/schemas/domain";
+import { questProgressForModel } from "@/lib/quest-display";
 import { getQuestState } from "@/server/services/quest-service";
 
 export interface PartyMemberInfo {
@@ -210,7 +211,7 @@ export async function buildTurnContext({
   const quest = await getQuestState(sessionId);
   let questContext: string | null = null;
   if (quest) {
-    questContext = `Objective: ${quest.objective} | Progress: ${quest.progress}% | Danger: ${quest.risk}% | Status: ${quest.status}`;
+    questContext = questProgressForModel(quest);
   }
 
   const npcRows = await db

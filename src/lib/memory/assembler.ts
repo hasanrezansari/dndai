@@ -10,6 +10,7 @@ import {
   sceneSnapshots,
   sessions,
 } from "@/lib/db/schema";
+import { questProgressForModel } from "@/lib/quest-display";
 import { getQuestState } from "@/server/services/quest-service";
 
 import {
@@ -69,9 +70,7 @@ async function buildCanonicalState(sessionId: string): Promise<string> {
   );
 
   const quest = await getQuestState(sessionId);
-  const questLine = quest
-    ? `Quest: ${quest.objective} | Progress ${quest.progress}% | Danger ${quest.risk}% | ${quest.status}`
-    : "";
+  const questLine = quest ? questProgressForModel(quest) : "";
 
   const worldSummary = typeof sess.world_summary === "string" ? sess.world_summary : "";
 

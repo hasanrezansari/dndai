@@ -40,6 +40,31 @@ export function playablePlayersInSeatOrder(
   });
 }
 
+/** Next playable in seat order after `currentPlayerId` (wrap). If the actor is not in `playable`, still walk from their seat so skips stay fair. */
+export function findNextPlayableIdInSeatOrder(
+  orderedBySeat: SeatPlayer[],
+  playable: SeatPlayer[],
+  currentPlayerId: string | null,
+): string | null {
+  if (playable.length === 0) return null;
+  const playableIds = new Set(playable.map((p) => p.id));
+  const n = orderedBySeat.length;
+
+  let start = -1;
+  if (currentPlayerId) {
+    start = orderedBySeat.findIndex((p) => p.id === currentPlayerId);
+  }
+  if (start < 0) {
+    return playable[0]!.id;
+  }
+
+  for (let step = 1; step <= n; step++) {
+    const seat = orderedBySeat[(start + step) % n]!;
+    if (playableIds.has(seat.id)) return seat.id;
+  }
+  return playable[0]!.id;
+}
+
 export function computeNextPlayableTurnState(params: {
   orderedBySeat: SeatPlayer[];
   sessionMode: string;
@@ -51,8 +76,13 @@ export function computeNextPlayableTurnState(params: {
   nextRound: number;
   roundAdvanced: boolean;
 } {
+  // Always advance by physical seat order; skip only people marked not playable
+  // (0 HP, dead / unconscious / incapacitated, and DM in human_dm). Never assign a turn to them.
+  const orderedBySeat = [...params.orderedBySeat].sort(
+    (a, b) => a.seat_index - b.seat_index,
+  );
   const playable = playablePlayersInSeatOrder(
-    params.orderedBySeat,
+    orderedBySeat,
     params.sessionMode,
   );
   if (playable.length === 0) {
@@ -63,14 +93,25 @@ export function computeNextPlayableTurnState(params: {
       roundAdvanced: false,
     };
   }
-  const idx = playable.findIndex((p) => p.id === params.currentPlayerId);
-  const currentIdx = idx >= 0 ? idx : 0;
-  const nextIdx = (currentIdx + 1) % playable.length;
-  const roundAdvanced = nextIdx === 0 && idx !== nextIdx;
+
+  const nextPlayerId = findNextPlayableIdInSeatOrder(
+    orderedBySeat,
+    playable,
+    params.currentPlayerId,
+  );
+
+  const nextTurnIndex = playable.findIndex((p) => p.id === nextPlayerId);
+  const safeTurnIndex = nextTurnIndex >= 0 ? nextTurnIndex : 0;
+
+  const firstPlayableId = playable[0]!.id;
+  const roundAdvanced =
+    nextPlayerId === firstPlayableId &&
+    params.currentPlayerId !== nextPlayerId;
   const nextRound = roundAdvanced ? params.currentRound + 1 : params.currentRound;
+
   return {
-    nextPlayerId: playable[nextIdx]!.id,
-    nextTurnIndex: nextIdx,
+    nextPlayerId,
+    nextTurnIndex: safeTurnIndex,
     nextRound,
     roundAdvanced,
   };

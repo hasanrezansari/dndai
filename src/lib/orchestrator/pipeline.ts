@@ -19,6 +19,7 @@ import type { DiceRoll, NarrativeEvent } from "@/lib/schemas/domain";
 import type { StatePatch } from "@/lib/schemas/state-patches";
 import { performRoll } from "@/server/services/dice-service";
 import { applyTurnQuestProgress } from "@/server/services/quest-service";
+import { resolveNextActorForNarration } from "@/server/services/turn-service";
 
 export type SessionImageJobPayload = {
   turnId: string;
@@ -568,6 +569,8 @@ export async function runTurnPipeline(params: {
     .set({ resolution_status: "applied" })
     .where(eq(actions.id, actionId));
 
+  const resolvedNextActor = await resolveNextActorForNarration(sessionId, playerId);
+
   if (ctx.session.mode === "human_dm") {
     const [marked] = await db
       .update(turns)
@@ -591,13 +594,13 @@ export async function runTurnPipeline(params: {
       statePatches,
       consequenceEffects: consequenceResult.data.effects,
       shouldEndSession: questUpdate.shouldEndSession,
-      expectedNextPlayerId: ctx.nextPlayerId,
+      expectedNextPlayerId: resolvedNextActor.nextPlayerId,
     };
   }
 
-  const expectedNextPlayerId = ctx.nextPlayerId;
+  const expectedNextPlayerId = resolvedNextActor.nextPlayerId;
   const actorName = ctx.character.name;
-  const nextActorName = ctx.nextPlayerName;
+  const nextActorName = resolvedNextActor.nextPlayerDisplayName;
 
   const memoryBundle = await buildMemoryBundle("narrator", sessionId);
 

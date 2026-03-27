@@ -98,6 +98,61 @@ async function buildSeatOrderWithStatus(sessionId: string) {
   return { orderedPlayers, seatOrder };
 }
 
+/** Next turn targets from current DB state (e.g. after HP / conditions are committed). */
+export async function computeNextTurnAfterActor(
+  sessionId: string,
+  actingPlayerId: string,
+): Promise<{
+  nextPlayerId: string;
+  nextTurnIndex: number;
+  nextRound: number;
+  roundAdvanced: boolean;
+}> {
+  const [sessionRow] = await db
+    .select()
+    .from(sessions)
+    .where(eq(sessions.id, sessionId))
+    .limit(1);
+  if (!sessionRow) {
+    throw new SessionNotFoundError();
+  }
+  const { seatOrder } = await buildSeatOrderWithStatus(sessionId);
+  return computeNextPlayableTurnState({
+    orderedBySeat: seatOrder,
+    sessionMode: sessionRow.mode,
+    currentPlayerId: actingPlayerId,
+    currentRound: sessionRow.current_round,
+  });
+}
+
+async function displayNameForPlayer(playerId: string): Promise<string> {
+  const [c] = await db
+    .select({ name: characters.name })
+    .from(characters)
+    .where(eq(characters.player_id, playerId))
+    .limit(1);
+  const n = c?.name?.trim();
+  return n && n.length > 0 ? n : "Adventurer";
+}
+
+/** Canonical next actor for narration / UI after state patches (matches advanceTurn). */
+export async function resolveNextActorForNarration(
+  sessionId: string,
+  actingPlayerId: string,
+): Promise<{ nextPlayerId: string; nextPlayerDisplayName: string }> {
+  const peek = await computeNextTurnAfterActor(sessionId, actingPlayerId);
+  if (peek.nextPlayerId === "__party_wipe__") {
+    return {
+      nextPlayerId: actingPlayerId,
+      nextPlayerDisplayName: await displayNameForPlayer(actingPlayerId),
+    };
+  }
+  return {
+    nextPlayerId: peek.nextPlayerId,
+    nextPlayerDisplayName: await displayNameForPlayer(peek.nextPlayerId),
+  };
+}
+
 export async function createFirstTurn(sessionId: string): Promise<string> {
   const [sessionRow] = await db
     .select()

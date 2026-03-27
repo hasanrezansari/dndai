@@ -2,6 +2,11 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 
+import {
+  isQuestFinaleThreshold,
+  questProgressBarWidth,
+  questProgressPrimaryLine,
+} from "@/lib/quest-display";
 import type { GameSessionView, QuestProgressView } from "@/lib/state/game-store";
 
 function dangerLabel(risk: number): { label: string; color: string } {
@@ -52,8 +57,18 @@ export function QuestPill({
   }, [quest]);
 
   const risk = dangerLabel(quest.risk);
+  const finaleThreshold = isQuestFinaleThreshold(quest);
+  const barWidth = questProgressBarWidth(quest);
+  const primaryProgress = questProgressPrimaryLine(quest);
+
+  const progressHint = useMemo(() => {
+    if (quest.status === "failed") return `${quest.progress}%`;
+    if (finaleThreshold) return "High tension · signals & danger still matter";
+    return `${quest.progress}%`;
+  }, [quest.status, quest.progress, finaleThreshold]);
+
   const statusLabel = useMemo(() => {
-    if (quest.status === "ready_to_end") return "Concluding";
+    if (quest.status === "ready_to_end") return "Vote open";
     if (quest.status === "failed") return "Failed";
     return "Active";
   }, [quest.status]);
@@ -79,7 +94,7 @@ export function QuestPill({
           <p className="mt-0.5 text-[9px] font-bold uppercase tracking-wider text-[var(--outline)]">
             <span style={{ color: risk.color }}>{risk.label}</span>
             <span className="text-[var(--outline)]"> · </span>
-            {quest.progress}%
+            {progressHint}
           </p>
         </div>
         <span className="shrink-0 rounded-[var(--radius-chip)] bg-[var(--surface-high)] px-2 py-0.5 text-[9px] font-black uppercase tracking-[0.15em] text-[var(--outline)]">
@@ -144,13 +159,15 @@ export function QuestPill({
             <div
               className="h-full rounded-sm bg-gradient-to-r from-[var(--color-gold-support)] to-[var(--color-gold-rare)] transition-[width] duration-300"
               style={{
-                width: `${Math.max(0, Math.min(100, quest.progress))}%`,
+                width: `${barWidth}%`,
               }}
             />
           </div>
           <div className="flex items-center justify-between text-[9px] font-bold uppercase tracking-wider">
             <span className="text-[var(--outline)]">
-              Progress {quest.progress}%
+              {finaleThreshold
+                ? `${primaryProgress} · story goes on until the table votes or keeps playing`
+                : `Progress ${primaryProgress}`}
             </span>
             <span style={{ color: risk.color }}>
               {risk.label} ({quest.risk}%)
@@ -164,7 +181,7 @@ export function QuestPill({
                 </span>
                 {quest.endingVote.reason === "party_defeated"
                   ? "Party Defeated"
-                  : "Objective Complete"}
+                  : "Story threshold — end or continue?"}
               </p>
               <div className="mb-2 text-[10px] font-bold text-[var(--outline)]">
                 {

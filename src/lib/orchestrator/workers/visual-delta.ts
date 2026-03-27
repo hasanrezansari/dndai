@@ -55,7 +55,13 @@ export async function checkVisualDelta(params: {
       ? contentWords.length / narrativeWords.length
       : 0;
 
-    if (noveltyRatio > 0.7) {
+    // Short lines (greetings, small talk) have few "long" tokens, so noveltyRatio
+    // often hits 1.0 vs a tiny scene summary — falsely suggesting a new image.
+    const MIN_WORDS_FOR_NOVELTY_CHECK = 8;
+    if (
+      narrativeWords.length >= MIN_WORDS_FOR_NOVELTY_CHECK &&
+      noveltyRatio > 0.7
+    ) {
       reasons.push("Narrative describes substantially different visual content");
     }
   }

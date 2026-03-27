@@ -39,7 +39,7 @@ RULES:
 - If critical success: make it epic and dramatic
 - If critical failure: make it dramatic but not punishing
 - Reference the character by name
-- End with a brief transition to the next player's turn
+- End with atmosphere or tension; do NOT name or address the “next” player — the app shows whose turn it is
 - Maintain consistency with the scene and recent events
 - DO NOT repeat the player's exact words verbatim — rephrase their action cinematically
 - Advance the story forward based on what the player did
@@ -94,63 +94,69 @@ const ATMOSPHERE = [
   "The torches flicker as though acknowledging something unseen.",
 ];
 
+const NEUTRAL_HANDOFFS = [
+  "The circle holds its breath — the table will show who stirs next.",
+  "The moment lingers, heavy with possibility.",
+  "Quiet settles; someone will break it when they are ready.",
+  "The story leans forward, waiting on the next beat.",
+];
+
 const CRIT_SUCCESS = [
-  (name: string, action: string, next: string) =>
-    `${name} moves with breathtaking precision. The attempt to ${action} succeeds beyond all expectation — the kind of moment that shifts the air in the room. ${pick(ATMOSPHERE)} For a heartbeat, even the shadows seem impressed. A moment of triumph, pure and undeniable. ${next}, the momentum is yours — seize it.`,
-  (name: string, action: string, next: string) =>
-    `Something extraordinary unfolds. As ${name} reaches to ${action}, fate answers with a resounding yes. Every element aligns — strength, will, and fortune conspire in perfect harmony. ${pick(ATMOSPHERE)} The party watches in awe. ${next}, you stand in the wake of something remarkable. What will you do?`,
-  (name: string, action: string, next: string) =>
-    `Brilliance. ${name} attempts to ${action} and the result is nothing short of legendary. The world bends to accommodate the deed. ${pick(ATMOSPHERE)} Tales will be told of this moment. ${next}, fortune rides high — make your move before the tide turns.`,
+  (name: string, action: string) =>
+    `${name} moves with breathtaking precision. The attempt to ${action} succeeds beyond all expectation — the kind of moment that shifts the air in the room. ${pick(ATMOSPHERE)} For a heartbeat, even the shadows seem impressed. A moment of triumph, pure and undeniable. ${pick(NEUTRAL_HANDOFFS)}`,
+  (name: string, action: string) =>
+    `Something extraordinary unfolds. As ${name} reaches to ${action}, fate answers with a resounding yes. Every element aligns — strength, will, and fortune conspire in perfect harmony. ${pick(ATMOSPHERE)} The party watches in awe. ${pick(NEUTRAL_HANDOFFS)}`,
+  (name: string, action: string) =>
+    `Brilliance. ${name} attempts to ${action} and the result is nothing short of legendary. The world bends to accommodate the deed. ${pick(ATMOSPHERE)} Tales will be told of this moment. ${pick(NEUTRAL_HANDOFFS)}`,
 ];
 
 const SUCCESS = [
-  (name: string, action: string, next: string) =>
-    `${name} sets their mind to ${action} — and the effort pays off. The tension eases just a fraction as success settles over the moment. ${pick(ATMOSPHERE)} The party presses on, emboldened. ${next}, the path ahead awaits your decision.`,
-  (name: string, action: string, next: string) =>
-    `With practiced resolve, ${name} manages to ${action}. The world seems to acknowledge the deed — a subtle shift, a flicker of something that might be hope. ${pick(ATMOSPHERE)} ${next}, the table turns to you. What stirs in your mind?`,
-  (name: string, action: string, next: string) =>
-    `${name} commits fully, and the attempt to ${action} finds its mark. A small victory, but in these dark places, small victories are everything. ${pick(ATMOSPHERE)} The group steadies. ${next}, it's your turn to shape what comes next.`,
-  (name: string, action: string, next: string) =>
-    `The dice fall kindly. ${name} reaches to ${action} and the outcome is favorable. A ripple of quiet relief passes through the party. ${pick(ATMOSPHERE)} ${next}, fortune watches — what will you attempt?`,
+  (name: string, action: string) =>
+    `${name} sets their mind to ${action} — and the effort pays off. The tension eases just a fraction as success settles over the moment. ${pick(ATMOSPHERE)} The party presses on, emboldened. ${pick(NEUTRAL_HANDOFFS)}`,
+  (name: string, action: string) =>
+    `With practiced resolve, ${name} manages to ${action}. The world seems to acknowledge the deed — a subtle shift, a flicker of something that might be hope. ${pick(ATMOSPHERE)} ${pick(NEUTRAL_HANDOFFS)}`,
+  (name: string, action: string) =>
+    `${name} commits fully, and the attempt to ${action} finds its mark. A small victory, but in these dark places, small victories are everything. ${pick(ATMOSPHERE)} The group steadies. ${pick(NEUTRAL_HANDOFFS)}`,
+  (name: string, action: string) =>
+    `The dice fall kindly. ${name} reaches to ${action} and the outcome is favorable. A ripple of quiet relief passes through the party. ${pick(ATMOSPHERE)} ${pick(NEUTRAL_HANDOFFS)}`,
 ];
 
 const FAILURE = [
-  (name: string, action: string, next: string) =>
-    `${name} reaches to ${action}, but the moment betrays them. The air feels heavier, the darkness just a shade deeper. ${pick(ATMOSPHERE)} But the journey is far from over. ${next}, perhaps fortune favors you. Step forward.`,
-  (name: string, action: string, next: string) =>
-    `The attempt falters. ${name} tries to ${action}, but something goes wrong — timing, angle, perhaps simple bad luck. ${pick(ATMOSPHERE)} ${next}, the burden shifts to you now. Choose wisely.`,
-  (name: string, action: string, next: string) =>
-    `${name}'s effort to ${action} doesn't find its mark. The darkness offers no sympathy, only the quiet reminder that fortune is fickle. ${pick(ATMOSPHERE)} ${next}, your move — the party needs a win.`,
-  (name: string, action: string, next: string) =>
-    `Not this time. ${name} attempts to ${action}, but the world resists. The shadows seem to lean in just a little closer. ${pick(ATMOSPHERE)} ${next}, the party looks to you. What do you do?`,
+  (name: string, action: string) =>
+    `${name} reaches to ${action}, but the moment betrays them. The air feels heavier, the darkness just a shade deeper. ${pick(ATMOSPHERE)} But the journey is far from over. ${pick(NEUTRAL_HANDOFFS)}`,
+  (name: string, action: string) =>
+    `The attempt falters. ${name} tries to ${action}, but something goes wrong — timing, angle, perhaps simple bad luck. ${pick(ATMOSPHERE)} ${pick(NEUTRAL_HANDOFFS)}`,
+  (name: string, action: string) =>
+    `${name}'s effort to ${action} doesn't find its mark. The darkness offers no sympathy, only the quiet reminder that fortune is fickle. ${pick(ATMOSPHERE)} ${pick(NEUTRAL_HANDOFFS)}`,
+  (name: string, action: string) =>
+    `Not this time. ${name} attempts to ${action}, but the world resists. The shadows seem to lean in just a little closer. ${pick(ATMOSPHERE)} ${pick(NEUTRAL_HANDOFFS)}`,
 ];
 
 const CRIT_FAILURE = [
-  (name: string, action: string, next: string) =>
-    `Everything goes wrong at once. ${name} attempts to ${action}, and the result is spectacularly unfortunate — the kind of failure that draws gasps. ${pick(ATMOSPHERE)} The shadows close in tighter. But despair is a luxury the party cannot afford. ${next}, rally — the tale is not yet written.`,
-  (name: string, action: string, next: string) =>
-    `Fate has a cruel sense of humor. As ${name} tries to ${action}, disaster strikes with almost theatrical timing. The ground shifts, the air sours. ${pick(ATMOSPHERE)} ${next}, the party needs you now more than ever. What do you do?`,
-  (name: string, action: string, next: string) =>
-    `A terrible moment. ${name}'s attempt to ${action} goes catastrophically wrong. Something breaks, something shifts, and the party collectively holds its breath. ${pick(ATMOSPHERE)} ${next}, there's no time to dwell — act now, before things get worse.`,
+  (name: string, action: string) =>
+    `Everything goes wrong at once. ${name} attempts to ${action}, and the result is spectacularly unfortunate — the kind of failure that draws gasps. ${pick(ATMOSPHERE)} The shadows close in tighter. But despair is a luxury the party cannot afford. ${pick(NEUTRAL_HANDOFFS)}`,
+  (name: string, action: string) =>
+    `Fate has a cruel sense of humor. As ${name} tries to ${action}, disaster strikes with almost theatrical timing. The ground shifts, the air sours. ${pick(ATMOSPHERE)} ${pick(NEUTRAL_HANDOFFS)}`,
+  (name: string, action: string) =>
+    `A terrible moment. ${name}'s attempt to ${action} goes catastrophically wrong. Something breaks, something shifts, and the party collectively holds its breath. ${pick(ATMOSPHERE)} ${pick(NEUTRAL_HANDOFFS)}`,
 ];
 
 function pickTemplate(
   result: DiceRoll["result"] | undefined,
   name: string,
   action: string,
-  next: string,
 ): string {
   switch (result) {
     case "critical_success":
-      return pick(CRIT_SUCCESS)(name, action, next);
+      return pick(CRIT_SUCCESS)(name, action);
     case "success":
-      return pick(SUCCESS)(name, action, next);
+      return pick(SUCCESS)(name, action);
     case "failure":
-      return pick(FAILURE)(name, action, next);
+      return pick(FAILURE)(name, action);
     case "critical_failure":
-      return pick(CRIT_FAILURE)(name, action, next);
+      return pick(CRIT_FAILURE)(name, action);
     default:
-      return pick(SUCCESS)(name, action, next);
+      return pick(SUCCESS)(name, action);
   }
 }
 
@@ -158,12 +164,11 @@ export function buildNarratorFallback(
   playerName: string,
   actionSummary: string,
   rollResult: DiceRoll["result"] | undefined,
-  nextPlayerName: string,
   nextActorId: string | null,
   _sceneContext?: string,
 ): NarratorOutput {
   const action = describeAction("other", actionSummary);
-  const text = pickTemplate(rollResult, playerName, action, nextPlayerName);
+  const text = pickTemplate(rollResult, playerName, action);
 
   const toneMap: Record<string, string> = {
     critical_success: "triumphant",
@@ -192,7 +197,7 @@ export async function generateNarration(params: {
   characterTraits?: string[];
   characterBackstory?: string;
   characterAppearance?: string;
-  nextPlayerName: string;
+  nextPlayerName?: string;
   recentNarrative: string;
   sceneContext: string;
   partySummary?: string;
@@ -212,7 +217,6 @@ export async function generateNarration(params: {
     character_traits: params.characterTraits ?? [],
     character_backstory: params.characterBackstory ?? "",
     character_appearance: params.characterAppearance ?? "",
-    next_player_name: params.nextPlayerName,
     recent_narrative: params.recentNarrative,
     scene_context: params.sceneContext,
     party_summary: params.partySummary ?? "",
@@ -243,7 +247,6 @@ export async function generateNarration(params: {
           (params.intent.suggested_roll_context ??
           params.intent.action_type.replace(/_/g, " ")),
         rollResult,
-        params.nextPlayerName,
         null,
         params.sceneContext,
       ),

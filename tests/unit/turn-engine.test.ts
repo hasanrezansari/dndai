@@ -168,6 +168,135 @@ describe("computeNextPlayableTurnState", () => {
       roundAdvanced: false,
     });
   });
+
+  it("when current actor is not playable, advances to next seat in order (not first playable)", () => {
+    const ordered = [
+      {
+        id: "a-00000000-0000-4000-8000-000000000001",
+        is_dm: false,
+        seat_index: 0,
+        is_incapacitated: false,
+      },
+      {
+        id: "b-00000000-0000-4000-8000-000000000002",
+        is_dm: false,
+        seat_index: 1,
+        is_incapacitated: true,
+      },
+      {
+        id: "c-00000000-0000-4000-8000-000000000003",
+        is_dm: false,
+        seat_index: 2,
+        is_incapacitated: false,
+      },
+    ];
+    expect(
+      computeNextPlayableTurnState({
+        orderedBySeat: ordered,
+        sessionMode: "ai_dm",
+        currentPlayerId: "b-00000000-0000-4000-8000-000000000002",
+        currentRound: 2,
+      }),
+    ).toMatchObject({
+      nextPlayerId: "c-00000000-0000-4000-8000-000000000003",
+      nextTurnIndex: 1,
+      nextRound: 2,
+      roundAdvanced: false,
+    });
+  });
+
+  it("uses seat_index order even if the caller passes rows out of order", () => {
+    const outOfOrder = [
+      {
+        id: "b-00000000-0000-4000-8000-000000000002",
+        is_dm: false,
+        seat_index: 1,
+        is_incapacitated: false,
+      },
+      {
+        id: "a-00000000-0000-4000-8000-000000000001",
+        is_dm: false,
+        seat_index: 0,
+        is_incapacitated: false,
+      },
+    ];
+    expect(
+      computeNextPlayableTurnState({
+        orderedBySeat: outOfOrder,
+        sessionMode: "ai_dm",
+        currentPlayerId: "a-00000000-0000-4000-8000-000000000001",
+        currentRound: 1,
+      }),
+    ).toMatchObject({
+      nextPlayerId: "b-00000000-0000-4000-8000-000000000002",
+      nextRound: 1,
+    });
+  });
+
+  it("sole survivor always gets the next turn (others dead or down)", () => {
+    const ordered = [
+      {
+        id: "solo-00000000-0000-4000-8000-000000000001",
+        is_dm: false,
+        seat_index: 0,
+        is_incapacitated: false,
+      },
+      {
+        id: "down-00000000-0000-4000-8000-000000000002",
+        is_dm: false,
+        seat_index: 1,
+        is_incapacitated: true,
+      },
+      {
+        id: "down-00000000-0000-4000-8000-000000000003",
+        is_dm: false,
+        seat_index: 2,
+        is_incapacitated: true,
+      },
+    ];
+    expect(
+      computeNextPlayableTurnState({
+        orderedBySeat: ordered,
+        sessionMode: "ai_dm",
+        currentPlayerId: "solo-00000000-0000-4000-8000-000000000001",
+        currentRound: 9,
+      }),
+    ).toMatchObject({
+      nextPlayerId: "solo-00000000-0000-4000-8000-000000000001",
+      nextRound: 9,
+      roundAdvanced: false,
+    });
+  });
+
+  it("increments round when returning to first playable after wrapping past last seat", () => {
+    const ordered = [
+      {
+        id: "a-00000000-0000-4000-8000-000000000001",
+        is_dm: false,
+        seat_index: 0,
+        is_incapacitated: false,
+      },
+      {
+        id: "b-00000000-0000-4000-8000-000000000002",
+        is_dm: false,
+        seat_index: 1,
+        is_incapacitated: false,
+      },
+    ];
+    expect(
+      computeNextPlayableTurnState({
+        orderedBySeat: ordered,
+        sessionMode: "ai_dm",
+        currentPlayerId: "b-00000000-0000-4000-8000-000000000002",
+        currentRound: 3,
+      }),
+    ).toMatchObject({
+      nextPlayerId: "a-00000000-0000-4000-8000-000000000001",
+      nextTurnIndex: 0,
+      nextRound: 4,
+      roundAdvanced: true,
+    });
+  });
 });
 
 describe("acquireTurnLock", () => {
