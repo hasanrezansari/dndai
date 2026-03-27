@@ -663,6 +663,22 @@ export async function runTurnPipeline(params: {
     });
   }
 
+  if (
+    !actionDenied &&
+    npcTarget &&
+    diceRolls[0] &&
+    (intent.action_type === "attack" || intent.action_type === "cast_spell")
+  ) {
+    const r = diceRolls[0].result;
+    if (r === "success" || r === "critical_success") {
+      statePatches.push({
+        op: "npc_reveal",
+        npcId: npcTarget.id,
+        level: r === "critical_success" ? "full" : "partial",
+      });
+    }
+  }
+
   const questUpdate = actionDenied
     ? {
       state:

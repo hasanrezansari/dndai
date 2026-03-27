@@ -192,11 +192,21 @@ export async function parseIntent(params: {
     timeoutMs: 20_000,
   });
 
-  if (result.data.confidence < LOW_CONFIDENCE_THRESHOLD && !result.data.rephrase_reason) {
-    result.data.rephrase_reason = "Low confidence classification — consider rephrasing";
+  if (
+    result.data.confidence < LOW_CONFIDENCE_THRESHOLD &&
+    result.data.rephrase_reason == null
+  ) {
+    result.data.rephrase_reason =
+      "Low confidence classification — consider rephrasing";
   }
 
   result.data = mergeExplicitNpcTargets(result.data, tagged.targets);
+  if (result.data.rephrase_reason === null) {
+    result.data = ActionIntentSchema.parse({
+      ...result.data,
+      rephrase_reason: undefined,
+    });
+  }
 
   return result;
 }

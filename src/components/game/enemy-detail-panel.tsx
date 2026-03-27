@@ -15,9 +15,9 @@ export function EnemyDetailPanel({ npc }: EnemyDetailPanelProps) {
   const revealPartial = npc.revealLevel === "partial" || npc.revealLevel === "full";
   const revealFull = npc.revealLevel === "full";
   const hpLine =
-    revealFull && npc.hp !== undefined && npc.maxHp !== undefined
+    revealPartial && npc.hp !== undefined && npc.maxHp !== undefined
       ? `${npc.hp} / ${npc.maxHp}`
-      : revealFull && npc.hp !== undefined
+      : revealPartial && npc.hp !== undefined
         ? String(npc.hp)
         : null;
 
@@ -64,7 +64,7 @@ export function EnemyDetailPanel({ npc }: EnemyDetailPanelProps) {
             >
               {npc.status}
             </span>
-            {revealFull && npc.ac !== undefined ? (
+            {revealPartial && npc.ac !== undefined ? (
               <span className="rounded-[var(--radius-pill)] border border-[rgba(77,70,53,0.2)] bg-[var(--surface-high)] px-2.5 py-1 text-[9px] font-black uppercase tracking-[0.15em] text-[var(--outline)]">
                 AC {npc.ac}
               </span>
@@ -99,10 +99,11 @@ export function EnemyDetailPanel({ npc }: EnemyDetailPanelProps) {
       {revealPartial && !revealFull ? (
         <div>
           <p className="mb-1 text-[9px] font-black uppercase tracking-[0.2em] text-[var(--color-gold-support)]">
-            Vitals
+            Intel
           </p>
           <p className="text-sm text-[var(--color-silver-dim)]">
-            You have partial combat intel. Use an inspect/scout action to reveal full stats.
+            You know their guard and condition from combat or a scout. Inspect again for weak
+            points and full loadout.
           </p>
         </div>
       ) : null}
