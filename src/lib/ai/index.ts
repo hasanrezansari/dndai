@@ -33,11 +33,30 @@ function getSingleProvider(name: string): AIProvider {
 function buildFallbackChain(primary: string): Array<{ name: string; provider: AIProvider }> {
   const added = new Set<string>();
   const chain: Array<{ name: string; provider: AIProvider }> = [];
+  const strictPrimary = (process.env.AI_PROVIDER_STRICT ?? "").trim().toLowerCase();
+  const allowFallbacksRaw = (process.env.AI_ALLOW_FALLBACKS ?? "").trim().toLowerCase();
+  const allowFallbacks =
+    allowFallbacksRaw === "1" ||
+    allowFallbacksRaw === "true" ||
+    allowFallbacksRaw === "yes" ||
+    allowFallbacksRaw === "on";
+  const strictRequested =
+    strictPrimary === "1" ||
+    strictPrimary === "true" ||
+    strictPrimary === "yes" ||
+    strictPrimary === "on";
+  const shouldLockToPrimary =
+    strictRequested || (primary === "openrouter" && !allowFallbacks);
 
   function add(name: string) {
     if (added.has(name)) return;
     added.add(name);
     chain.push({ name, provider: getSingleProvider(name) });
+  }
+
+  if (shouldLockToPrimary) {
+    add(primary);
+    return chain;
   }
 
   // OpenRouter's free router (27 models, auto-routing) is the most
