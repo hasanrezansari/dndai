@@ -119,6 +119,7 @@ export function useSessionChannel(sessionId: string | null) {
         session?: GameSessionView;
         players: GamePlayerView[];
         npcs?: NpcCombatantView[];
+        activeTurnId?: string | null;
         sceneTitle?: string | null;
         sceneImage?: string | null;
         scenePending?: boolean;
@@ -159,6 +160,9 @@ export function useSessionChannel(sessionId: string | null) {
       }
       if (data.session) {
         useGameStore.getState().setSession(data.session);
+      }
+      if ("activeTurnId" in data) {
+        useGameStore.getState().setActiveTurnId(data.activeTurnId ?? null);
       }
       if ("quest" in data) {
         useGameStore.getState().setQuest(data.quest ?? null);
@@ -334,9 +338,11 @@ export function useSessionChannel(sessionId: string | null) {
       useGameStore.getState().setWaitingForDm(false);
       useGameStore.getState().setDmAwaiting(null);
       const activeTurnId = useGameStore.getState().activeTurnId;
-      const isFreshTurnNarration =
-        !!parsed.data.turn_id && parsed.data.turn_id === activeTurnId;
-      if (parsed.data.event_type !== "dm_event" && isFreshTurnNarration) {
+      const turnIdMatches =
+        !parsed.data.turn_id ||
+        !activeTurnId ||
+        parsed.data.turn_id === activeTurnId;
+      if (parsed.data.event_type !== "dm_event" && turnIdMatches) {
         useGameStore.getState().updateSessionField(
           "currentPlayerId",
           parsed.data.next_actor.player_id,

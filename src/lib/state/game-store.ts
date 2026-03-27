@@ -204,6 +204,8 @@ interface GameState {
     quest?: QuestProgressView | null;
     rollingMemories?: RollingMemoryView[];
     npcs?: NpcCombatantView[];
+    /** Open turn id for Pusher event matching (`turn-started` / `narration-update`). */
+    activeTurnId?: string | null;
   }) => void;
   reset: () => void;
   openSheet: (sheet: ActiveSheet) => void;
@@ -219,6 +221,15 @@ interface GameState {
   addStatPopups: (popups: StatPopup[]) => void;
   setHpFlash: (flash: Record<string, "damage" | "heal">) => void;
   setActiveTurnId: (id: string | null) => void;
+}
+
+/** Round rollup rows use `detail: "Round N"` — skip when attaching scene art. */
+function isRoundRollupNarration(entry: FeedEntry): boolean {
+  return (
+    entry.type === "narration" &&
+    typeof entry.detail === "string" &&
+    /^Round \d+$/.test(entry.detail.trim())
+  );
 }
 
 const emptyState = {
@@ -276,8 +287,9 @@ export const useGameStore = create<GameState>((set) => ({
     set((s) => {
       const feed = [...s.feed];
       for (let i = feed.length - 1; i >= 0; i--) {
-        if (feed[i]!.type === "narration" && !feed[i]!.imageUrl) {
-          feed[i] = { ...feed[i]!, imageUrl };
+        const e = feed[i]!;
+        if (e.type === "narration" && !e.imageUrl && !isRoundRollupNarration(e)) {
+          feed[i] = { ...e, imageUrl };
           return { feed };
         }
       }
@@ -346,6 +358,8 @@ export const useGameStore = create<GameState>((set) => ({
       quest: data.quest ?? null,
       rollingMemories: data.rollingMemories ?? [],
       npcs: data.npcs ?? [],
+      activeTurnId:
+        data.activeTurnId === undefined ? null : data.activeTurnId,
     }),
 
   reset: () => set({ ...emptyState, activeTurnId: null }),
