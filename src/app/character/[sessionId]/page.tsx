@@ -605,8 +605,9 @@ export default function CharacterCreationPage() {
                             return { ...prev, abilities: next };
                           })
                         }
+                        size="sm"
                         wrap={false}
-                        className="w-max pb-1"
+                        className="w-full overflow-x-auto scrollbar-hide pb-1"
                       />
                       <PillSelect
                         options={[
@@ -627,8 +628,9 @@ export default function CharacterCreationPage() {
                             return { ...prev, abilities: next };
                           })
                         }
+                        size="sm"
                         wrap={false}
-                        className="w-max pb-1"
+                        className="w-full overflow-x-auto scrollbar-hide pb-1"
                       />
                       <label className="text-[10px] uppercase tracking-[0.12em] text-[var(--outline)]">
                         Resource
@@ -732,8 +734,9 @@ export default function CharacterCreationPage() {
                             return { ...prev, starting_gear: next };
                           })
                         }
+                        size="sm"
                         wrap={false}
-                        className="w-max pb-1"
+                        className="w-full overflow-x-auto scrollbar-hide pb-1"
                       />
                       <label className="text-[10px] uppercase tracking-[0.12em] text-[var(--outline)]">
                         Power Cost
