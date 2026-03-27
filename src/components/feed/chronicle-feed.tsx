@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 
+import { speakNarrationText } from "@/lib/audio/use-narration-tts";
 import { filterStaleScenePendingRows } from "@/lib/feed/display-feed-filters";
 import {
   filterFeedBySemantic,
@@ -179,6 +180,18 @@ function ChronicleEntryBlock({
           <p className="text-fantasy mt-3 text-center text-[15px] font-medium leading-relaxed text-[var(--color-silver-muted)]">
             {entry.text}
           </p>
+          <div className="mt-2 flex justify-center">
+            <button
+              type="button"
+              onClick={() => {
+                speakNarrationText(entry.text);
+              }}
+              className="inline-flex min-h-[40px] items-center gap-1.5 rounded-[var(--radius-chip)] border border-[rgba(77,70,53,0.25)] bg-[var(--surface-high)] px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.12em] text-[var(--color-gold-support)] transition-colors hover:border-[var(--color-gold-rare)]/35 hover:text-[var(--color-gold-rare)]"
+            >
+              <span className="material-symbols-outlined text-sm">volume_up</span>
+              Hear narration
+            </button>
+          </div>
         </div>
       );
     }
@@ -200,6 +213,18 @@ function ChronicleEntryBlock({
         <p className="text-fantasy text-[17px] font-normal leading-[1.65] tracking-tight text-[var(--color-silver-muted)]">
           {entry.text}
         </p>
+        <div>
+          <button
+            type="button"
+            onClick={() => {
+              speakNarrationText(entry.text);
+            }}
+            className="inline-flex min-h-[40px] items-center gap-1.5 rounded-[var(--radius-chip)] border border-[rgba(77,70,53,0.25)] bg-[var(--surface-high)] px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.12em] text-[var(--color-gold-support)] transition-colors hover:border-[var(--color-gold-rare)]/35 hover:text-[var(--color-gold-rare)]"
+          >
+            <span className="material-symbols-outlined text-sm">volume_up</span>
+            Hear narration
+          </button>
+        </div>
         {entry.detail ? (
           <p className="text-[11px] leading-relaxed text-[var(--outline)]">
             <span className="mb-1 block text-[9px] font-black uppercase tracking-[0.18em] text-[var(--color-gold-support)]/70">

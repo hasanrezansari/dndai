@@ -8,6 +8,26 @@ function getSynth(): SpeechSynthesis | null {
   return window.speechSynthesis;
 }
 
+export function speakNarrationText(text: string): boolean {
+  const synth = getSynth();
+  const trimmed = text.trim();
+  if (!synth || !trimmed) return false;
+
+  synth.cancel();
+  const utterance = new SpeechSynthesisUtterance(trimmed);
+  utterance.rate = 1;
+  utterance.pitch = 1;
+  utterance.volume = 1;
+  synth.speak(utterance);
+  return true;
+}
+
+export function stopNarrationSpeech() {
+  const synth = getSynth();
+  if (!synth) return;
+  synth.cancel();
+}
+
 export interface NarrationTtsControls {
   isSupported: boolean;
   isSpeaking: boolean;
@@ -25,9 +45,7 @@ export function useNarrationTts(): NarrationTtsControls {
   }, []);
 
   const stop = useCallback(() => {
-    const synth = getSynth();
-    if (!synth) return;
-    synth.cancel();
+    stopNarrationSpeech();
     utteranceRef.current = null;
     setIsSpeaking(false);
   }, []);

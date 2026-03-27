@@ -26,7 +26,6 @@ import { SceneHeader } from "@/components/game/scene-header";
 import { TurnBanner } from "@/components/game/turn-banner";
 import { SceneTransition } from "@/components/game/scene-transition";
 import { StatPopupOverlay } from "@/components/game/stat-popup";
-import { NarrationAudioControl } from "@/components/game/narration-audio-control";
 import { ChronicleFeed } from "@/components/feed/chronicle-feed";
 import { FeedList } from "@/components/feed/feed-list";
 import { BeatStrip } from "@/components/game/beat-strip";
@@ -611,7 +610,6 @@ export default function SessionGameplayPage() {
           currentPlayerName={currentPlayerName}
           phaseLabel={phaseLabel}
         />
-        <NarrationAudioControl text={narrativeText} />
         <div className="rounded-[var(--radius-card)] border border-[rgba(77,70,53,0.18)] bg-[var(--surface-container)]/30 px-3 py-2.5">
           <p className="mb-2 text-[9px] font-black uppercase tracking-[0.2em] text-[var(--outline)]">
             Table layout
