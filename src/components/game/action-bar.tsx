@@ -181,7 +181,7 @@ export function ActionBar({
                 <button
                   type="button"
                   onClick={() => {
-                    appendToInput(`${n.name}: `);
+                    appendToInput(`${n.name} [target:npc:${n.id}]: `);
                     setTargetOpen(false);
                   }}
                   className="flex min-h-[48px] w-full items-center justify-between gap-3 rounded-[var(--radius-card)] border border-[rgba(77,70,53,0.2)] bg-[var(--surface-container)]/50 px-4 py-2 text-left transition-colors hover:border-[var(--atmosphere-combat)]/40"

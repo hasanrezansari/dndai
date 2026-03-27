@@ -28,7 +28,8 @@ export const ActionIntentSchema = z.object({
   requires_roll: z.boolean(),
   suggested_roll_context: z.string().optional(),
   confidence: z.number().min(0).max(1),
-  rephrase_reason: z.string().optional(),
+  /** LLMs may return null; normalize to undefined in app code. */
+  rephrase_reason: z.string().nullish(),
 });
 export type ActionIntent = output<typeof ActionIntentSchema>;
 

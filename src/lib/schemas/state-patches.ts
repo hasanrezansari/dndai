@@ -16,6 +16,12 @@ export const NpcHpPatchSchema = z.object({
   reason: z.string(),
 });
 
+export const NpcRevealPatchSchema = z.object({
+  op: z.literal("npc_reveal"),
+  npcId: z.string(),
+  level: z.enum(["none", "partial", "full"]),
+});
+
 export const PlayerHpPatchSchema = z.object({
   op: z.literal("player_hp"),
   playerId: z.string(),
@@ -65,6 +71,7 @@ export const LocationSetPatchSchema = z.object({
 
 export const StatePatchSchema = z.discriminatedUnion("op", [
   NpcHpPatchSchema,
+  NpcRevealPatchSchema,
   PlayerHpPatchSchema,
   PlayerManaPatchSchema,
   ConditionAddPatchSchema,

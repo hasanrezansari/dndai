@@ -4,6 +4,7 @@ import { getAIProvider } from "@/lib/ai";
 import { db } from "@/lib/db";
 import { actions, narrativeEvents, npcStates, sceneSnapshots, turns } from "@/lib/db/schema";
 import { broadcastToSession } from "@/lib/socket/server";
+import { redis } from "@/lib/redis";
 import { buildTurnContext } from "@/lib/orchestrator/context-builder";
 import { commitStatePatches } from "@/lib/orchestrator/apply-state";
 import { logTrace } from "@/lib/orchestrator/trace";
@@ -18,7 +19,7 @@ import type { ActionIntent, ConsequenceEffect, NarratorOutput } from "@/lib/sche
 import type { DiceRoll, NarrativeEvent } from "@/lib/schemas/domain";
 import type { StatePatch } from "@/lib/schemas/state-patches";
 import { performRoll } from "@/server/services/dice-service";
-import { applyTurnQuestProgress } from "@/server/services/quest-service";
+import { applyTurnQuestProgress, defaultQuestState, getQuestState } from "@/server/services/quest-service";
 import { resolveNextActorForNarration } from "@/server/services/turn-service";
 
 export type SessionImageJobPayload = {
@@ -81,12 +82,83 @@ function resolveNpcTarget(
 ): { id: string; name: string } | null {
   if (!npcIds.length) return null;
   const npcTargets = intent.targets?.filter((t) => t.kind === "npc") ?? [];
+  const byId = npcTargets.find((t) => t.id && npcIds.some((n) => n.id === t.id));
+  if (byId?.id) {
+    return npcIds.find((n) => n.id === byId.id) ?? null;
+  }
   const first = npcTargets[0];
   if (!first?.label) return null;
   const label = first.label.toLowerCase();
   return npcIds.find((n) => n.name.toLowerCase() === label) ??
     npcIds.find((n) => label.includes(n.name.toLowerCase())) ??
     null;
+}
+
+function sanitizeNpcName(label: string): string {
+  const stripped = label.replace(/[^\p{L}\p{N}\s'’-]/gu, " ").replace(/\s{2,}/g, " ").trim();
+  if (!stripped) return "";
+  return stripped.slice(0, 40);
+}
+
+function shouldCreateNpcTarget(intent: ActionIntent, label: string): boolean {
+  if (!label) return false;
+  if (!["attack", "cast_spell", "inspect", "talk", "other"].includes(intent.action_type)) {
+    return false;
+  }
+  const lowered = label.toLowerCase();
+  if (["enemy", "foe", "monster", "target", "them", "it", "someone"].includes(lowered)) {
+    return false;
+  }
+  return true;
+}
+
+async function ensureNpcTargetsExist(params: {
+  sessionId: string;
+  turnId: string;
+  intent: ActionIntent;
+  npcIds: Array<{ id: string; name: string }>;
+  npcDetails: Array<{ id: string; name: string; status: string; attitude: string }>;
+}): Promise<void> {
+  const npcTargets = params.intent.targets?.filter((t) => t.kind === "npc") ?? [];
+  for (const t of npcTargets) {
+    if (t.id && params.npcIds.some((n) => n.id === t.id)) continue;
+    if (t.label) {
+      const label = sanitizeNpcName(t.label);
+      if (!shouldCreateNpcTarget(params.intent, label)) continue;
+      const existingByName = params.npcIds.find(
+        (n) => n.name.trim().toLowerCase() === label.toLowerCase(),
+      );
+      if (existingByName) continue;
+      const [inserted] = await db
+        .insert(npcStates)
+        .values({
+          session_id: params.sessionId,
+          name: label,
+          role: "hostile",
+          attitude: "hostile",
+          status: "alive",
+          location: "Current scene",
+          hp: 12,
+          max_hp: 12,
+          ac: 12,
+          weak_points: [],
+          reveal_level: "none",
+          notes: "Introduced during live play",
+          introduced_turn_id: params.turnId,
+          visual_profile: {},
+        })
+        .returning({ id: npcStates.id, name: npcStates.name, status: npcStates.status, attitude: npcStates.attitude });
+      if (inserted) {
+        params.npcIds.push({ id: inserted.id, name: inserted.name });
+        params.npcDetails.push({
+          id: inserted.id,
+          name: inserted.name,
+          status: inserted.status,
+          attitude: inserted.attitude,
+        });
+      }
+    }
+  }
 }
 
 function isSelfTarget(intent: ActionIntent): boolean {
@@ -353,9 +425,48 @@ async function unlockNpcPortraitsFromLatestScene(params: {
   }
 }
 
-function rollDc(roll: { dice: string; dc?: number }): number {
+function baseRollDc(roll: { dice: string; dc?: number }): number {
   if (roll.dc !== undefined) return roll.dc;
   return roll.dice === "d20" ? 10 : 1;
+}
+
+function dmDcRedisKey(sessionId: string): string {
+  return `session:dc:${sessionId}`;
+}
+
+async function getDmDcOverride(sessionId: string): Promise<number | null> {
+  if (!redis) return null;
+  const raw = await redis.get<string>(dmDcRedisKey(sessionId));
+  const parsed = Number(raw);
+  if (!Number.isFinite(parsed)) return null;
+  return Math.max(5, Math.min(30, Math.round(parsed)));
+}
+
+async function resolveRollDc(params: {
+  sessionId: string;
+  intent: ActionIntent;
+  roll: { dice: string; dc?: number };
+  npcTargetId: string | null;
+  dmDcOverride: number | null;
+}): Promise<number> {
+  if (params.intent.action_type === "attack" && params.npcTargetId) {
+    const [npc] = await db
+      .select({ ac: npcStates.ac })
+      .from(npcStates)
+      .where(
+        and(
+          eq(npcStates.session_id, params.sessionId),
+          eq(npcStates.id, params.npcTargetId),
+        ),
+      )
+      .limit(1);
+    if (npc?.ac) return npc.ac;
+  }
+  if (params.roll.dc !== undefined) return params.roll.dc;
+  if (params.dmDcOverride !== null && params.roll.dice === "d20") {
+    return params.dmDcOverride;
+  }
+  return baseRollDc(params.roll);
 }
 
 export type TurnPipelineResult =
@@ -423,6 +534,13 @@ export async function runTurnPipeline(params: {
     provider,
   });
   const intent = intentResult.data;
+  await ensureNpcTargetsExist({
+    sessionId,
+    turnId,
+    intent,
+    npcIds: ctx.npcIds,
+    npcDetails: ctx.npcDetails,
+  });
 
   await db
     .update(actions)
@@ -440,10 +558,14 @@ export async function runTurnPipeline(params: {
     provider,
   });
   const rules = rulesResult.data;
+  const actionDenied = !rules.legal;
+  const deniedReason = rules.denial_reason?.trim() || "That action is not possible right now.";
+  const npcTarget = resolveNpcTarget(intent, ctx.npcIds);
+  const dmDcOverride = await getDmDcOverride(sessionId);
 
   const d0 = Date.now();
   const diceRolls: DiceRoll[] = [];
-  if (rules.rolls.length > 0) {
+  if (!actionDenied && rules.rolls.length > 0) {
     for (const roll of rules.rolls) {
       try {
         await broadcastToSession(sessionId, "dice-rolling", {
@@ -461,7 +583,13 @@ export async function runTurnPipeline(params: {
         context: roll.context,
         modifier: roll.modifier,
         advantageState: roll.advantage_state,
-        dc: rollDc(roll),
+        dc: await resolveRollDc({
+          sessionId,
+          intent,
+          roll,
+          npcTargetId: npcTarget?.id ?? null,
+          dmDcOverride,
+        }),
       });
       diceRolls.push(dr);
     }
@@ -486,7 +614,9 @@ export async function runTurnPipeline(params: {
   });
 
   const s0 = Date.now();
-  const fallbackPatches = computeFallbackPatches(intent, diceRolls, playerId, rawInput, ctx.npcIds);
+  const fallbackPatches = actionDenied
+    ? []
+    : computeFallbackPatches(intent, diceRolls, playerId, rawInput, ctx.npcIds);
 
   const actingMember = ctx.partyMembers.find((p) => p.playerId === playerId) ?? {
     playerId,
@@ -498,57 +628,105 @@ export async function runTurnPipeline(params: {
     conditions: ctx.character.conditions,
   };
 
-  const consequenceResult = await interpretConsequences({
-    sessionId,
-    turnId,
-    rawInput,
-    intent,
-    diceRolls,
-    actingPlayer: actingMember,
-    partyMembers: ctx.partyMembers,
-    npcs: ctx.npcDetails,
-    sceneContext:
-      ctx.currentSceneDescription?.trim() ||
-      ctx.recentEvents.slice(-2).join(" ").slice(0, 500) ||
-      "",
-    fallbackPatches,
-    provider,
-  });
+  const consequenceResult = actionDenied
+    ? null
+    : await interpretConsequences({
+      sessionId,
+      turnId,
+      rawInput,
+      intent,
+      diceRolls,
+      actingPlayer: actingMember,
+      partyMembers: ctx.partyMembers,
+      npcs: ctx.npcDetails,
+      sceneContext:
+        ctx.currentSceneDescription?.trim() ||
+        ctx.recentEvents.slice(-2).join(" ").slice(0, 500) ||
+        "",
+      fallbackPatches,
+      provider,
+    });
 
-  const statePatches = consequenceResult.usage.model === "fallback"
-    ? fallbackPatches
-    : consequenceToPatches(consequenceResult.data);
+  let statePatches: StatePatch[] = actionDenied
+    ? []
+    : consequenceResult!.usage.model === "fallback"
+      ? fallbackPatches
+      : consequenceToPatches(consequenceResult!.data);
 
-  const questUpdate = await applyTurnQuestProgress({
-    sessionId,
-    turnId,
-    round: ctx.session.currentRound,
-    objectiveFallback:
-      ctx.session.adventurePrompt?.trim() ||
-      ctx.session.campaignTitle?.trim() ||
-      "Complete the mission and survive.",
-    actionType: intent.action_type,
-    diceRolls,
-    actionText: rawInput,
-    recentNarrative: ctx.recentEvents[ctx.recentEvents.length - 1],
-    provider,
-  });
+  if (!actionDenied && intent.action_type === "inspect" && npcTarget && diceRolls[0]) {
+    const r = diceRolls[0].result;
+    const level = (r === "success" || r === "critical_success") ? "full" : "partial";
+    statePatches.push({
+      op: "npc_reveal",
+      npcId: npcTarget.id,
+      level,
+    });
+  }
+
+  if (
+    !actionDenied &&
+    npcTarget &&
+    diceRolls[0] &&
+    (intent.action_type === "attack" || intent.action_type === "cast_spell")
+  ) {
+    const r = diceRolls[0].result;
+    if (r === "success" || r === "critical_success") {
+      statePatches.push({
+        op: "npc_reveal",
+        npcId: npcTarget.id,
+        level: r === "critical_success" ? "full" : "partial",
+      });
+    }
+  }
+
+  const questUpdate = actionDenied
+    ? {
+      state:
+        (await getQuestState(sessionId)) ??
+        defaultQuestState(
+          ctx.session.adventurePrompt?.trim() ||
+            ctx.session.campaignTitle?.trim() ||
+            "Complete the mission and survive.",
+        ),
+      visibleChanges: [],
+      shouldEndSession: false,
+    }
+    : await applyTurnQuestProgress({
+      sessionId,
+      turnId,
+      round: ctx.session.currentRound,
+      objectiveFallback:
+        ctx.session.adventurePrompt?.trim() ||
+        ctx.session.campaignTitle?.trim() ||
+        "Complete the mission and survive.",
+      actionType: intent.action_type,
+      diceRolls,
+      actionText: rawInput,
+      recentNarrative: ctx.recentEvents[ctx.recentEvents.length - 1],
+      provider,
+    });
+  const consequenceEffects = actionDenied ? [] : consequenceResult!.data.effects;
+  const consequenceModel = actionDenied ? "deterministic" : consequenceResult!.usage.model;
+  const consequenceTokensIn = actionDenied ? 0 : consequenceResult!.usage.inputTokens;
+  const consequenceTokensOut = actionDenied ? 0 : consequenceResult!.usage.outputTokens;
+  const consequenceSuccess = actionDenied ? true : consequenceResult!.success;
+  const consequenceError = actionDenied ? deniedReason : consequenceResult!.error;
   await logTrace({
     sessionId,
     turnId,
     stepName: "state_delta",
-    input: { intent_summary: intent.action_type, ai_consequences: consequenceResult.usage.model !== "fallback" },
+    input: { intent_summary: intent.action_type, ai_consequences: !actionDenied && consequenceResult!.usage.model !== "fallback" },
     output: {
       patches: statePatches,
-      consequence_effects: consequenceResult.data.effects,
+      consequence_effects: consequenceEffects,
       quest_state: questUpdate.state,
     },
-    modelUsed: consequenceResult.usage.model,
-    tokensIn: consequenceResult.usage.inputTokens,
-    tokensOut: consequenceResult.usage.outputTokens,
+    modelUsed: consequenceModel,
+    tokensIn: consequenceTokensIn,
+    tokensOut: consequenceTokensOut,
     latencyMs: Date.now() - s0,
-    success: consequenceResult.success,
-    errorMessage: consequenceResult.error,
+    success: consequenceSuccess,
+    errorMessage: consequenceError,
   });
 
   const a0 = Date.now();
@@ -594,7 +772,7 @@ export async function runTurnPipeline(params: {
       kind: "human_dm",
       diceRolls,
       statePatches,
-      consequenceEffects: consequenceResult.data.effects,
+      consequenceEffects,
       shouldEndSession: questUpdate.shouldEndSession,
       expectedNextPlayerId: resolvedNextActor.nextPlayerId,
     };
@@ -612,41 +790,51 @@ export async function runTurnPipeline(params: {
     ctx.session.adventurePrompt?.trim() ||
     "";
 
-  const narr0 = await generateNarration({
-    sessionId,
-    turnId,
-    rawInput,
-    intent,
-    diceResults: diceRolls.map((r) => ({
-      context: r.context,
-      total: r.total,
-      result: r.result,
-    })),
-    characterName: actorName,
-    characterPronouns: ctx.character.pronouns,
-    characterTraits: ctx.character.traits,
-    characterBackstory: ctx.character.backstory,
-    characterAppearance: ctx.character.appearance,
-    characterClassIdentity: ctx.character.classIdentitySummary,
-    characterMechanicalClass: ctx.character.mechanicalClass,
-    characterIdentitySource: ctx.character.classProfile?.source ?? "preset",
-    characterVisualTags: ctx.character.classProfile?.visual_tags ?? [],
-    nextPlayerName: nextActorName,
-    recentNarrative: memoryBundle.recentEventWindow,
-    sceneContext,
-    partySummary: ctx.allCharacterSummaries.join("; "),
-    questContext: ctx.questContext,
-    npcContext: ctx.npcContext,
-    canonicalState: memoryBundle.canonicalState,
-    rollingSummary: memoryBundle.rollingSummary,
-    stylePolicy: memoryBundle.stylePolicy,
-    provider,
-  });
+  const narr0 = actionDenied
+    ? null
+    : await generateNarration({
+      sessionId,
+      turnId,
+      rawInput,
+      intent,
+      diceResults: diceRolls.map((r) => ({
+        context: r.context,
+        total: r.total,
+        result: r.result,
+      })),
+      characterName: actorName,
+      characterPronouns: ctx.character.pronouns,
+      characterTraits: ctx.character.traits,
+      characterBackstory: ctx.character.backstory,
+      characterAppearance: ctx.character.appearance,
+      characterClassIdentity: ctx.character.classIdentitySummary,
+      characterMechanicalClass: ctx.character.mechanicalClass,
+      characterIdentitySource: ctx.character.classProfile?.source ?? "preset",
+      characterVisualTags: ctx.character.classProfile?.visual_tags ?? [],
+      nextPlayerName: nextActorName,
+      recentNarrative: memoryBundle.recentEventWindow,
+      sceneContext,
+      partySummary: ctx.allCharacterSummaries.join("; "),
+      questContext: ctx.questContext,
+      npcContext: ctx.npcContext,
+      canonicalState: memoryBundle.canonicalState,
+      rollingSummary: memoryBundle.rollingSummary,
+      stylePolicy: memoryBundle.stylePolicy,
+      provider,
+    });
 
-  let narration: NarratorOutput = {
-    ...narr0.data,
-    next_actor_id: expectedNextPlayerId,
-  };
+  let narration: NarratorOutput = actionDenied
+    ? {
+      scene_text: `${actorName} hesitates. ${deniedReason}`,
+      visible_changes: ["Action blocked by rules"],
+      tone: "neutral",
+      next_actor_id: expectedNextPlayerId,
+      image_hint: { subjects: [], avoid: [] },
+    }
+    : {
+      ...narr0!.data,
+      next_actor_id: expectedNextPlayerId,
+    };
   narration = {
     ...narration,
     visible_changes: [...narration.visible_changes, ...questUpdate.visibleChanges],
@@ -696,24 +884,26 @@ export async function runTurnPipeline(params: {
     console.error("[pipeline] summarizer failed, continuing:", err);
   }
 
-  const visualDeltaResult = await checkVisualDelta({
-    sessionId,
-    turnId,
-    narrativeText: narration.scene_text,
-    currentSceneDescription: ctx.currentSceneDescription,
-  });
-  const imageNeeded = visualDeltaResult.data.image_needed;
+  const visualDeltaResult = actionDenied
+    ? null
+    : await checkVisualDelta({
+      sessionId,
+      turnId,
+      narrativeText: narration.scene_text,
+      currentSceneDescription: ctx.currentSceneDescription,
+    });
+  const imageNeeded = visualDeltaResult?.data.image_needed ?? false;
 
   await logTrace({
     sessionId,
     turnId,
     stepName: "visual_delta",
     input: { narrative_len: narration.scene_text.length },
-    output: { image_needed: imageNeeded, reasons: visualDeltaResult.data.reasons },
+    output: { image_needed: imageNeeded, reasons: visualDeltaResult?.data.reasons ?? [] },
     modelUsed: "deterministic",
     tokensIn: 0,
     tokensOut: 0,
-    latencyMs: visualDeltaResult.latencyMs,
+    latencyMs: visualDeltaResult?.latencyMs ?? 0,
     success: true,
   });
 
@@ -737,7 +927,7 @@ export async function runTurnPipeline(params: {
     narrativeEvent: mapNarrativeRow(inserted),
     diceRolls,
     statePatches,
-    consequenceEffects: consequenceResult.data.effects,
+    consequenceEffects,
     shouldEndSession: questUpdate.shouldEndSession,
     imageNeeded,
     imageJobPayload,

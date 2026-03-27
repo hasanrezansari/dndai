@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { and, desc, eq } from "drizzle-orm";
+import { and, asc, desc, eq } from "drizzle-orm";
 import { z } from "zod";
 
 import { apiError, handleApiError } from "@/lib/api/errors";
@@ -165,29 +165,53 @@ export async function GET(
       .orderBy(desc(narrativeEvents.created_at))
       .limit(20);
 
-    const chronological = [...narrativeRows].reverse();
-    const feed: FeedEntry[] = chronological.map(({ ev, turn_round }) => ({
-      id: ev.id,
-      type: "narration" as const,
-      text: ev.scene_text,
-      detail:
-        ev.visible_changes.length > 0
-          ? ev.visible_changes.join(" · ")
-          : undefined,
-      timestamp: ev.created_at.toISOString(),
-      turnId: ev.turn_id ?? undefined,
-      roundNumber: turn_round ?? undefined,
-    }));
-
-    const latestNarrative = narrativeRows[0];
-    const narrativeText = latestNarrative?.ev.scene_text ?? null;
-
-    const [latestScene] = await db
+    const snapshotRows = await db
       .select()
       .from(sceneSnapshots)
       .where(eq(sceneSnapshots.session_id, sessionId))
-      .orderBy(desc(sceneSnapshots.created_at))
-      .limit(1);
+      .orderBy(asc(sceneSnapshots.created_at));
+
+    const latestScene =
+      snapshotRows.length > 0
+        ? snapshotRows[snapshotRows.length - 1]!
+        : undefined;
+
+    function sceneImageServingUrl(
+      snap: typeof sceneSnapshots.$inferSelect,
+    ): string | undefined {
+      const raw = snap.image_url;
+      if (!raw?.trim()) return undefined;
+      return raw.startsWith("data:")
+        ? `/api/sessions/${sessionId}/scene-image/${snap.id}`
+        : raw;
+    }
+
+    const chronological = [...narrativeRows].reverse();
+    const feed: FeedEntry[] = chronological.map(({ ev, turn_round }) => {
+      const snap = snapshotRows.find(
+        (s) =>
+          s.created_at >= ev.created_at &&
+          typeof s.image_url === "string" &&
+          s.image_url.trim().length > 0,
+      );
+      const imageUrl = snap ? sceneImageServingUrl(snap) : undefined;
+      return {
+        id: ev.id,
+        type: "narration" as const,
+        text: ev.scene_text,
+        detail:
+          ev.visible_changes.length > 0
+            ? ev.visible_changes.join(" · ")
+            : undefined,
+        timestamp: ev.created_at.toISOString(),
+        turnId: ev.turn_id ?? undefined,
+        roundNumber: turn_round ?? undefined,
+        ...(imageUrl ? { imageUrl } : {}),
+      };
+    });
+
+    const latestNarrative = narrativeRows[0];
+    const narrativeText = latestNarrative?.ev.scene_text ?? null;
 
     const rawSceneImage = latestScene?.image_url ?? null;
     const sceneImage =
@@ -222,6 +246,37 @@ export async function GET(
           actingPlayerId: dmAwaitingRow.player_id,
         }
       : null;
+
+    let activeTurnId: string | null = null;
+    if (sessionRow.current_player_id) {
+      const [awaitingTurnRow] = await db
+        .select({ id: turns.id })
+        .from(turns)
+        .where(
+          and(
+            eq(turns.session_id, sessionId),
+            eq(turns.status, "awaiting_input"),
+            eq(turns.player_id, sessionRow.current_player_id),
+          ),
+        )
+        .orderBy(desc(turns.started_at))
+        .limit(1);
+      activeTurnId = awaitingTurnRow?.id ?? null;
+    }
+    if (!activeTurnId) {
+      const [processingTurnRow] = await db
+        .select({ id: turns.id })
+        .from(turns)
+        .where(
+          and(eq(turns.session_id, sessionId), eq(turns.status, "processing")),
+        )
+        .orderBy(desc(turns.started_at))
+        .limit(1);
+      activeTurnId = processingTurnRow?.id ?? null;
+    }
+    if (!activeTurnId && dmAwaitingRow) {
+      activeTurnId = dmAwaitingRow.id;
+    }
 
     const [finalChapterRow] = await db
       .select({ id: narrativeEvents.id })
@@ -284,6 +339,7 @@ export async function GET(
       narrativeText,
       scenePending,
       dmAwaiting,
+      activeTurnId,
       quest,
       rollingMemories,
     });

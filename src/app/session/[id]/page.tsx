@@ -33,7 +33,10 @@ import { SessionViewModeToggle } from "@/components/game/session-view-mode-toggl
 import { useGuidedTurnUi } from "@/hooks/use-guided-turn-ui";
 import { useSessionUiMode } from "@/hooks/use-session-ui-mode";
 import { useSessionChannel } from "@/lib/socket/use-session-channel";
-import { useGameStore } from "@/lib/state/game-store";
+import {
+  useGameStore,
+  type SessionStatePayload,
+} from "@/lib/state/game-store";
 
 function formatPhaseLabel(phase: string | undefined): string | null {
   if (!phase?.trim()) return null;
@@ -215,7 +218,7 @@ export default function SessionGameplayPage() {
           setLoadError(`Failed to load session (${res.status})`);
           return;
         }
-        const data = (await res.json()) as Parameters<typeof hydrate>[0];
+        const data = (await res.json()) as SessionStatePayload;
         if (cancelled) return;
         hydrate(data);
         const me = data.players.find((p) => p.userId === userId);

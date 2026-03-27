@@ -39,16 +39,26 @@ export function mapNpcRowToCombatantView(row: NpcRow): NpcCombatantView {
       ? (raw as Record<string, unknown>)
       : {};
 
-  const ac = readNumericProfile(vp, ["ac", "AC", "armor_class"]);
-  const hp = readNumericProfile(vp, ["hp", "current_hp", "currentHp", "hit_points"]);
-  const maxHp = readNumericProfile(vp, ["max_hp", "maxHp", "max_hit_points"]);
+  const profileAc = readNumericProfile(vp, ["ac", "AC", "armor_class"]);
+  const profileHp = readNumericProfile(vp, ["hp", "current_hp", "currentHp", "hit_points"]);
+  const profileMaxHp = readNumericProfile(vp, ["max_hp", "maxHp", "max_hit_points"]);
   const attacks = readAttacksProfile(vp);
+  const weakRaw = vp.weak_points;
+  const weakPoints = Array.isArray(weakRaw)
+    ? weakRaw.map((x) => String(x).trim()).filter((x) => x.length > 0)
+    : Array.isArray(row.weak_points)
+      ? row.weak_points.map((x) => String(x).trim()).filter((x) => x.length > 0)
+      : undefined;
   const portraitRaw = vp.portrait_url;
   const portraitUrl =
     typeof portraitRaw === "string" && portraitRaw.trim().length > 0
       ? portraitRaw
       : undefined;
   const portraitStatus = portraitUrl ? "ready" : "locked";
+
+  const revealRaw = String(row.reveal_level ?? "").trim().toLowerCase();
+  const revealLevel: "none" | "partial" | "full" =
+    revealRaw === "full" || revealRaw === "partial" ? revealRaw : "none";
 
   return {
     id: row.id,
@@ -58,9 +68,11 @@ export function mapNpcRowToCombatantView(row: NpcRow): NpcCombatantView {
     status: row.status,
     location: row.location,
     notes: row.notes,
-    ac,
-    hp,
-    maxHp,
+    revealLevel,
+    ac: row.ac ?? profileAc,
+    hp: row.hp ?? profileHp,
+    maxHp: row.max_hp ?? profileMaxHp,
+    weakPoints,
     attacks,
     portraitUrl,
     portraitStatus,

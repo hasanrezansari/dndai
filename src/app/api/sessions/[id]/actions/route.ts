@@ -217,22 +217,35 @@ export async function POST(
       return NextResponse.json({ actionId, turnId }, { status: 202 });
     }
 
-    const advanceResult = await advanceTurn(sessionId);
-    const { nextPlayerId } = advanceResult;
+    const expectedNextPlayerId = pipelineResult.narrativeEvent.next_actor_id;
 
-    if (advanceResult.partyWipe) {
-      const stateVersion = await finalizeSessionEnd(sessionId);
+    try {
+      await broadcastToSession(sessionId, "narration-update", {
+        scene_text: pipelineResult.narrativeEvent.scene_text,
+        visible_changes: pipelineResult.narrativeEvent.visible_changes,
+        next_actor: { player_id: expectedNextPlayerId ?? parsed.data.playerId },
+        turn_id: turnId,
+        round_number: completedTurnRound,
+      });
+    } catch (err) {
+      console.error(err);
+    }
+
+    if (pipelineResult.consequenceEffects.length > 0) {
       try {
-        await broadcastToSession(sessionId, "narration-update", {
-          scene_text: pipelineResult.narrativeEvent.scene_text,
-          visible_changes: pipelineResult.narrativeEvent.visible_changes,
-          next_actor: { player_id: parsed.data.playerId },
+        await broadcastToSession(sessionId, "stat-change", {
+          effects: pipelineResult.consequenceEffects,
           turn_id: turnId,
           round_number: completedTurnRound,
         });
       } catch (err) {
-        console.error(err);
+        console.error("[actions] stat-change broadcast failed:", err);
       }
+    }
+
+    const advanceResult = await advanceTurn(sessionId);
+    if (advanceResult.partyWipe) {
+      const stateVersion = await finalizeSessionEnd(sessionId);
       try {
         await broadcastToSession(sessionId, "dm-notice", {
           message: "The party has fallen. The adventure ends here.",
@@ -252,40 +265,16 @@ export async function POST(
       } catch (err) {
         console.error(err);
       }
-      if (pipelineResult.consequenceEffects.length > 0) {
-        try {
-          await broadcastToSession(sessionId, "stat-change", {
-            effects: pipelineResult.consequenceEffects,
-            turn_id: turnId,
-            round_number: completedTurnRound,
-          });
-        } catch (err) {
-          console.error("[actions] stat-change broadcast failed:", err);
-        }
-      }
       await releaseTurnLock(sessionId);
       lockHeld = false;
       return NextResponse.json({ actionId, turnId }, { status: 202 });
     }
 
     const [sessionAfterAdvance] = await db
-      .select({ state_version: sessions.state_version, current_round: sessions.current_round })
+      .select({ state_version: sessions.state_version })
       .from(sessions)
       .where(eq(sessions.id, sessionId))
       .limit(1);
-
-    try {
-      await broadcastToSession(sessionId, "narration-update", {
-        scene_text: pipelineResult.narrativeEvent.scene_text,
-        visible_changes: pipelineResult.narrativeEvent.visible_changes,
-        next_actor: { player_id: nextPlayerId },
-        turn_id: turnId,
-        round_number: completedTurnRound,
-      });
-    } catch (err) {
-      console.error(err);
-    }
-
     try {
       await broadcastToSession(sessionId, "state-update", {
         changes: pipelineResult.statePatches,
@@ -295,18 +284,6 @@ export async function POST(
       });
     } catch (err) {
       console.error(err);
-    }
-
-    if (pipelineResult.consequenceEffects.length > 0) {
-      try {
-        await broadcastToSession(sessionId, "stat-change", {
-          effects: pipelineResult.consequenceEffects,
-          turn_id: turnId,
-          round_number: completedTurnRound,
-        });
-      } catch (err) {
-        console.error("[actions] stat-change broadcast failed:", err);
-      }
     }
 
     if (pipelineResult.imageNeeded && pipelineResult.imageJobPayload) {

@@ -1,5 +1,8 @@
 const BASE_URL = "https://openrouter.ai/api/v1/chat/completions";
-const IMAGE_MODEL = "google/gemini-2.5-flash-image";
+const PRIMARY_IMAGE_MODEL = "google/gemini-2.5-flash-image";
+const FALLBACK_IMAGE_MODEL =
+  process.env.OPENROUTER_IMAGE_FALLBACK_MODEL ??
+  "google/gemini-2.0-flash-exp:free";
 
 interface OpenRouterImageResponse {
   choices?: Array<{
@@ -34,30 +37,21 @@ async function fetchImageAsBase64(url: string): Promise<string> {
   return Buffer.from(arr).toString("base64");
 }
 
-export async function generateSceneImageOpenRouter(params: {
-  prompt: string;
-  negativePrompt?: string;
+async function requestOpenRouterImage(params: {
+  apiKey: string;
+  model: string;
+  userContent: string;
 }): Promise<{ base64: string }> {
-  const apiKey = process.env.OPENROUTER_API_KEY;
-  if (!apiKey) {
-    console.error("[openrouter-image] OPENROUTER_API_KEY is not set");
-    throw new Error("OPENROUTER_API_KEY is not set");
-  }
-
-  const userContent = params.negativePrompt
-    ? `${params.prompt}\n\nAvoid: ${params.negativePrompt}`
-    : params.prompt;
-
   const res = await fetch(BASE_URL, {
     method: "POST",
     headers: {
-      Authorization: `Bearer ${apiKey}`,
+      Authorization: `Bearer ${params.apiKey}`,
       "Content-Type": "application/json",
       "HTTP-Referer": process.env.NEXTAUTH_URL ?? "https://playdndai.com",
       "X-Title": "Ashveil DND",
     },
     body: JSON.stringify({
-      model: IMAGE_MODEL,
+      model: params.model,
       messages: [
         {
           role: "system",
@@ -66,7 +60,7 @@ export async function generateSceneImageOpenRouter(params: {
         },
         {
           role: "user",
-          content: userContent,
+          content: params.userContent,
         },
       ],
       modalities: ["image", "text"],
@@ -85,7 +79,7 @@ export async function generateSceneImageOpenRouter(params: {
     console.error("[openrouter-image] non-200 response", {
       status: res.status,
       requestId,
-      model: IMAGE_MODEL,
+      model: params.model,
       body: truncateForLog(errText),
     });
     throw new Error(`OpenRouter Image API ${res.status}: ${truncateForLog(errText, 240)}`);
@@ -95,7 +89,7 @@ export async function generateSceneImageOpenRouter(params: {
 
   if (data.error?.message) {
     console.error("[openrouter-image] api error payload", {
-      model: IMAGE_MODEL,
+      model: params.model,
       code: data.error.code ?? null,
       message: truncateForLog(data.error.message),
     });
@@ -106,7 +100,7 @@ export async function generateSceneImageOpenRouter(params: {
   if (!images?.length) {
     const content = data.choices?.[0]?.message?.content ?? "";
     console.error("[openrouter-image] no images in response", {
-      model: IMAGE_MODEL,
+      model: params.model,
       contentPreview: truncateForLog(content, 240),
     });
     throw new Error("OpenRouter returned no images");
@@ -125,4 +119,41 @@ export async function generateSceneImageOpenRouter(params: {
   }
 
   return { base64: dataUrl };
+}
+
+export async function generateSceneImageOpenRouter(params: {
+  prompt: string;
+  negativePrompt?: string;
+}): Promise<{ base64: string }> {
+  const apiKey = process.env.OPENROUTER_API_KEY;
+  if (!apiKey) {
+    console.error("[openrouter-image] OPENROUTER_API_KEY is not set");
+    throw new Error("OPENROUTER_API_KEY is not set");
+  }
+
+  const userContent = params.negativePrompt
+    ? `${params.prompt}\n\nAvoid: ${params.negativePrompt}`
+    : params.prompt;
+
+  const primary =
+    process.env.OPENROUTER_IMAGE_MODEL?.trim() || PRIMARY_IMAGE_MODEL;
+  const models = [primary, FALLBACK_IMAGE_MODEL].filter(
+    (m, i, a) => m.length > 0 && a.indexOf(m) === i,
+  );
+
+  let lastErr: Error | null = null;
+  for (const model of models) {
+    try {
+      return await requestOpenRouterImage({ apiKey, model, userContent });
+    } catch (e) {
+      lastErr = e instanceof Error ? e : new Error(String(e));
+      if (model !== models[models.length - 1]) {
+        console.warn("[openrouter-image] retrying with fallback model", {
+          failed: model,
+          next: models[models.indexOf(model) + 1],
+        });
+      }
+    }
+  }
+  throw lastErr ?? new Error("OpenRouter image generation failed");
 }

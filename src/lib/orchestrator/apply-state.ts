@@ -153,15 +153,42 @@ export async function commitStatePatches(
         )
         .limit(1);
       if (npc) {
-        const newStatus = patch.delta < 0 && Math.abs(patch.delta) >= 10 ? "dead" : npc.status;
+        const nextHp = Math.max(0, Math.min(npc.max_hp, npc.hp + patch.delta));
+        const newStatus = nextHp <= 0 ? "dead" : npc.status;
         await db
           .update(npcStates)
           .set({
+            hp: nextHp,
             status: newStatus,
             notes: `${npc.notes} | HP change: ${patch.delta > 0 ? "+" : ""}${patch.delta} (${patch.reason})`.trim(),
             updated_at: new Date(),
           })
           .where(eq(npcStates.id, patch.npcId));
+      }
+    } else if (patch.op === "npc_reveal") {
+      const [npc] = await db
+        .select()
+        .from(npcStates)
+        .where(
+          and(
+            eq(npcStates.session_id, sessionId),
+            eq(npcStates.id, patch.npcId),
+          ),
+        )
+        .limit(1);
+      if (npc) {
+        const rank = { none: 0, partial: 1, full: 2 } as const;
+        const currentRaw = String(npc.reveal_level ?? "none").toLowerCase();
+        const current = currentRaw === "full" || currentRaw === "partial" ? currentRaw : "none";
+        if (rank[patch.level] > rank[current]) {
+          await db
+            .update(npcStates)
+            .set({
+              reveal_level: patch.level,
+              updated_at: new Date(),
+            })
+            .where(eq(npcStates.id, patch.npcId));
+        }
       }
     } else if (patch.op === "inventory_add") {
       const rows = await db
