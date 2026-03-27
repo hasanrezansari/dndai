@@ -14,7 +14,7 @@ export function TurnBanner({ visible }: TurnBannerProps) {
       initial={{ opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
-      className="pointer-events-none mb-2 flex justify-center px-2"
+      className="pointer-events-none mb-1 flex justify-center px-2"
     >
       <div className="rounded-[var(--radius-card)] border border-[var(--color-gold-rare)]/30 bg-[var(--color-obsidian)]/90 backdrop-blur-md px-6 py-2.5 shadow-[0_0_24px_rgba(242,202,80,0.15)] flex items-center gap-2">
         <span
