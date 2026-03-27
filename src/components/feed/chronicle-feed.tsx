@@ -15,6 +15,7 @@ import type { FeedEntry, GamePlayerView, StatEffect } from "@/lib/state/game-sto
 import { useGameStore } from "@/lib/state/game-store";
 
 import { FeedSemanticChips } from "./feed-semantic-chips";
+import { NarrationPlaybackButton } from "./narration-playback-button";
 
 const ROUND_DETAIL = /^Round \d+$/;
 
@@ -179,6 +180,9 @@ function ChronicleEntryBlock({
           <p className="text-fantasy mt-3 text-center text-[15px] font-medium leading-relaxed text-[var(--color-silver-muted)]">
             {entry.text}
           </p>
+          <div className="mt-2 flex justify-center">
+            <NarrationPlaybackButton text={entry.text} />
+          </div>
         </div>
       );
     }
@@ -200,6 +204,9 @@ function ChronicleEntryBlock({
         <p className="text-fantasy text-[17px] font-normal leading-[1.65] tracking-tight text-[var(--color-silver-muted)]">
           {entry.text}
         </p>
+        <div>
+          <NarrationPlaybackButton text={entry.text} />
+        </div>
         {entry.detail ? (
           <p className="text-[11px] leading-relaxed text-[var(--outline)]">
             <span className="mb-1 block text-[9px] font-black uppercase tracking-[0.18em] text-[var(--color-gold-support)]/70">

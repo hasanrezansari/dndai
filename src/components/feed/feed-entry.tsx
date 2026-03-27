@@ -5,6 +5,8 @@ import { motion } from "framer-motion";
 
 import type { FeedEntry, StatEffect } from "@/lib/state/game-store";
 
+import { NarrationPlaybackButton } from "./narration-playback-button";
+
 const ROLL_RESULTS = new Set([
   "success",
   "failure",
@@ -370,6 +372,9 @@ export function FeedEntryRow({ entry }: FeedEntryRowProps) {
           <p className="text-fantasy mt-3 text-center text-[15px] font-semibold leading-relaxed text-[var(--color-silver-muted)]">
             {entry.text}
           </p>
+          <div className="mt-2 flex justify-center">
+            <NarrationPlaybackButton text={entry.text} />
+          </div>
           <time
             className={`${timeClass} mt-2 block text-center`}
             dateTime={entry.timestamp}
@@ -416,6 +421,9 @@ export function FeedEntryRow({ entry }: FeedEntryRowProps) {
               <p className="text-fantasy animate-fade-in text-[16px] italic leading-relaxed text-[var(--color-silver-muted)]">
                 {entry.text}
               </p>
+              <div className="mt-3">
+                <NarrationPlaybackButton text={entry.text} />
+              </div>
               {entry.detail ? (
                 <p className="mt-3 border-l-2 border-[var(--color-gold-support)]/40 pl-3 text-[11px] leading-snug text-[var(--outline)]">
                   <span className="mb-1 block text-[9px] font-black uppercase tracking-[0.15em] text-[var(--color-gold-support)]/80">
