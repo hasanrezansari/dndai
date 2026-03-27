@@ -785,6 +785,9 @@ export default function CharacterCreationPage() {
           <h2 className="text-[10px] font-black uppercase tracking-[0.2em] text-[var(--outline)]">
             Race
           </h2>
+          <span className="text-[10px] text-[var(--outline)]/70">
+            optional (defaults to Human)
+          </span>
         </div>
         <div className="overflow-x-auto scrollbar-hide -mx-1 px-1">
           <PillSelect

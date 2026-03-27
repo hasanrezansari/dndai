@@ -35,7 +35,13 @@ export async function POST(request: NextRequest) {
   } catch (e) {
     if (e instanceof Error) {
       const msg = e.message.toLowerCase();
-      if (msg.includes("timeout") || msg.includes("429") || msg.includes("quota")) {
+      if (
+        msg.includes("timeout") ||
+        msg.includes("429") ||
+        msg.includes("quota") ||
+        msg.includes("credit balance is too low") ||
+        msg.includes("insufficient credits")
+      ) {
         return apiError("Class generation is temporarily unavailable. Try again.", 503);
       }
     }
