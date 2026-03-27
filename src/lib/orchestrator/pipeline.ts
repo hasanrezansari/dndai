@@ -435,6 +435,8 @@ export async function runTurnPipeline(params: {
     intent,
     characterStats: ctx.character.stats,
     characterClass: ctx.character.class,
+    mechanicalClass: ctx.character.mechanicalClass,
+    classProfile: ctx.character.classProfile,
     provider,
   });
   const rules = rulesResult.data;
@@ -625,6 +627,10 @@ export async function runTurnPipeline(params: {
     characterTraits: ctx.character.traits,
     characterBackstory: ctx.character.backstory,
     characterAppearance: ctx.character.appearance,
+    characterClassIdentity: ctx.character.classIdentitySummary,
+    characterMechanicalClass: ctx.character.mechanicalClass,
+    characterIdentitySource: ctx.character.classProfile?.source ?? "preset",
+    characterVisualTags: ctx.character.classProfile?.visual_tags ?? [],
     nextPlayerName: nextActorName,
     recentNarrative: memoryBundle.recentEventWindow,
     sceneContext,

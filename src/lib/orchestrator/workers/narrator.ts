@@ -22,6 +22,12 @@ CHARACTER IDENTITY:
 - Weave "character_traits" naturally into descriptions where fitting (e.g. a cautious character hesitates, a bold one charges in).
 - Reference "character_backstory" for flavor when it naturally ties to the action.
 - If "character_appearance" is provided, keep physical/clothing details consistent in narration when relevant.
+- If "character_class_identity" is provided, use it as the source-of-truth class/archetype label.
+- If "character_identity" is provided, treat it as the canonical identity bundle:
+  - "display_class_identity" is the narrative label.
+  - "mechanical_class" is the normalized mechanics identity.
+  - "source" indicates preset vs custom.
+- If "character_visual_tags" are provided, keep those motifs consistent when describing action details.
 
 PARTY & QUEST AWARENESS:
 - "party_summary" lists each party member with race, class, HP, and pronouns. Reference party members naturally.
@@ -198,6 +204,10 @@ export async function generateNarration(params: {
   characterTraits?: string[];
   characterBackstory?: string;
   characterAppearance?: string;
+  characterClassIdentity?: string;
+  characterMechanicalClass?: string;
+  characterIdentitySource?: "preset" | "custom";
+  characterVisualTags?: string[];
   nextPlayerName?: string;
   recentNarrative: string;
   sceneContext: string;
@@ -209,6 +219,8 @@ export async function generateNarration(params: {
   stylePolicy?: string;
   provider: AIProvider;
 }): Promise<OrchestrationStepResult<NarratorOutput>> {
+  const normalizedDisplayClass = (params.characterClassIdentity ?? "").trim();
+  const normalizedMechanicalClass = (params.characterMechanicalClass ?? "").trim().toLowerCase();
   const userPrompt = JSON.stringify({
     player_action: params.rawInput,
     intent: params.intent,
@@ -218,6 +230,13 @@ export async function generateNarration(params: {
     character_traits: params.characterTraits ?? [],
     character_backstory: params.characterBackstory ?? "",
     character_appearance: params.characterAppearance ?? "",
+    character_class_identity: normalizedDisplayClass,
+    character_identity: {
+      display_class_identity: normalizedDisplayClass,
+      mechanical_class: normalizedMechanicalClass,
+      source: params.characterIdentitySource ?? "preset",
+    },
+    character_visual_tags: params.characterVisualTags ?? [],
     recent_narrative: params.recentNarrative,
     scene_context: params.sceneContext,
     party_summary: params.partySummary ?? "",

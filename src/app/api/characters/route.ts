@@ -7,7 +7,8 @@ import {
   requireUser,
   unauthorizedResponse,
 } from "@/lib/auth/guards";
-import { CharacterStatsSchema } from "@/lib/schemas/domain";
+import { isCustomClassesEnabled } from "@/lib/config/features";
+import { CharacterStatsSchema, ClassProfileSchema } from "@/lib/schemas/domain";
 import { CLASSES, RACES } from "@/lib/rules/character";
 import { broadcastToSession } from "@/lib/socket/server";
 import {
@@ -23,13 +24,14 @@ const CreateBodySchema = z.object({
   playerId: z.string().uuid(),
   sessionId: z.string().uuid(),
   name: z.string().trim().min(1).max(48),
-  characterClass: z.string(),
+  characterClass: z.string().trim().min(1).max(40),
   race: z.string(),
   stats: CharacterStatsSchema,
   pronouns: z.string().max(20).optional(),
   traits: z.array(z.string().max(40)).max(5).optional(),
   backstory: z.string().max(500).optional(),
   appearance: z.string().max(220).optional(),
+  classProfile: ClassProfileSchema.optional(),
 });
 
 export async function POST(request: NextRequest) {
@@ -39,17 +41,36 @@ export async function POST(request: NextRequest) {
     const json: unknown = await request.json();
     const parsed = CreateBodySchema.safeParse(json);
     if (!parsed.success) {
-      return apiError("Invalid body", 400);
+      const message = parsed.error.issues[0]?.message ?? "Invalid body";
+      return apiError(message, 400);
     }
-    const { playerId, sessionId, name, characterClass, race, stats, pronouns, traits, backstory, appearance } =
+    const {
+      playerId,
+      sessionId,
+      name,
+      characterClass,
+      race,
+      stats,
+      pronouns,
+      traits,
+      backstory,
+      appearance,
+      classProfile,
+    } =
       parsed.data;
     if (!(await isPlayerForUser(playerId, sessionId, user.id))) {
       return apiError("Forbidden", 403);
     }
     const cls = characterClass.trim().toLowerCase();
     const rc = race.trim().toLowerCase();
-    if (!classSet.has(cls)) {
-      return apiError("Invalid class", 400);
+    const isPresetClass = classSet.has(cls);
+    if (!isPresetClass) {
+      if (!isCustomClassesEnabled()) {
+        return apiError("Custom classes are currently disabled", 403);
+      }
+      if (!classProfile || classProfile.source !== "custom") {
+        return apiError("Invalid class", 400);
+      }
     }
     if (!raceSet.has(rc)) {
       return apiError("Invalid race", 400);
@@ -70,6 +91,7 @@ export async function POST(request: NextRequest) {
       traits,
       backstory,
       appearance,
+      classProfile,
     });
     try {
       await broadcastToSession(sessionId, "player-ready", {
