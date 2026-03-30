@@ -169,19 +169,15 @@ function ChronicleEntryBlock({
 
     if (isRoundBreak) {
       return (
-        <div className="py-1">
-          <div className="flex items-center gap-2">
-            <span className="h-px flex-1 bg-gradient-to-r from-transparent via-[var(--color-gold-rare)]/30 to-transparent" />
-            <span className="shrink-0 text-[8px] font-black uppercase tracking-[0.2em] text-[var(--color-gold-rare)]">
+        <div className="border-t border-[rgba(77,70,53,0.08)] pt-2">
+          <div className="flex items-start gap-2">
+            <span className="mt-0.5 shrink-0 rounded border border-[rgba(212,175,55,0.12)] bg-[var(--color-deep-void)]/50 px-1.5 py-0 text-[8px] font-black uppercase tracking-[0.14em] text-[var(--color-gold-rare)]/85">
               {entry.detail}
             </span>
-            <span className="h-px flex-1 bg-gradient-to-r from-transparent via-[var(--color-gold-rare)]/30 to-transparent" />
-          </div>
-          <p className="text-fantasy mt-2 text-center text-[14px] font-medium leading-snug text-[var(--color-silver-muted)]">
-            {entry.text}
-          </p>
-          <div className="mt-1.5 flex justify-center">
-            <NarrationPlaybackButton text={entry.text} />
+            <p className="min-w-0 flex-1 text-left text-[11px] leading-snug text-[var(--outline)]/75">
+              {entry.text}
+            </p>
+            <NarrationPlaybackButton compact text={entry.text} />
           </div>
         </div>
       );
@@ -244,10 +240,10 @@ function ChronicleEntryBlock({
 
   if (entry.type === "state_change") {
     return (
-      <p className="text-center text-[9px] uppercase tracking-[0.1em] text-[var(--outline)]/45">
+      <p className="border-t border-[rgba(77,70,53,0.06)] pt-1.5 text-left text-[8px] uppercase tracking-[0.08em] text-[var(--outline)]/32">
         {entry.text}
         {entry.detail ? (
-          <span className="text-[var(--outline)]/35"> · {entry.detail}</span>
+          <span className="text-[var(--outline)]/25"> · {entry.detail}</span>
         ) : null}
       </p>
     );
