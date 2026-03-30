@@ -9,6 +9,7 @@ import {
   memorySummaries,
   narrativeEvents,
   npcStates,
+  orchestrationTraces,
   players,
   sceneSnapshots,
   sessions,
@@ -22,6 +23,7 @@ import type {
   GameSessionView,
   NpcCombatantView,
   SessionStatePayload,
+  StatEffect,
 } from "@/lib/state/game-store";
 import { getQuestState } from "@/server/services/quest-service";
 
@@ -112,6 +114,61 @@ function playerDisplayLabel(
   const p = playersList.find((x) => x.id === playerId);
   if (!p) return "Player";
   return p.character?.name ?? p.displayName ?? `Seat ${p.seatIndex + 1}`;
+}
+
+function rawToStatEffects(
+  raw: unknown,
+  playersList: GamePlayerView[],
+  npcNames: Map<string, string>,
+): StatEffect[] {
+  if (!Array.isArray(raw)) return [];
+  const out: StatEffect[] = [];
+  for (const item of raw) {
+    if (!item || typeof item !== "object") continue;
+    const o = item as Record<string, unknown>;
+    const target_type = o.target_type === "npc" ? "npc" : "player";
+    const target_id = String(o.target_id ?? "");
+    if (!target_id) continue;
+    const targetName =
+      target_type === "player"
+        ? playerDisplayLabel(playersList, target_id)
+        : npcNames.get(target_id) ?? "NPC";
+    out.push({
+      targetId: target_id,
+      targetName,
+      hpDelta: typeof o.hp_delta === "number" ? o.hp_delta : 0,
+      manaDelta: typeof o.mana_delta === "number" ? o.mana_delta : 0,
+      conditionsAdd: Array.isArray(o.conditions_add)
+        ? o.conditions_add.filter((x): x is string => typeof x === "string")
+        : [],
+      conditionsRemove: Array.isArray(o.conditions_remove)
+        ? o.conditions_remove.filter((x): x is string => typeof x === "string")
+        : [],
+      reasoning: typeof o.reasoning === "string" ? o.reasoning : "",
+    });
+  }
+  return out;
+}
+
+function statEffectsToFeedText(effects: StatEffect[]): string {
+  const parts: string[] = [];
+  for (const e of effects) {
+    const chunks: string[] = [];
+    if (e.hpDelta !== 0) {
+      chunks.push(`${e.hpDelta > 0 ? "+" : ""}${e.hpDelta} HP`);
+    }
+    if (e.manaDelta !== 0) {
+      chunks.push(`${e.manaDelta > 0 ? "+" : ""}${e.manaDelta} MP`);
+    }
+    if (e.conditionsAdd.length) {
+      chunks.push(`+${e.conditionsAdd.join(", ")}`);
+    }
+    if (e.conditionsRemove.length) {
+      chunks.push(`-${e.conditionsRemove.join(", ")}`);
+    }
+    if (chunks.length) parts.push(`${e.targetName}: ${chunks.join(", ")}`);
+  }
+  return parts.join(" | ");
 }
 
 /**
@@ -232,6 +289,21 @@ export async function loadSessionStatePayload(
     (a, b) => a.created_at.getTime() - b.created_at.getTime(),
   );
 
+  /** Matches live Pusher "dice-rolling" rows (context + dice type as detail). */
+  const diceRollingEntries: FeedEntry[] = diceSorted.map((roll) => {
+    const turn = turnByActionId.get(roll.action_id);
+    const ms = roll.created_at.getTime() - 12;
+    return {
+      id: `dice:${roll.id}:rolling`,
+      type: "dice" as const,
+      text: roll.context,
+      detail: roll.roll_type,
+      timestamp: new Date(ms).toISOString(),
+      turnId: turn?.id,
+      roundNumber: turn?.round_number,
+    };
+  });
+
   const actionEntries: FeedEntry[] = actionTurnRows.map(({ action, turn }) => ({
     id: `action:${action.id}`,
     type: "action" as const,
@@ -256,14 +328,102 @@ export async function loadSessionStatePayload(
     };
   });
 
+  const npcNamesMap = new Map(
+    (
+      await db
+        .select({ id: npcStates.id, name: npcStates.name })
+        .from(npcStates)
+        .where(eq(npcStates.session_id, sessionId))
+    ).map((r) => [r.id, r.name]),
+  );
+
+  const turnRoundById = new Map(
+    (
+      await db
+        .select({ id: turns.id, round_number: turns.round_number })
+        .from(turns)
+        .where(eq(turns.session_id, sessionId))
+    ).map((t) => [t.id, t.round_number]),
+  );
+
+  const traceRows = await db
+    .select()
+    .from(orchestrationTraces)
+    .where(
+      and(
+        eq(orchestrationTraces.session_id, sessionId),
+        inArray(orchestrationTraces.step_name, [
+          "state_delta",
+          "apply_state",
+        ]),
+      ),
+    )
+    .orderBy(desc(orchestrationTraces.created_at))
+    .limit(300);
+
+  const traceFeed: FeedEntry[] = [];
+  for (const row of [...traceRows].reverse()) {
+    const out = row.output_summary;
+    if (!out || typeof out !== "object") continue;
+    const summary = out as Record<string, unknown>;
+
+    if (row.step_name === "state_delta") {
+      const effects = rawToStatEffects(
+        summary.consequence_effects,
+        mappedPlayers,
+        npcNamesMap,
+      );
+      if (effects.length === 0) continue;
+      const text = statEffectsToFeedText(effects);
+      if (!text.trim()) continue;
+      traceFeed.push({
+        id: `trace:stat:${row.id}`,
+        type: "stat_change",
+        text,
+        timestamp: row.created_at.toISOString(),
+        statEffects: effects,
+        turnId: row.turn_id ?? undefined,
+        roundNumber: row.turn_id
+          ? turnRoundById.get(row.turn_id)
+          : undefined,
+      });
+    } else if (row.step_name === "apply_state") {
+      const ver = summary.state_version;
+      if (typeof ver !== "number") continue;
+      const inp = row.input_summary;
+      const inpRec =
+        inp && typeof inp === "object"
+          ? (inp as Record<string, unknown>)
+          : {};
+      const patchCount =
+        typeof inpRec.patch_count === "number" ? inpRec.patch_count : undefined;
+      traceFeed.push({
+        id: `trace:state:${row.id}`,
+        type: "state_change",
+        text: `State v${ver}`,
+        detail:
+          patchCount !== undefined ? `${patchCount} change(s)` : undefined,
+        timestamp: row.created_at.toISOString(),
+        turnId: row.turn_id ?? undefined,
+        roundNumber: row.turn_id
+          ? turnRoundById.get(row.turn_id)
+          : undefined,
+      });
+    }
+  }
+
   const feed: FeedEntry[] = [
     ...actionEntries,
+    ...diceRollingEntries,
     ...diceEntries,
+    ...traceFeed,
     ...narrationFeed,
-  ].sort(
-    (a, b) =>
-      new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime(),
-  );
+  ].sort((a, b) => {
+    const ta = new Date(a.timestamp).getTime();
+    const tb = new Date(b.timestamp).getTime();
+    if (ta !== tb) return ta - tb;
+    return a.id.localeCompare(b.id);
+  });
 
   const latestNarrative = narrativeRows[0];
   const narrativeText = latestNarrative?.ev.scene_text ?? null;
