@@ -2,7 +2,10 @@
 
 import { useMemo, useState } from "react";
 
-import { filterStaleScenePendingRows } from "@/lib/feed/display-feed-filters";
+import {
+  filterChronicleDisplayEntries,
+  filterStaleScenePendingRows,
+} from "@/lib/feed/display-feed-filters";
 import {
   filterFeedBySemantic,
   type FeedSemanticFilter,
@@ -62,6 +65,24 @@ function segmentHeading(
     segment.entries.find((e) => e.roundNumber !== undefined)?.roundNumber;
   const roundPart = r != null ? `Round ${r}` : "Beat";
   return actor ? `${roundPart} · ${actor}` : roundPart;
+}
+
+/** No full story beat — skip heavy card chrome so the log stays out of the way. */
+function segmentUsesCompactShell(segment: FeedTurnSegment): boolean {
+  if (segment.entries.length === 0) return true;
+  if (segment.entries.every((e) => e.type === "system" || e.type === "dice")) {
+    return true;
+  }
+  if (
+    segment.entries.every(
+      (e) =>
+        e.type === "narration" &&
+        Boolean(e.detail && ROUND_DETAIL.test(e.detail)),
+    )
+  ) {
+    return true;
+  }
+  return false;
 }
 
 function parseDiceLine(text: string): {
@@ -169,19 +190,15 @@ function ChronicleEntryBlock({
 
     if (isRoundBreak) {
       return (
-        <div className="py-2">
-          <div className="flex items-center gap-2">
-            <span className="h-px flex-1 bg-gradient-to-r from-transparent via-[var(--color-gold-rare)]/30 to-transparent" />
-            <span className="shrink-0 text-[9px] font-black uppercase tracking-[0.22em] text-[var(--color-gold-rare)]">
+        <div className="border-t border-[rgba(77,70,53,0.08)] pt-2">
+          <div className="flex items-start gap-2">
+            <span className="mt-0.5 shrink-0 rounded border border-[rgba(212,175,55,0.12)] bg-[var(--color-deep-void)]/50 px-1.5 py-0 text-[8px] font-black uppercase tracking-[0.14em] text-[var(--color-gold-rare)]/85">
               {entry.detail}
             </span>
-            <span className="h-px flex-1 bg-gradient-to-r from-transparent via-[var(--color-gold-rare)]/30 to-transparent" />
-          </div>
-          <p className="text-fantasy mt-3 text-center text-[15px] font-medium leading-relaxed text-[var(--color-silver-muted)]">
-            {entry.text}
-          </p>
-          <div className="mt-2 flex justify-center">
-            <NarrationPlaybackButton text={entry.text} />
+            <p className="min-w-0 flex-1 text-left text-[11px] leading-snug text-[var(--outline)]/75">
+              {entry.text}
+            </p>
+            <NarrationPlaybackButton compact text={entry.text} />
           </div>
         </div>
       );
@@ -244,10 +261,10 @@ function ChronicleEntryBlock({
 
   if (entry.type === "state_change") {
     return (
-      <p className="text-center text-[10px] uppercase tracking-[0.12em] text-[var(--outline)]/55">
+      <p className="border-t border-[rgba(77,70,53,0.06)] pt-1.5 text-left text-[8px] uppercase tracking-[0.08em] text-[var(--outline)]/32">
         {entry.text}
         {entry.detail ? (
-          <span className="text-[var(--outline)]/40"> · {entry.detail}</span>
+          <span className="text-[var(--outline)]/25"> · {entry.detail}</span>
         ) : null}
       </p>
     );
@@ -271,20 +288,49 @@ export interface ChronicleFeedProps {
   className?: string;
 }
 
+function ChronicleTableMetaCaption() {
+  const session = useGameStore((s) => s.session);
+  const feed = useGameStore((s) => s.feed);
+
+  const lastSync = useMemo(() => {
+    for (let i = feed.length - 1; i >= 0; i--) {
+      const e = feed[i]!;
+      if (e.type === "state_change") return e;
+    }
+    return null;
+  }, [feed]);
+
+  if (!session) return null;
+
+  const parts = [`Round ${session.currentRound}`];
+  if (lastSync) {
+    parts.push(
+      lastSync.detail
+        ? `${lastSync.text} · ${lastSync.detail}`
+        : lastSync.text,
+    );
+  }
+
+  return (
+    <p
+      className="px-0.5 text-[8px] uppercase tracking-[0.12em] text-[var(--outline)]/38"
+      aria-live="polite"
+    >
+      {parts.join(" · ")}
+    </p>
+  );
+}
+
 export function ChronicleFeed({ entries, className = "" }: ChronicleFeedProps) {
   const players = useGameStore((s) => s.players);
   const scenePending = useGameStore((s) => s.scenePending);
   const [semanticFilter, setSemanticFilter] =
     useState<FeedSemanticFilter>("all");
 
-  const filtered = useMemo(
-    () =>
-      filterStaleScenePendingRows(entries, scenePending).filter(
-        /** `state_change` is sync metadata (state_version bumps), not story — hide in Chronicle only. */
-        (e) => e.type !== "state_change",
-      ),
-    [entries, scenePending],
-  );
+  const filtered = useMemo(() => {
+    const staleOk = filterStaleScenePendingRows(entries, scenePending);
+    return filterChronicleDisplayEntries(staleOk);
+  }, [entries, scenePending]);
 
   const semanticsFiltered = useMemo(
     () => filterFeedBySemantic(filtered, semanticFilter),
@@ -298,7 +344,7 @@ export function ChronicleFeed({ entries, className = "" }: ChronicleFeedProps) {
 
   return (
     <div
-      className={`flex min-h-0 flex-1 flex-col gap-8 overflow-y-auto overflow-x-hidden px-1 pb-20 scrollbar-hide ${className}`}
+      className={`flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto overflow-x-hidden px-1 pb-12 scrollbar-hide sm:gap-4 ${className}`}
       role="feed"
       aria-label="Chronicle"
     >
@@ -307,6 +353,7 @@ export function ChronicleFeed({ entries, className = "" }: ChronicleFeedProps) {
         onChange={setSemanticFilter}
         className="sticky top-0 z-[1] -mx-1 bg-[var(--color-obsidian)]/90 px-1 pb-2 pt-0 backdrop-blur-sm"
       />
+      <ChronicleTableMetaCaption />
       {segments.length === 0 ? (
         <p className="text-center text-sm text-[var(--color-silver-dim)]">
           {filtered.length === 0
@@ -316,28 +363,45 @@ export function ChronicleFeed({ entries, className = "" }: ChronicleFeedProps) {
       ) : (
         segments.map((segment, i) => {
           const time = formatSegmentTime(segment.entries);
+          const compact = segmentUsesCompactShell(segment);
           return (
             <article
               key={`${segment.turnId ?? "orphan"}-${i}`}
               className="relative mx-auto w-full max-w-[min(100%,22rem)] sm:max-w-[min(100%,26rem)]"
             >
               <div
-                className="rounded-[2px] px-5 py-6 sm:px-7 sm:py-8"
-                style={{
-                  background:
-                    "linear-gradient(165deg, color-mix(in srgb, var(--surface-container) 88%, transparent) 0%, color-mix(in srgb, var(--color-deep-void) 92%, transparent) 100%)",
-                  boxShadow:
-                    "inset 0 0 0 1px rgba(212,175,55,0.14), 0 16px 48px rgba(0,0,0,0.45)",
-                }}
+                className={
+                  compact
+                    ? "rounded-[2px] border border-[rgba(77,70,53,0.12)] bg-[var(--color-deep-void)]/35 px-3 py-2"
+                    : "rounded-[2px] px-4 py-4 sm:px-5 sm:py-5"
+                }
+                style={
+                  compact
+                    ? undefined
+                    : {
+                        background:
+                          "linear-gradient(165deg, color-mix(in srgb, var(--surface-container) 88%, transparent) 0%, color-mix(in srgb, var(--color-deep-void) 92%, transparent) 100%)",
+                        boxShadow:
+                          "inset 0 0 0 1px rgba(212,175,55,0.14), 0 12px 36px rgba(0,0,0,0.38)",
+                      }
+                }
               >
-                <header className="mb-5 text-center">
-                  <p className="text-fantasy text-[11px] font-black uppercase tracking-[0.28em] text-[var(--color-gold-rare)]">
-                    {segmentHeading(segment, players)}
-                  </p>
-                  <div className="mx-auto mt-2 h-px w-12 bg-gradient-to-r from-transparent via-[var(--color-gold-support)]/50 to-transparent" />
-                </header>
+                {!compact ? (
+                  <header className="mb-2.5 text-center">
+                    <p className="text-fantasy text-[10px] font-black uppercase tracking-[0.26em] text-[var(--color-gold-rare)]">
+                      {segmentHeading(segment, players)}
+                    </p>
+                    <div className="mx-auto mt-1.5 h-px w-10 bg-gradient-to-r from-transparent via-[var(--color-gold-support)]/50 to-transparent" />
+                  </header>
+                ) : null}
 
-                <div className="flex flex-col gap-5">
+                <div
+                  className={
+                    compact
+                      ? "flex flex-col gap-1.5"
+                      : "flex flex-col gap-2.5 sm:gap-3"
+                  }
+                >
                   {segment.entries.map((e) => (
                     <div key={e.id}>
                       <ChronicleEntryBlock entry={e} />
@@ -345,15 +409,26 @@ export function ChronicleFeed({ entries, className = "" }: ChronicleFeedProps) {
                   ))}
                 </div>
 
-                {time ? (
-                  <footer className="mt-6 border-t border-[rgba(77,70,53,0.1)] pt-3 text-center">
+                {!compact && time ? (
+                  <footer className="mt-3 border-t border-[rgba(77,70,53,0.1)] pt-2 text-center">
                     <time
                       className="text-[9px] tabular-nums tracking-wider text-[var(--outline)]/45"
-                      dateTime={segment.entries[segment.entries.length - 1]!.timestamp}
+                      dateTime={
+                        segment.entries[segment.entries.length - 1]!.timestamp
+                      }
                     >
                       {time}
                     </time>
                   </footer>
+                ) : compact && time ? (
+                  <time
+                    className="mt-1.5 block text-right text-[8px] tabular-nums text-[var(--outline)]/28"
+                    dateTime={
+                      segment.entries[segment.entries.length - 1]!.timestamp
+                    }
+                  >
+                    {time}
+                  </time>
                 ) : null}
               </div>
             </article>

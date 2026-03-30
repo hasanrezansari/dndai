@@ -72,6 +72,14 @@ export function BeatStrip() {
     };
   }, [feed, diceOverlay]);
 
+  const lastSync = useMemo(() => {
+    for (let i = feed.length - 1; i >= 0; i--) {
+      const e = feed[i]!;
+      if (e.type === "state_change") return e;
+    }
+    return null;
+  }, [feed]);
+
   const hasAny =
     activeName ||
     actionLine ||
@@ -160,6 +168,14 @@ export function BeatStrip() {
           ) : null}
         </dl>
       )}
+      {session ? (
+        <p className="mt-2 border-t border-[rgba(77,70,53,0.1)] pt-2 text-[8px] uppercase tracking-[0.1em] text-[var(--outline)]/35">
+          Round {session.currentRound}
+          {lastSync
+            ? ` · ${lastSync.text}${lastSync.detail ? ` (${lastSync.detail})` : ""}`
+            : ""}
+        </p>
+      ) : null}
     </section>
   );
 }
