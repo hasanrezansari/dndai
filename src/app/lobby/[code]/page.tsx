@@ -218,6 +218,12 @@ export default function LobbyPage() {
     router.push("/");
   }
 
+  function openRoomDisplayInNewTab() {
+    if (!sessionId || typeof window === "undefined") return;
+    const url = `${window.location.origin}/session/${sessionId}/display`;
+    window.open(url, "_blank", "noopener,noreferrer");
+  }
+
   const title = session?.campaign_title?.trim() || "Untitled Adventure";
 
   const slots = useMemo(() => {
@@ -412,6 +418,18 @@ export default function LobbyPage() {
               <span>{startLoading ? "Opening portal…" : "Begin Adventure"}</span>
               <span className="material-symbols-outlined text-lg">swords</span>
             </GoldButton>
+          ) : null}
+
+          {sessionId ? (
+            <GhostButton
+              type="button"
+              size="lg"
+              className="w-full min-h-[48px] flex items-center justify-center gap-2 border-[rgba(77,70,53,0.25)]"
+              onClick={openRoomDisplayInNewTab}
+            >
+              <span className="material-symbols-outlined text-lg">tv</span>
+              Room display
+            </GhostButton>
           ) : null}
 
           <button

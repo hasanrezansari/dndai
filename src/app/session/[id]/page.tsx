@@ -5,6 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { ConnectionStatus } from "@/components/ui/connection-status";
+import { GhostButton } from "@/components/ui/ghost-button";
 import {
   SkeletonCard,
   SkeletonCircle,
@@ -411,6 +412,15 @@ export default function SessionGameplayPage() {
     }
   }, [router]);
 
+  const openRoomDisplayInNewTab = useCallback(() => {
+    if (!sessionId || typeof window === "undefined") return;
+    window.open(
+      `${window.location.origin}/session/${sessionId}/display`,
+      "_blank",
+      "noopener,noreferrer",
+    );
+  }, [sessionId]);
+
   const handleEndingVote = useCallback(
     async (choice: "end_now" | "continue") => {
       if (!sessionId || !currentPlayerId || voteBusy) return;
@@ -621,6 +631,15 @@ export default function SessionGameplayPage() {
             mode={sessionUiMode}
             onChange={setSessionUiMode}
           />
+          <GhostButton
+            type="button"
+            size="md"
+            className="mt-3 w-full min-h-[44px] border-[rgba(77,70,53,0.22)]"
+            onClick={openRoomDisplayInNewTab}
+          >
+            <span className="material-symbols-outlined text-base">tv</span>
+            Room display
+          </GhostButton>
         </div>
       </div>
 
