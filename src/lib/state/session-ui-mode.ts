@@ -2,12 +2,13 @@ export type SessionUiMode = "spotlight" | "classic" | "chronicle";
 
 export const SESSION_UI_MODE_STORAGE_KEY = "ashveil.sessionUiMode";
 
-export const DEFAULT_SESSION_UI_MODE: SessionUiMode = "spotlight";
+export const DEFAULT_SESSION_UI_MODE: SessionUiMode = "chronicle";
 
 export function parseSessionUiMode(raw: string | null): SessionUiMode {
   if (raw === "classic") return "classic";
   if (raw === "chronicle") return "chronicle";
-  return "spotlight";
+  if (raw === "spotlight") return "spotlight";
+  return DEFAULT_SESSION_UI_MODE;
 }
 
 export function readSessionUiModeFromStorage(): SessionUiMode {

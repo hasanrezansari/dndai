@@ -130,8 +130,8 @@ export function useSessionChannel(sessionId: string | null) {
     let fullResyncInFlight: Promise<void> | null = null;
 
     /**
-     * Full hydrate from `/state` — used when returning from background or after realtime reconnect.
-     * Singleflight so visibility + subscription_succeeded don’t double-fetch.
+     * Resync session fields from `/state` without replacing client feed (Pusher-only rows like actions).
+     * Used when returning from background or after realtime reconnect. Singleflight for visibility + subscription_succeeded.
      */
     function scheduleFullResyncFromServer() {
       if (accessForbidden) return;
@@ -141,7 +141,7 @@ export function useSessionChannel(sessionId: string | null) {
           const data = await fetchSessionState();
           if (!data?.session || accessForbidden) return;
           const store = useGameStore.getState();
-          store.hydrate(data);
+          store.patchSessionFromStateApi(data);
           store.setIsThinking(false);
           store.hideDiceOverlay();
         } finally {
