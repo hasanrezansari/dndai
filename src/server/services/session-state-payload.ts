@@ -352,10 +352,7 @@ export async function loadSessionStatePayload(
     .where(
       and(
         eq(orchestrationTraces.session_id, sessionId),
-        inArray(orchestrationTraces.step_name, [
-          "state_delta",
-          "apply_state",
-        ]),
+        inArray(orchestrationTraces.step_name, ["state_delta"]),
       ),
     )
     .orderBy(desc(orchestrationTraces.created_at))
@@ -382,28 +379,6 @@ export async function loadSessionStatePayload(
         text,
         timestamp: row.created_at.toISOString(),
         statEffects: effects,
-        turnId: row.turn_id ?? undefined,
-        roundNumber: row.turn_id
-          ? turnRoundById.get(row.turn_id)
-          : undefined,
-      });
-    } else if (row.step_name === "apply_state") {
-      const ver = summary.state_version;
-      if (typeof ver !== "number") continue;
-      const inp = row.input_summary;
-      const inpRec =
-        inp && typeof inp === "object"
-          ? (inp as Record<string, unknown>)
-          : {};
-      const patchCount =
-        typeof inpRec.patch_count === "number" ? inpRec.patch_count : undefined;
-      traceFeed.push({
-        id: `trace:state:${row.id}`,
-        type: "state_change",
-        text: `State v${ver}`,
-        detail:
-          patchCount !== undefined ? `${patchCount} change(s)` : undefined,
-        timestamp: row.created_at.toISOString(),
         turnId: row.turn_id ?? undefined,
         roundNumber: row.turn_id
           ? turnRoundById.get(row.turn_id)

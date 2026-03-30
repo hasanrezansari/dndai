@@ -278,7 +278,11 @@ export function ChronicleFeed({ entries, className = "" }: ChronicleFeedProps) {
     useState<FeedSemanticFilter>("all");
 
   const filtered = useMemo(
-    () => filterStaleScenePendingRows(entries, scenePending),
+    () =>
+      filterStaleScenePendingRows(entries, scenePending).filter(
+        /** `state_change` is sync metadata (state_version bumps), not story — hide in Chronicle only. */
+        (e) => e.type !== "state_change",
+      ),
     [entries, scenePending],
   );
 
