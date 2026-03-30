@@ -169,18 +169,18 @@ function ChronicleEntryBlock({
 
     if (isRoundBreak) {
       return (
-        <div className="py-2">
+        <div className="py-1">
           <div className="flex items-center gap-2">
             <span className="h-px flex-1 bg-gradient-to-r from-transparent via-[var(--color-gold-rare)]/30 to-transparent" />
-            <span className="shrink-0 text-[9px] font-black uppercase tracking-[0.22em] text-[var(--color-gold-rare)]">
+            <span className="shrink-0 text-[8px] font-black uppercase tracking-[0.2em] text-[var(--color-gold-rare)]">
               {entry.detail}
             </span>
             <span className="h-px flex-1 bg-gradient-to-r from-transparent via-[var(--color-gold-rare)]/30 to-transparent" />
           </div>
-          <p className="text-fantasy mt-3 text-center text-[15px] font-medium leading-relaxed text-[var(--color-silver-muted)]">
+          <p className="text-fantasy mt-2 text-center text-[14px] font-medium leading-snug text-[var(--color-silver-muted)]">
             {entry.text}
           </p>
-          <div className="mt-2 flex justify-center">
+          <div className="mt-1.5 flex justify-center">
             <NarrationPlaybackButton text={entry.text} />
           </div>
         </div>
@@ -244,10 +244,10 @@ function ChronicleEntryBlock({
 
   if (entry.type === "state_change") {
     return (
-      <p className="text-center text-[10px] uppercase tracking-[0.12em] text-[var(--outline)]/55">
+      <p className="text-center text-[9px] uppercase tracking-[0.1em] text-[var(--outline)]/45">
         {entry.text}
         {entry.detail ? (
-          <span className="text-[var(--outline)]/40"> · {entry.detail}</span>
+          <span className="text-[var(--outline)]/35"> · {entry.detail}</span>
         ) : null}
       </p>
     );
@@ -294,7 +294,7 @@ export function ChronicleFeed({ entries, className = "" }: ChronicleFeedProps) {
 
   return (
     <div
-      className={`flex min-h-0 flex-1 flex-col gap-8 overflow-y-auto overflow-x-hidden px-1 pb-20 scrollbar-hide ${className}`}
+      className={`flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto overflow-x-hidden px-1 pb-12 scrollbar-hide sm:gap-4 ${className}`}
       role="feed"
       aria-label="Chronicle"
     >
@@ -318,22 +318,22 @@ export function ChronicleFeed({ entries, className = "" }: ChronicleFeedProps) {
               className="relative mx-auto w-full max-w-[min(100%,22rem)] sm:max-w-[min(100%,26rem)]"
             >
               <div
-                className="rounded-[2px] px-5 py-6 sm:px-7 sm:py-8"
+                className="rounded-[2px] px-4 py-4 sm:px-5 sm:py-5"
                 style={{
                   background:
                     "linear-gradient(165deg, color-mix(in srgb, var(--surface-container) 88%, transparent) 0%, color-mix(in srgb, var(--color-deep-void) 92%, transparent) 100%)",
                   boxShadow:
-                    "inset 0 0 0 1px rgba(212,175,55,0.14), 0 16px 48px rgba(0,0,0,0.45)",
+                    "inset 0 0 0 1px rgba(212,175,55,0.14), 0 12px 36px rgba(0,0,0,0.38)",
                 }}
               >
-                <header className="mb-5 text-center">
-                  <p className="text-fantasy text-[11px] font-black uppercase tracking-[0.28em] text-[var(--color-gold-rare)]">
+                <header className="mb-2.5 text-center">
+                  <p className="text-fantasy text-[10px] font-black uppercase tracking-[0.26em] text-[var(--color-gold-rare)]">
                     {segmentHeading(segment, players)}
                   </p>
-                  <div className="mx-auto mt-2 h-px w-12 bg-gradient-to-r from-transparent via-[var(--color-gold-support)]/50 to-transparent" />
+                  <div className="mx-auto mt-1.5 h-px w-10 bg-gradient-to-r from-transparent via-[var(--color-gold-support)]/50 to-transparent" />
                 </header>
 
-                <div className="flex flex-col gap-5">
+                <div className="flex flex-col gap-2.5 sm:gap-3">
                   {segment.entries.map((e) => (
                     <div key={e.id}>
                       <ChronicleEntryBlock entry={e} />
@@ -342,7 +342,7 @@ export function ChronicleFeed({ entries, className = "" }: ChronicleFeedProps) {
                 </div>
 
                 {time ? (
-                  <footer className="mt-6 border-t border-[rgba(77,70,53,0.1)] pt-3 text-center">
+                  <footer className="mt-3 border-t border-[rgba(77,70,53,0.1)] pt-2 text-center">
                     <time
                       className="text-[9px] tabular-nums tracking-wider text-[var(--outline)]/45"
                       dateTime={segment.entries[segment.entries.length - 1]!.timestamp}
