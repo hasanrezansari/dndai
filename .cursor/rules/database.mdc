@@ -12,7 +12,7 @@ alwaysApply: false
 ## DB Client
 ```typescript
 import { db } from "@/lib/db";
-// Uses node-postgres (pg Pool) + Drizzle ORM. Lazy singleton; tune DATABASE_POOL_MAX on serverless.
+// Uses node-postgres (pg Pool) + Drizzle ORM. Lazy singleton; default max 3 (override DATABASE_POOL_MAX).
 ```
 
 ## Migration Workflow

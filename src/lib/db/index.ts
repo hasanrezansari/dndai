@@ -2,6 +2,9 @@ import { drizzle, type NodePgDatabase } from "drizzle-orm/node-postgres";
 import { Pool } from "pg";
 import * as schema from "./schema";
 
+/** Tuned for serverless (Vercel + Supabase): many instances × low max avoids exhausting DB connections. */
+const DEFAULT_POOL_MAX = 3;
+
 let _pool: Pool | null = null;
 let _db: NodePgDatabase<typeof schema> | null = null;
 
@@ -12,10 +15,10 @@ function getPool(): Pool {
       throw new Error("DATABASE_URL is required");
     }
     const maxRaw = process.env.DATABASE_POOL_MAX;
-    const max = maxRaw !== undefined ? Number(maxRaw) : 5;
+    const max = maxRaw !== undefined ? Number(maxRaw) : DEFAULT_POOL_MAX;
     _pool = new Pool({
       connectionString: url,
-      max: Number.isFinite(max) && max > 0 ? max : 5,
+      max: Number.isFinite(max) && max > 0 ? max : DEFAULT_POOL_MAX,
       idleTimeoutMillis: 20_000,
       connectionTimeoutMillis: 10_000,
     });
