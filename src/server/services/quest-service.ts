@@ -622,7 +622,7 @@ export async function applyTurnQuestProgress(params: {
   recentActions.push(params.actionType);
   if (recentActions.length > 5) recentActions.shift();
 
-  let progress = clamp(current.progress + progressDelta, 0, MAX_PROGRESS);
+  const progress = clamp(current.progress + progressDelta, 0, MAX_PROGRESS);
   let risk = clamp(current.risk + riskDelta, 0, MAX_RISK);
   let status: QuestStatus = current.status;
 

@@ -5,6 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { ConnectionStatus } from "@/components/ui/connection-status";
+import { GhostButton } from "@/components/ui/ghost-button";
 import {
   SkeletonCard,
   SkeletonCircle,
@@ -160,6 +161,7 @@ export default function SessionGameplayPage() {
   const [sceneTransitionTrigger, setSceneTransitionTrigger] = useState(false);
   const [prevSceneTitle, setPrevSceneTitle] = useState<string | null>(null);
   const [chronicleOpen, setChronicleOpen] = useState(false);
+  const [displayLinkHint, setDisplayLinkHint] = useState<string | null>(null);
   const [sceneDetailOpen, setSceneDetailOpen] = useState(false);
   const [questOpen, setQuestOpen] = useState(false);
   const [partyInspectPlayerId, setPartyInspectPlayerId] = useState<
@@ -411,6 +413,57 @@ export default function SessionGameplayPage() {
     }
   }, [router]);
 
+  const openRoomDisplayInNewTab = useCallback(async () => {
+    if (!sessionId || typeof window === "undefined") return;
+    try {
+      const res = await fetch(`/api/sessions/${sessionId}/display-token`, {
+        method: "POST",
+      });
+      const body = (await res.json().catch(() => ({}))) as {
+        path?: string;
+        error?: string;
+      };
+      if (!res.ok) {
+        window.alert(body.error ?? "Could not open room display");
+        return;
+      }
+      if (!body.path) return;
+      window.open(
+        `${window.location.origin}${body.path}`,
+        "_blank",
+        "noopener,noreferrer",
+      );
+    } catch {
+      window.alert("Could not open room display");
+    }
+  }, [sessionId]);
+
+  const copyRoomDisplayLink = useCallback(async () => {
+    if (!sessionId || typeof window === "undefined") return;
+    try {
+      const res = await fetch(`/api/sessions/${sessionId}/display-token`, {
+        method: "POST",
+      });
+      const body = (await res.json().catch(() => ({}))) as {
+        path?: string;
+        error?: string;
+      };
+      if (!res.ok) {
+        setDisplayLinkHint(body.error ?? "Could not create link");
+        setTimeout(() => setDisplayLinkHint(null), 2500);
+        return;
+      }
+      if (!body.path) return;
+      const url = `${window.location.origin}${body.path}`;
+      await navigator.clipboard.writeText(url);
+      setDisplayLinkHint("TV link copied");
+      setTimeout(() => setDisplayLinkHint(null), 2000);
+    } catch {
+      setDisplayLinkHint("Copy failed");
+      setTimeout(() => setDisplayLinkHint(null), 2000);
+    }
+  }, [sessionId]);
+
   const handleEndingVote = useCallback(
     async (choice: "end_now" | "continue") => {
       if (!sessionId || !currentPlayerId || voteBusy) return;
@@ -621,6 +674,40 @@ export default function SessionGameplayPage() {
             mode={sessionUiMode}
             onChange={setSessionUiMode}
           />
+          <div className="mt-3 flex gap-2 items-stretch">
+            <GhostButton
+              type="button"
+              size="md"
+              className="min-h-[44px] flex-1 border-[rgba(77,70,53,0.22)]"
+              onClick={() => void openRoomDisplayInNewTab()}
+            >
+              <span className="material-symbols-outlined text-base">tv</span>
+              Room display
+            </GhostButton>
+            <button
+              type="button"
+              aria-label="Copy room display link"
+              className="shrink-0 min-h-[44px] min-w-[44px] rounded-[var(--radius-card)] border border-[rgba(77,70,53,0.22)] bg-[var(--surface-high)]/50 flex items-center justify-center text-[var(--outline)] hover:border-[var(--color-gold-rare)]/35 hover:text-[var(--color-gold-rare)] transition-colors"
+              onClick={() => void copyRoomDisplayLink()}
+            >
+              <span className="material-symbols-outlined text-base">
+                content_copy
+              </span>
+            </button>
+          </div>
+          {displayLinkHint ? (
+            <p className="mt-2 text-[10px] text-[var(--color-gold-rare)] uppercase tracking-[0.15em] text-center">
+              {displayLinkHint}
+            </p>
+          ) : null}
+          {session?.joinCode ? (
+            <p className="mt-2 text-[10px] text-[var(--color-silver-dim)] text-center leading-relaxed px-0.5">
+              TV: home → Watch on TV →{" "}
+              <span className="font-mono text-[var(--color-gold-support)] tracking-[0.12em]">
+                {session.joinCode}
+              </span>
+            </p>
+          ) : null}
         </div>
       </div>
 

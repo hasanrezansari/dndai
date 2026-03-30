@@ -4,10 +4,12 @@ import { and, count, eq, max, sql } from "drizzle-orm";
 
 import { db } from "@/lib/db";
 import { authUsers, players, sessions } from "@/lib/db/schema";
+import {
+  JOIN_CODE_ALPHABET,
+  normalizeJoinCodeForLookup,
+} from "@/lib/join-code";
 import type { Player, Session } from "@/lib/schemas/domain";
 import type { CampaignMode, SessionMode } from "@/lib/schemas/enums";
-
-const JOIN_CODE_ALPHABET = "23456789ABCDEFGHJKMNPQRSTUVWXYZ";
 
 function generateJoinCode(): string {
   let code = "";
@@ -15,6 +17,20 @@ function generateJoinCode(): string {
     code += JOIN_CODE_ALPHABET[randomInt(JOIN_CODE_ALPHABET.length)]!;
   }
   return code;
+}
+
+/** Read-only display entry by room code; lobby, active, or paused — not ended. */
+export async function findSessionIdByJoinCodeForDisplayWatch(
+  joinCode: string,
+): Promise<string | null> {
+  const normalized = normalizeJoinCodeForLookup(joinCode);
+  const [row] = await db
+    .select({ id: sessions.id, status: sessions.status })
+    .from(sessions)
+    .where(eq(sessions.join_code, normalized))
+    .limit(1);
+  if (!row || row.status === "ended") return null;
+  return row.id;
 }
 
 function mapSessionRow(row: typeof sessions.$inferSelect): Session {

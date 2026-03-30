@@ -19,6 +19,15 @@ export interface SceneHeaderProps {
   teaser?: string | null;
   /** Opens full scene + lore sheet (entire header is tappable). */
   onOpenDetails?: () => void;
+  /** When false, hides round / phase / turn chips (e.g. room display). Default true. */
+  showMetaChips?: boolean;
+  /** When false, hides “Tap for scene & lore”. Default true. */
+  showTapHint?: boolean;
+  /**
+   * When false and there is no teaser, omit the turn/waiting line under the title
+   * (room display uses narration below instead).
+   */
+  showTurnWhenNoTeaser?: boolean;
 }
 
 function phaseChipClass(phase: string | undefined): string {
@@ -46,6 +55,9 @@ export function SceneHeader({
   phase,
   teaser,
   onOpenDetails,
+  showMetaChips = true,
+  showTapHint = true,
+  showTurnWhenNoTeaser = true,
 }: SceneHeaderProps) {
   const turnShort = currentPlayerName
     ? `${currentPlayerName}'s turn`
@@ -72,7 +84,7 @@ export function SceneHeader({
         : currentPlayerName;
     chips.push({ text: name, accentPhase: null });
   }
-  const visibleChips = chips.slice(0, 3);
+  const visibleChips = showMetaChips ? chips.slice(0, 3) : [];
 
   return (
     <div className="relative h-full w-full overflow-hidden">
@@ -139,20 +151,22 @@ export function SceneHeader({
       ) : null}
 
       <div className="pointer-events-none absolute inset-x-0 bottom-0 top-0 z-[2] flex flex-col justify-end pb-4 pl-4 pr-4 pt-14">
-        <div className="flex flex-wrap items-center gap-1.5">
-          {visibleChips.map((c, i) => (
-            <span
-              key={`${c.text}-${i}`}
-              className={`rounded-[var(--radius-pill)] border bg-[var(--color-obsidian)]/75 px-2.5 py-1 text-[9px] font-black uppercase tracking-[0.14em] backdrop-blur-sm ${
-                c.accentPhase
-                  ? phaseChipClass(c.accentPhase)
-                  : "border-[rgba(77,70,53,0.25)] text-[var(--outline)]"
-              }`}
-            >
-              {c.text}
-            </span>
-          ))}
-        </div>
+        {visibleChips.length > 0 ? (
+          <div className="flex flex-wrap items-center gap-1.5">
+            {visibleChips.map((c, i) => (
+              <span
+                key={`${c.text}-${i}`}
+                className={`rounded-[var(--radius-pill)] border bg-[var(--color-obsidian)]/75 px-2.5 py-1 text-[9px] font-black uppercase tracking-[0.14em] backdrop-blur-sm ${
+                  c.accentPhase
+                    ? phaseChipClass(c.accentPhase)
+                    : "border-[rgba(77,70,53,0.25)] text-[var(--outline)]"
+                }`}
+              >
+                {c.text}
+              </span>
+            ))}
+          </div>
+        ) : null}
         <h1
           className="text-fantasy mt-2 line-clamp-1 text-lg font-black leading-tight tracking-tight text-[var(--color-silver-muted)] sm:text-xl"
           style={{
@@ -166,14 +180,16 @@ export function SceneHeader({
           <p className="mt-1 line-clamp-1 text-[11px] leading-snug text-[var(--color-silver-dim)]">
             {teaser}
           </p>
-        ) : (
+        ) : showTurnWhenNoTeaser ? (
           <p className="mt-1 line-clamp-1 text-[10px] font-bold uppercase tracking-wider text-[var(--color-gold-rare)]">
             {turnShort}
           </p>
-        )}
-        <p className="mt-2 text-[9px] font-bold uppercase tracking-[0.18em] text-[var(--outline)]">
-          Tap for scene &amp; lore
-        </p>
+        ) : null}
+        {showTapHint ? (
+          <p className="mt-2 text-[9px] font-bold uppercase tracking-[0.18em] text-[var(--outline)]">
+            Tap for scene &amp; lore
+          </p>
+        ) : null}
       </div>
 
       {onOpenDetails && !showBlockingPaintOverlay ? (

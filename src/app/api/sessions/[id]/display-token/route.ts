@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from "next/server";
-import { and, eq } from "drizzle-orm";
 import { z } from "zod";
 
 import { apiError, handleApiError } from "@/lib/api/errors";
@@ -8,11 +7,9 @@ import {
   requireUser,
   unauthorizedResponse,
 } from "@/lib/auth/guards";
-import { db } from "@/lib/db";
-import { players } from "@/lib/db/schema";
-import { loadSessionStatePayload } from "@/server/services/session-state-payload";
+import { signDisplayToken } from "@/lib/display-token";
 
-export async function GET(
+export async function POST(
   _request: NextRequest,
   context: { params: Promise<{ id: string }> },
 ) {
@@ -27,19 +24,22 @@ export async function GET(
       return apiError("Forbidden", 403);
     }
 
-    await db
-      .update(players)
-      .set({ is_connected: true })
-      .where(
-        and(eq(players.session_id, sessionId), eq(players.user_id, user.id)),
-      );
-
-    const payload = await loadSessionStatePayload(sessionId);
-    if (!payload) {
-      return apiError("Not found", 404);
+    let token: string;
+    let expiresAtIso: string;
+    try {
+      const out = await signDisplayToken(sessionId);
+      token = out.token;
+      expiresAtIso = out.expiresAtIso;
+    } catch {
+      return apiError("Display tokens not configured", 503);
     }
 
-    return NextResponse.json(payload);
+    const path = `/session/${sessionId}/display?t=${encodeURIComponent(token)}`;
+    return NextResponse.json({
+      token,
+      expiresAt: expiresAtIso,
+      path,
+    });
   } catch (e) {
     return handleApiError(e);
   }

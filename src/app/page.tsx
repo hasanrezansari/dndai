@@ -1,12 +1,12 @@
 "use client";
 
 import { useSession } from "next-auth/react";
+import Link from "next/link";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 
 import { COPY } from "@/lib/copy/ashveil";
 import { GoldButton } from "@/components/ui/gold-button";
-import { GhostButton } from "@/components/ui/ghost-button";
 import { ModeCardsSkeleton } from "@/components/ui/loading-skeleton";
 import { PillSelect } from "@/components/ui/pill-select";
 import type { CampaignMode, SessionMode } from "@/lib/schemas/enums";
@@ -335,6 +335,14 @@ export default function Home() {
               </>
             )}
           </GoldButton>
+
+          <Link
+            href="/tv"
+            className="w-full flex items-center justify-center gap-2 min-h-[48px] rounded-[var(--radius-card)] border border-[rgba(77,70,53,0.25)] bg-[var(--surface-container)]/40 text-[var(--color-silver-muted)] text-[10px] font-bold uppercase tracking-[0.14em] hover:border-[var(--color-gold-rare)]/30 hover:text-[var(--color-gold-rare)] transition-colors"
+          >
+            <span className="material-symbols-outlined text-lg">tv</span>
+            Watch on TV
+          </Link>
 
           {joinOpen ? (
             <form

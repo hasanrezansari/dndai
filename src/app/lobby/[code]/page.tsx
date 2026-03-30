@@ -42,6 +42,7 @@ export default function LobbyPage() {
   const [loading, setLoading] = useState(true);
   const [readyLoading, setReadyLoading] = useState(false);
   const [shareHint, setShareHint] = useState<string | null>(null);
+  const [shareDisplayHint, setShareDisplayHint] = useState<string | null>(null);
 
   const refetchSession = useCallback(async (sid: string) => {
     const res = await fetch(`/api/sessions/${sid}`);
@@ -216,6 +217,57 @@ export default function LobbyPage() {
 
   function handleLeave() {
     router.push("/");
+  }
+
+  async function openRoomDisplayInNewTab() {
+    if (!sessionId || typeof window === "undefined") return;
+    try {
+      const res = await fetch(`/api/sessions/${sessionId}/display-token`, {
+        method: "POST",
+      });
+      const body = (await res.json().catch(() => ({}))) as {
+        path?: string;
+        error?: string;
+      };
+      if (!res.ok) {
+        window.alert(body.error ?? "Could not open room display");
+        return;
+      }
+      if (!body.path) return;
+      window.open(
+        `${window.location.origin}${body.path}`,
+        "_blank",
+        "noopener,noreferrer",
+      );
+    } catch {
+      window.alert("Could not open room display");
+    }
+  }
+
+  async function copyRoomDisplayLink() {
+    if (!sessionId || typeof window === "undefined") return;
+    try {
+      const res = await fetch(`/api/sessions/${sessionId}/display-token`, {
+        method: "POST",
+      });
+      const body = (await res.json().catch(() => ({}))) as {
+        path?: string;
+        error?: string;
+      };
+      if (!res.ok) {
+        setShareDisplayHint(body.error ?? "Could not create link");
+        setTimeout(() => setShareDisplayHint(null), 2500);
+        return;
+      }
+      if (!body.path) return;
+      const url = `${window.location.origin}${body.path}`;
+      await navigator.clipboard.writeText(url);
+      setShareDisplayHint("TV link copied");
+      setTimeout(() => setShareDisplayHint(null), 2000);
+    } catch {
+      setShareDisplayHint("Copy failed");
+      setTimeout(() => setShareDisplayHint(null), 2000);
+    }
   }
 
   const title = session?.campaign_title?.trim() || "Untitled Adventure";
@@ -412,6 +464,45 @@ export default function LobbyPage() {
               <span>{startLoading ? "Opening portal…" : "Begin Adventure"}</span>
               <span className="material-symbols-outlined text-lg">swords</span>
             </GoldButton>
+          ) : null}
+
+          {sessionId ? (
+            <div className="flex flex-col gap-2">
+              <div className="flex gap-2 items-stretch">
+                <GhostButton
+                  type="button"
+                  size="lg"
+                  className="flex-1 min-h-[48px] flex items-center justify-center gap-2 border-[rgba(77,70,53,0.25)]"
+                  onClick={() => void openRoomDisplayInNewTab()}
+                >
+                  <span className="material-symbols-outlined text-lg">tv</span>
+                  Room display
+                </GhostButton>
+                <button
+                  type="button"
+                  aria-label="Copy room display link"
+                  className="shrink-0 min-h-[48px] min-w-[48px] rounded-[var(--radius-card)] border border-[rgba(77,70,53,0.25)] bg-[var(--surface-high)]/50 flex items-center justify-center text-[var(--outline)] hover:border-[var(--color-gold-rare)]/35 hover:text-[var(--color-gold-rare)] transition-colors"
+                  onClick={() => void copyRoomDisplayLink()}
+                >
+                  <span className="material-symbols-outlined text-lg">
+                    content_copy
+                  </span>
+                </button>
+              </div>
+              {shareDisplayHint ? (
+                <p className="text-[10px] text-[var(--color-gold-rare)] text-center uppercase tracking-[0.15em]">
+                  {shareDisplayHint}
+                </p>
+              ) : null}
+              {session?.join_code ? (
+                <p className="text-[10px] text-[var(--color-silver-dim)] text-center leading-relaxed px-1">
+                  On a TV: home → Watch on TV → code{" "}
+                  <span className="font-mono text-[var(--color-gold-support)] tracking-[0.15em]">
+                    {session.join_code}
+                  </span>
+                </p>
+              ) : null}
+            </div>
           ) : null}
 
           <button
