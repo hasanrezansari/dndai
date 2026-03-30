@@ -1,6 +1,7 @@
 "use client";
 
 import { AnimatePresence, motion } from "framer-motion";
+import { useCallback, useState } from "react";
 
 import { COPY } from "@/lib/copy/ashveil";
 
@@ -28,6 +29,11 @@ export interface SceneHeaderProps {
    * (room display uses narration below instead).
    */
   showTurnWhenNoTeaser?: boolean;
+  /**
+   * Room / TV display: hide scene images until loaded and retry on error so a broken
+   * icon never shows; optional loading shimmer over the frame while fetching.
+   */
+  roomDisplay?: boolean;
 }
 
 function phaseChipClass(phase: string | undefined): string {
@@ -44,6 +50,109 @@ function phaseChipClass(phase: string | undefined): string {
   }
 }
 
+/** Remount via `key` on parent when URLs change — resets load state without effects. */
+function SceneHeaderRoomImages({
+  sceneImage,
+  previousSceneImage,
+  scenePending,
+}: {
+  sceneImage: string;
+  previousSceneImage: string | null;
+  scenePending: boolean;
+}) {
+  const [frontReady, setFrontReady] = useState(false);
+  const [frontSrc, setFrontSrc] = useState(sceneImage);
+  const [prevSrc, setPrevSrc] = useState(previousSceneImage);
+
+  const onFrontError = useCallback(() => {
+    try {
+      const u = new URL(frontSrc ?? sceneImage, window.location.href);
+      u.searchParams.set("cb", String(Date.now()));
+      setFrontSrc(u.pathname + u.search);
+      setFrontReady(false);
+    } catch {
+      setFrontSrc((s) =>
+        s ? `${s.split("?")[0]}?cb=${Date.now()}` : s,
+      );
+      setFrontReady(false);
+    }
+  }, [frontSrc, sceneImage]);
+
+  const onPrevError = useCallback(() => {
+    if (!previousSceneImage) return;
+    try {
+      const u = new URL(prevSrc ?? previousSceneImage, window.location.href);
+      u.searchParams.set("cb", String(Date.now()));
+      setPrevSrc(u.pathname + u.search);
+    } catch {
+      setPrevSrc((s) =>
+        s ? `${s.split("?")[0]}?cb=${Date.now()}` : s,
+      );
+    }
+  }, [prevSrc, previousSceneImage]);
+
+  const showGate =
+    Boolean(sceneImage) && !frontReady && !scenePending;
+
+  return (
+    <>
+      {previousSceneImage && sceneImage ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={prevSrc ?? previousSceneImage}
+          alt=""
+          onError={onPrevError}
+          className="absolute inset-0 z-0 h-full w-full object-cover"
+        />
+      ) : null}
+
+      <AnimatePresence initial={false}>
+        <motion.img
+          key={sceneImage}
+          src={frontSrc ?? sceneImage}
+          alt=""
+          loading="eager"
+          decoding="async"
+          onLoad={() => {
+            setFrontReady(true);
+          }}
+          onError={onFrontError}
+          className={`absolute inset-0 z-[1] h-full w-full object-cover ${
+            !frontReady ? "opacity-0" : ""
+          }`}
+          initial={{ opacity: 1 }}
+          animate={{ opacity: !frontReady ? 0 : 1 }}
+          transition={{ duration: 0.4 }}
+        />
+      </AnimatePresence>
+
+      {!sceneImage && previousSceneImage ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={prevSrc ?? previousSceneImage}
+          alt=""
+          onError={onPrevError}
+          loading="eager"
+          decoding="async"
+          className="absolute inset-0 z-0 h-full w-full object-cover"
+        />
+      ) : null}
+
+      {showGate ? (
+        <div
+          className="pointer-events-none absolute inset-0 z-[3] flex flex-col items-center justify-center overflow-hidden"
+          aria-busy
+        >
+          <div className="animate-shimmer absolute inset-0 opacity-[0.97]" />
+          <p className="text-fantasy relative z-[1] text-sm tracking-wide text-[var(--color-gold-support)] drop-shadow-[0_2px_10px_rgba(0,0,0,0.95)]">
+            {COPY.scenePending}
+          </p>
+        </div>
+      ) : null}
+    </>
+  );
+}
+
 export function SceneHeader({
   sceneImage,
   previousSceneImage,
@@ -58,6 +167,7 @@ export function SceneHeader({
   showMetaChips = true,
   showTapHint = true,
   showTurnWhenNoTeaser = true,
+  roomDisplay = false,
 }: SceneHeaderProps) {
   const turnShort = currentPlayerName
     ? `${currentPlayerName}'s turn`
@@ -65,8 +175,9 @@ export function SceneHeader({
 
   const showBackdrop = !sceneImage && !previousSceneImage;
 
-  const showBlockingPaintOverlay =
+  const showServerPendingOverlay =
     scenePending && !sceneImage && !previousSceneImage;
+  const showBlockingPaintOverlay = showServerPendingOverlay;
 
   type Chip = { text: string; accentPhase: string | null };
   const chips: Chip[] = [];
@@ -99,46 +210,57 @@ export function SceneHeader({
           />
         ) : null}
 
-        {previousSceneImage && sceneImage ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={previousSceneImage}
-            alt=""
-            className="absolute inset-0 z-0 h-full w-full object-cover"
+        {roomDisplay && sceneImage ? (
+          <SceneHeaderRoomImages
+            key={`${sceneImage}__${previousSceneImage ?? ""}`}
+            sceneImage={sceneImage}
+            previousSceneImage={previousSceneImage}
+            scenePending={scenePending}
           />
-        ) : null}
+        ) : (
+          <>
+            {previousSceneImage && sceneImage ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={previousSceneImage}
+                alt=""
+                className="absolute inset-0 z-0 h-full w-full object-cover"
+              />
+            ) : null}
 
-        <AnimatePresence initial={false}>
-          {sceneImage ? (
-            <motion.img
-              key={sceneImage}
-              src={sceneImage}
-              alt=""
-              loading="eager"
-              decoding="async"
-              className="absolute inset-0 z-[1] h-full w-full object-cover"
-              initial={{ opacity: 1 }}
-              animate={{ opacity: 1 }}
-              transition={{ duration: 0.4 }}
-            />
-          ) : null}
-        </AnimatePresence>
+            <AnimatePresence initial={false}>
+              {sceneImage ? (
+                <motion.img
+                  key={sceneImage}
+                  src={sceneImage}
+                  alt=""
+                  loading="eager"
+                  decoding="async"
+                  className="absolute inset-0 z-[1] h-full w-full object-cover"
+                  initial={{ opacity: 1 }}
+                  animate={{ opacity: 1 }}
+                  transition={{ duration: 0.4 }}
+                />
+              ) : null}
+            </AnimatePresence>
 
-        {!sceneImage && previousSceneImage ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={previousSceneImage}
-            alt=""
-            loading="eager"
-            decoding="async"
-            className="absolute inset-0 z-0 h-full w-full object-cover"
-          />
-        ) : null}
+            {!sceneImage && previousSceneImage ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={previousSceneImage}
+                alt=""
+                loading="eager"
+                decoding="async"
+                className="absolute inset-0 z-0 h-full w-full object-cover"
+              />
+            ) : null}
+          </>
+        )}
       </div>
 
       <div className="absolute inset-0 bg-gradient-to-t from-[var(--color-obsidian)] via-[var(--color-obsidian)]/55 to-transparent" />
 
-      {showBlockingPaintOverlay ? (
+      {showServerPendingOverlay ? (
         <div
           className="pointer-events-none absolute inset-0 z-[3] flex flex-col items-center justify-center overflow-hidden"
           aria-busy

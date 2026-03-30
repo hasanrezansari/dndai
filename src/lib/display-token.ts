@@ -1,6 +1,19 @@
+import type { NextRequest } from "next/server";
 import { SignJWT, jwtVerify } from "jose";
 
 export const DISPLAY_TOKEN_AUDIENCE = "ashveil-display";
+
+/** `?t=` query or `Authorization: Bearer` — same as display-state API. */
+export function getDisplayTokenFromRequest(request: NextRequest): string | null {
+  const url = new URL(request.url);
+  const q = url.searchParams.get("t")?.trim();
+  if (q) return q;
+  const auth = request.headers.get("authorization");
+  if (auth?.startsWith("Bearer ")) {
+    return auth.slice(7).trim() || null;
+  }
+  return null;
+}
 
 const DISPLAY_TOKEN_TTL_SEC = 60 * 60 * 24; // 24h
 

@@ -2,19 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 
 import { apiError, handleApiError } from "@/lib/api/errors";
-import { verifyDisplayToken } from "@/lib/display-token";
+import { getDisplayTokenFromRequest, verifyDisplayToken } from "@/lib/display-token";
 import { loadSessionStatePayload } from "@/server/services/session-state-payload";
-
-function tokenFromRequest(request: NextRequest): string | null {
-  const url = new URL(request.url);
-  const q = url.searchParams.get("t")?.trim();
-  if (q) return q;
-  const auth = request.headers.get("authorization");
-  if (auth?.startsWith("Bearer ")) {
-    return auth.slice(7).trim() || null;
-  }
-  return null;
-}
 
 export async function GET(
   request: NextRequest,
@@ -26,7 +15,7 @@ export async function GET(
       return apiError("Invalid session id", 400);
     }
 
-    const raw = tokenFromRequest(request);
+    const raw = getDisplayTokenFromRequest(request);
     if (!raw) {
       return apiError("Missing token", 401);
     }

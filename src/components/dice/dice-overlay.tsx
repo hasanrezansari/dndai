@@ -5,7 +5,8 @@ import { useEffect } from "react";
 
 import { useGameStore } from "@/lib/state/game-store";
 
-const OVERLAY_MS = 3200;
+/** Shared with room display presentation timing. */
+export const DICE_OVERLAY_MS = 3200;
 
 function resultAccent(result: string): {
   label: string;
@@ -57,7 +58,7 @@ export function DiceOverlay() {
     if (diceOverlay === null) return;
     const t = window.setTimeout(() => {
       hideDiceOverlay();
-    }, OVERLAY_MS);
+    }, DICE_OVERLAY_MS);
     return () => window.clearTimeout(t);
   }, [diceOverlay, hideDiceOverlay]);
 

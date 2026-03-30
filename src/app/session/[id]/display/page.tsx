@@ -5,9 +5,10 @@ import { useParams, useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useState } from "react";
 
 import { RoomDisplayNarration } from "@/components/display/room-display-narration";
-import { ConnectionStatus } from "@/components/ui/connection-status";
+import { DiceOverlay } from "@/components/dice/dice-overlay";
 import { SkeletonText } from "@/components/ui/loading-skeleton";
 import { SceneHeader } from "@/components/game/scene-header";
+import { useRoomDisplayPresentation } from "@/lib/display/use-room-display-presentation";
 import { useSessionChannel } from "@/lib/socket/use-session-channel";
 import {
   useGameStore,
@@ -49,16 +50,27 @@ function SessionRoomDisplayContent() {
         : "";
 
   const session = useGameStore((s) => s.session);
-  const sceneImage = useGameStore((s) => s.sceneImage);
-  const previousSceneImage = useGameStore((s) => s.previousSceneImage);
   const sceneTitle = useGameStore((s) => s.sceneTitle);
-  const scenePending = useGameStore((s) => s.scenePending);
-  const narrativeText = useGameStore((s) => s.narrativeText);
   const isThinking = useGameStore((s) => s.isThinking);
 
   const setSessionId = useGameStore((s) => s.setSessionId);
   const setCurrentPlayerId = useGameStore((s) => s.setCurrentPlayerId);
   const hydrate = useGameStore((s) => s.hydrate);
+
+  const {
+    visible,
+    onActionSubmittedForDisplay,
+    onDiceRollingForDisplay,
+    flushFromStore,
+  } = useRoomDisplayPresentation(sessionId, displayToken);
+
+  useSessionChannel(sessionId || null, {
+    displayToken: displayToken ?? undefined,
+    participateInPresence: false,
+    onActionSubmittedForDisplay,
+    onDiceRollingForDisplay,
+    onFullResyncComplete: flushFromStore,
+  });
 
   const { data: authSession, status: authStatus } = useSession();
   const [hydrated, setHydrated] = useState(false);
@@ -67,13 +79,6 @@ function SessionRoomDisplayContent() {
   useEffect(() => {
     setHydrated(false);
   }, [sessionId, displayToken]);
-
-  useSessionChannel(
-    sessionId || null,
-    displayToken
-      ? { displayToken, participateInPresence: false }
-      : undefined,
-  );
 
   useEffect(() => {
     if (!sessionId) return;
@@ -164,12 +169,7 @@ function SessionRoomDisplayContent() {
   }
 
   if (!hydrated) {
-    return (
-      <>
-        <DisplaySkeleton />
-        <ConnectionStatus />
-      </>
-    );
+    return <DisplaySkeleton />;
   }
 
   if (loadError) {
@@ -186,33 +186,33 @@ function SessionRoomDisplayContent() {
         >
           Retry
         </button>
-        <ConnectionStatus />
       </div>
     );
   }
 
   return (
     <div className="relative flex min-h-dvh flex-col bg-[var(--color-obsidian)]">
-      <ConnectionStatus />
+      <DiceOverlay />
       <div className="relative z-[1] h-[min(52vh,560px)] w-full shrink-0 overflow-hidden sm:h-[min(55vh,620px)]">
         <SceneHeader
-          sceneImage={sceneImage}
-          previousSceneImage={previousSceneImage}
+          sceneImage={visible.sceneImage}
+          previousSceneImage={visible.previousSceneImage}
           sceneTitle={sceneTitle}
           roundNumber={session?.currentRound ?? 1}
           currentPlayerName={null}
-          scenePending={scenePending}
+          scenePending={visible.scenePending}
           phase={null}
           phaseLabel={null}
           teaser={null}
           showMetaChips={false}
           showTapHint={false}
           showTurnWhenNoTeaser={false}
+          roomDisplay
         />
       </div>
       <div className="relative z-[2] flex min-h-0 flex-1 flex-col px-4 pb-8 pt-4 sm:px-8 sm:pt-6">
         <RoomDisplayNarration
-          narrativeText={narrativeText}
+          narrativeText={visible.narrativeText}
           isThinking={isThinking}
         />
       </div>
@@ -222,14 +222,7 @@ function SessionRoomDisplayContent() {
 
 export default function SessionRoomDisplayPage() {
   return (
-    <Suspense
-      fallback={
-        <>
-          <DisplaySkeleton />
-          <ConnectionStatus />
-        </>
-      }
-    >
+    <Suspense fallback={<DisplaySkeleton />}>
       <SessionRoomDisplayContent />
     </Suspense>
   );

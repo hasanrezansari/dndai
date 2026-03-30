@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 
 import {
   ActionSubmittedEventSchema,
@@ -39,6 +39,15 @@ export type UseSessionChannelOptions = {
   displayToken?: string | null;
   /** When false, skip `/disconnect` beacons (read-only TV). Defaults to false if displayToken is set. */
   participateInPresence?: boolean;
+  /** Room display only: freeze beat order before pipeline output. */
+  onActionSubmittedForDisplay?: () => void;
+  /** Room display only: dice pipeline started (clears no-roll fallback). */
+  onDiceRollingForDisplay?: (data: {
+    turn_id?: string;
+    round_number?: number;
+  }) => void;
+  /** Room display only: after reconnect / full state resync from server. */
+  onFullResyncComplete?: () => void;
 };
 
 function nowIso() {
@@ -90,6 +99,8 @@ export function useSessionChannel(
   const displayTokenOpt = options?.displayToken?.trim() || null;
   const participateInPresence =
     options?.participateInPresence ?? !displayTokenOpt;
+  const channelOptionsRef = useRef(options);
+  channelOptionsRef.current = options;
 
   useEffect(() => {
     if (!sessionId) return;
@@ -166,6 +177,7 @@ export function useSessionChannel(
           store.patchSessionFromStateApi(data);
           store.setIsThinking(false);
           store.hideDiceOverlay();
+          channelOptionsRef.current?.onFullResyncComplete?.();
         } finally {
           fullResyncInFlight = null;
         }
@@ -276,11 +288,16 @@ export function useSessionChannel(
         }),
       });
       useGameStore.getState().setIsThinking(true);
+      channelOptionsRef.current?.onActionSubmittedForDisplay?.();
     };
 
     const onDiceRolling = (raw: unknown) => {
       const parsed = DiceRollingEventSchema.safeParse(raw);
       if (!parsed.success) return;
+      channelOptionsRef.current?.onDiceRollingForDisplay?.({
+        turn_id: parsed.data.turn_id,
+        round_number: parsed.data.round_number,
+      });
       useGameStore.getState().addFeedEntry({
         id: feedId(),
         type: "dice",

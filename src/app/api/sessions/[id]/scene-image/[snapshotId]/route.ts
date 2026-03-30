@@ -2,6 +2,7 @@ import { and, eq } from "drizzle-orm";
 import { NextRequest, NextResponse } from "next/server";
 
 import { isSessionMember, requireUser } from "@/lib/auth/guards";
+import { getDisplayTokenFromRequest, verifyDisplayToken } from "@/lib/display-token";
 import { db } from "@/lib/db";
 import { sceneSnapshots } from "@/lib/db/schema";
 
@@ -22,18 +23,25 @@ function isAllowedRedirectUrl(url: string): boolean {
 }
 
 export async function GET(
-  _request: NextRequest,
+  request: NextRequest,
   context: { params: Promise<{ id: string; snapshotId: string }> },
 ) {
-  const user = await requireUser();
-  if (!user) {
-    return new NextResponse("Unauthorized", { status: 401 });
-  }
-
   const { id: sessionId, snapshotId } = await context.params;
 
-  if (!(await isSessionMember(sessionId, user.id))) {
-    return new NextResponse("Forbidden", { status: 403 });
+  const displayToken = getDisplayTokenFromRequest(request);
+  if (displayToken) {
+    const verified = await verifyDisplayToken(displayToken);
+    if (!verified || verified.sessionId !== sessionId) {
+      return new NextResponse("Forbidden", { status: 403 });
+    }
+  } else {
+    const user = await requireUser();
+    if (!user) {
+      return new NextResponse("Unauthorized", { status: 401 });
+    }
+    if (!(await isSessionMember(sessionId, user.id))) {
+      return new NextResponse("Forbidden", { status: 403 });
+    }
   }
 
   const [snap] = await db
