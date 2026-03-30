@@ -1,9 +1,11 @@
-import { and, asc, desc, eq } from "drizzle-orm";
+import { and, asc, desc, eq, inArray } from "drizzle-orm";
 
 import { db } from "@/lib/db";
 import {
+  actions,
   authUsers,
   characters,
+  diceRolls,
   memorySummaries,
   narrativeEvents,
   npcStates,
@@ -103,6 +105,15 @@ function mapPlayerRow(
   return base;
 }
 
+function playerDisplayLabel(
+  playersList: GamePlayerView[],
+  playerId: string,
+): string {
+  const p = playersList.find((x) => x.id === playerId);
+  if (!p) return "Player";
+  return p.character?.name ?? p.displayName ?? `Seat ${p.seatIndex + 1}`;
+}
+
 /**
  * Read-only snapshot for gameplay hydrate and room display (no presence writes).
  */
@@ -166,7 +177,7 @@ export async function loadSessionStatePayload(
   }
 
   const chronological = [...narrativeRows].reverse();
-  const feed: FeedEntry[] = chronological.map(({ ev, turn_round }) => {
+  const narrationFeed: FeedEntry[] = chronological.map(({ ev, turn_round }) => {
     const snap = snapshotRows.find(
       (s) =>
         s.created_at >= ev.created_at &&
@@ -188,6 +199,71 @@ export async function loadSessionStatePayload(
       ...(imageUrl ? { imageUrl } : {}),
     };
   });
+
+  const actionTurnRows = await db
+    .select({
+      action: actions,
+      turn: turns,
+    })
+    .from(actions)
+    .innerJoin(turns, eq(turns.id, actions.turn_id))
+    .where(eq(turns.session_id, sessionId))
+    .orderBy(desc(actions.created_at))
+    .limit(120);
+
+  const actionIds = actionTurnRows.map((r) => r.action.id);
+  const diceQuery =
+    actionIds.length > 0
+      ? await db
+          .select()
+          .from(diceRolls)
+          .where(inArray(diceRolls.action_id, actionIds))
+      : [];
+
+  const turnByActionId = new Map<
+    string,
+    (typeof actionTurnRows)[number]["turn"]
+  >();
+  for (const row of actionTurnRows) {
+    turnByActionId.set(row.action.id, row.turn);
+  }
+
+  const diceSorted = [...diceQuery].sort(
+    (a, b) => a.created_at.getTime() - b.created_at.getTime(),
+  );
+
+  const actionEntries: FeedEntry[] = actionTurnRows.map(({ action, turn }) => ({
+    id: `action:${action.id}`,
+    type: "action" as const,
+    playerName: playerDisplayLabel(mappedPlayers, turn.player_id),
+    playerId: turn.player_id,
+    text: action.raw_input,
+    timestamp: action.created_at.toISOString(),
+    turnId: turn.id,
+    roundNumber: turn.round_number,
+  }));
+
+  const diceEntries: FeedEntry[] = diceSorted.map((roll) => {
+    const turn = turnByActionId.get(roll.action_id);
+    return {
+      id: `dice:${roll.id}`,
+      type: "dice" as const,
+      text: `${roll.roll_type.toUpperCase()}: ${roll.roll_value} + ${roll.modifier} = ${roll.total}`,
+      detail: roll.result,
+      timestamp: roll.created_at.toISOString(),
+      turnId: turn?.id,
+      roundNumber: turn?.round_number,
+    };
+  });
+
+  const feed: FeedEntry[] = [
+    ...actionEntries,
+    ...diceEntries,
+    ...narrationFeed,
+  ].sort(
+    (a, b) =>
+      new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime(),
+  );
 
   const latestNarrative = narrativeRows[0];
   const narrativeText = latestNarrative?.ev.scene_text ?? null;
