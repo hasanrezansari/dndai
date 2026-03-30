@@ -18,12 +18,15 @@ function shouldCoalesceStateChangeIntoPrevious(
   if (entry.type !== "state_change") return false;
   const a = prev.turnId ?? null;
   const b = entry.turnId ?? null;
-  if (a !== null && b !== null && a !== b) return false;
   const rPrev = prev.roundNumber;
   const rEntry = entry.roundNumber;
-  if (rPrev !== undefined && rEntry !== undefined && rPrev !== rEntry)
-    return false;
-  return true;
+  const sameRound =
+    rPrev === undefined ||
+    rEntry === undefined ||
+    rPrev === rEntry;
+  if (!sameRound) return false;
+  if (a === null || b === null) return true;
+  return a === b;
 }
 
 /** Group consecutive rows that share the same `turnId` (including `null`). */

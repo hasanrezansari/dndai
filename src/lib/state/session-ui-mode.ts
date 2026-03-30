@@ -2,7 +2,8 @@ export type SessionUiMode = "spotlight" | "classic" | "chronicle";
 
 export const SESSION_UI_MODE_STORAGE_KEY = "ashveil.sessionUiMode";
 
-export const DEFAULT_SESSION_UI_MODE: SessionUiMode = "chronicle";
+/** Spotlight keeps table focus on the beat; full log lives behind “Open Chronicle”. */
+export const DEFAULT_SESSION_UI_MODE: SessionUiMode = "spotlight";
 
 export function parseSessionUiMode(raw: string | null): SessionUiMode {
   if (raw === "classic") return "classic";

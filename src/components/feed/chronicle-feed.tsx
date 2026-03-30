@@ -64,6 +64,31 @@ function segmentHeading(
   return actor ? `${roundPart} · ${actor}` : roundPart;
 }
 
+/** No full story beat — skip heavy card chrome so the log stays out of the way. */
+function segmentUsesCompactShell(segment: FeedTurnSegment): boolean {
+  if (segment.entries.length === 0) return true;
+  if (
+    segment.entries.every(
+      (e) =>
+        e.type === "system" ||
+        e.type === "state_change" ||
+        e.type === "dice",
+    )
+  ) {
+    return true;
+  }
+  if (
+    segment.entries.every(
+      (e) =>
+        e.type === "narration" &&
+        Boolean(e.detail && ROUND_DETAIL.test(e.detail)),
+    )
+  ) {
+    return true;
+  }
+  return false;
+}
+
 function parseDiceLine(text: string): {
   label: string;
   roll: string;
@@ -278,9 +303,15 @@ export function ChronicleFeed({ entries, className = "" }: ChronicleFeedProps) {
     [entries, scenePending],
   );
 
+  /** Sync lines are for debugging — hide in Chronicle unless “System” filter is on. */
+  const withoutSyncNoise = useMemo(() => {
+    if (semanticFilter === "system") return filtered;
+    return filtered.filter((e) => e.type !== "state_change");
+  }, [filtered, semanticFilter]);
+
   const semanticsFiltered = useMemo(
-    () => filterFeedBySemantic(filtered, semanticFilter),
-    [filtered, semanticFilter],
+    () => filterFeedBySemantic(withoutSyncNoise, semanticFilter),
+    [withoutSyncNoise, semanticFilter],
   );
 
   const segments = useMemo(
@@ -308,28 +339,45 @@ export function ChronicleFeed({ entries, className = "" }: ChronicleFeedProps) {
       ) : (
         segments.map((segment, i) => {
           const time = formatSegmentTime(segment.entries);
+          const compact = segmentUsesCompactShell(segment);
           return (
             <article
               key={`${segment.turnId ?? "orphan"}-${i}`}
               className="relative mx-auto w-full max-w-[min(100%,22rem)] sm:max-w-[min(100%,26rem)]"
             >
               <div
-                className="rounded-[2px] px-4 py-4 sm:px-5 sm:py-5"
-                style={{
-                  background:
-                    "linear-gradient(165deg, color-mix(in srgb, var(--surface-container) 88%, transparent) 0%, color-mix(in srgb, var(--color-deep-void) 92%, transparent) 100%)",
-                  boxShadow:
-                    "inset 0 0 0 1px rgba(212,175,55,0.14), 0 12px 36px rgba(0,0,0,0.38)",
-                }}
+                className={
+                  compact
+                    ? "rounded-[2px] border border-[rgba(77,70,53,0.12)] bg-[var(--color-deep-void)]/35 px-3 py-2"
+                    : "rounded-[2px] px-4 py-4 sm:px-5 sm:py-5"
+                }
+                style={
+                  compact
+                    ? undefined
+                    : {
+                        background:
+                          "linear-gradient(165deg, color-mix(in srgb, var(--surface-container) 88%, transparent) 0%, color-mix(in srgb, var(--color-deep-void) 92%, transparent) 100%)",
+                        boxShadow:
+                          "inset 0 0 0 1px rgba(212,175,55,0.14), 0 12px 36px rgba(0,0,0,0.38)",
+                      }
+                }
               >
-                <header className="mb-2.5 text-center">
-                  <p className="text-fantasy text-[10px] font-black uppercase tracking-[0.26em] text-[var(--color-gold-rare)]">
-                    {segmentHeading(segment, players)}
-                  </p>
-                  <div className="mx-auto mt-1.5 h-px w-10 bg-gradient-to-r from-transparent via-[var(--color-gold-support)]/50 to-transparent" />
-                </header>
+                {!compact ? (
+                  <header className="mb-2.5 text-center">
+                    <p className="text-fantasy text-[10px] font-black uppercase tracking-[0.26em] text-[var(--color-gold-rare)]">
+                      {segmentHeading(segment, players)}
+                    </p>
+                    <div className="mx-auto mt-1.5 h-px w-10 bg-gradient-to-r from-transparent via-[var(--color-gold-support)]/50 to-transparent" />
+                  </header>
+                ) : null}
 
-                <div className="flex flex-col gap-2.5 sm:gap-3">
+                <div
+                  className={
+                    compact
+                      ? "flex flex-col gap-1.5"
+                      : "flex flex-col gap-2.5 sm:gap-3"
+                  }
+                >
                   {segment.entries.map((e) => (
                     <div key={e.id}>
                       <ChronicleEntryBlock entry={e} />
@@ -337,15 +385,26 @@ export function ChronicleFeed({ entries, className = "" }: ChronicleFeedProps) {
                   ))}
                 </div>
 
-                {time ? (
+                {!compact && time ? (
                   <footer className="mt-3 border-t border-[rgba(77,70,53,0.1)] pt-2 text-center">
                     <time
                       className="text-[9px] tabular-nums tracking-wider text-[var(--outline)]/45"
-                      dateTime={segment.entries[segment.entries.length - 1]!.timestamp}
+                      dateTime={
+                        segment.entries[segment.entries.length - 1]!.timestamp
+                      }
                     >
                       {time}
                     </time>
                   </footer>
+                ) : compact && time ? (
+                  <time
+                    className="mt-1.5 block text-right text-[8px] tabular-nums text-[var(--outline)]/28"
+                    dateTime={
+                      segment.entries[segment.entries.length - 1]!.timestamp
+                    }
+                  >
+                    {time}
+                  </time>
                 ) : null}
               </div>
             </article>
