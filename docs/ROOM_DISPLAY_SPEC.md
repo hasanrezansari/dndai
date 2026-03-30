@@ -1,29 +1,44 @@
-# Room display (TV) — specification
+# Room display (read-only TV)
 
-**Status:** Implemented — `/session/[id]/display`  
-**Audience:** Engineers maintaining the optional big-screen surface.
+Seated players mint a short-lived JWT and open a **read-only** `/session/[id]/display?t=…` URL on a second screen. That browser does not join as a party member (no `players` row, no `/disconnect` storms) but still receives **Pusher** events and the same **session state payload** shape as `GET /api/sessions/[id]/state`.
 
-## Purpose
+## Environment
 
-Optional **cinema mode** for a TV or shared browser: **scene image + AI narration only**. Phones keep the full session (Chronicle / Spotlight / Classic, feed, actions). The display route is **not** a phone view mode and does not read `sessionUiMode` storage.
+| Variable | Purpose |
+|----------|---------|
+| `DISPLAY_TOKEN_SECRET` | HS256 key for display JWTs (preferred in production). |
+| `NEXTAUTH_SECRET` | Fallback signing key if `DISPLAY_TOKEN_SECRET` is unset. |
 
-## Guarantees
+Mint and verification fail closed if neither secret is set.
 
-- Same realtime pipeline as gameplay: [`useSessionChannel`](../src/lib/socket/use-session-channel.ts) → [`game-store`](../src/lib/state/game-store.ts). No second Pusher binding layer.
-- No changes to orchestration, `/actions`, or turn services for this feature (Milestone A).
-- Pusher auth still requires a logged-in user with a `players` row for the session ([`/api/pusher/auth` routes](../src/app/api/pusher/auth/route.ts)).
+## Token
 
-## Out of scope on the display page
+- Library: `jose`, algorithm **HS256**.
+- Claims: `sub` = session UUID, `aud` = `ashveil-display`, ~24h TTL.
+- **Never** send this token to write routes (actions, DM tools, etc.).
 
-- Feed list, BeatStrip, Chronicle, dice overlay, party strip, quest, turn banner, ActionBar, DM bar, sheets.
-- Replacing or switching phone UI to “TV mode.”
+## HTTP
+
+| Route | Auth | Behavior |
+|-------|------|----------|
+| `POST /api/sessions/[id]/display-token` | Session user must be a **session member** | Returns `{ token, expiresAt, path }`. |
+| `GET /api/sessions/[id]/display-state` | `?t=` or `Authorization: Bearer` | Verifies JWT; returns `SessionStatePayload` **without** mutating `players.is_connected`. |
+| `GET /api/sessions/[id]/state` | Session member | Updates `is_connected` for the caller, then same payload builder. |
+| `POST /api/pusher/auth` | Cookie session **or** `Authorization: Bearer` display JWT matching the channel’s session | Authorizes `private-session-[sessionId]`. |
+
+## Client
+
+- Gameplay keeps the existing Pusher **singleton** (cookie auth).
+- Display uses `createPusherClientWithDisplayAuth(token)` and **disconnects** on unmount.
+- `useSessionChannel(id, { displayToken, participateInPresence: false })` uses `/display-state` and skips `beforeunload` / `pagehide` **disconnect** beacons.
+
+## Auth gate
+
+Paths matching `/session/[uuid]/display` with a **three-segment** `t` query param bypass the guest sign-in wall so a cold TV browser can render without a `players` row.
 
 ## QA
 
-- **Phone:** Full loop unchanged; entry is an extra link only.
-- **Display:** Image and narration update live; no player action text; read-only.
-- **Reload display:** Rehydrates from `/state` + events; same limitations as thin narration history for past Pusher-only rows.
-
-## Future (optional)
-
-- Display-only subscribe token + QR (narrow auth; no write access).
+- [ ] Member gameplay still hydrates from `/state` and updates presence.
+- [ ] TV with `?t=` loads without gate; no `POST …/disconnect` when closing the TV tab (verify network).
+- [ ] Expired or wrong-session token → 403 on `display-state` and Pusher auth.
+- [ ] Revoked secret invalidates new verifications (expected).

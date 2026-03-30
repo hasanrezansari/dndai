@@ -1,8 +1,8 @@
 "use client";
 
 import { useSession } from "next-auth/react";
-import { useParams } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useParams, useSearchParams } from "next/navigation";
+import { Suspense, useEffect, useState } from "react";
 
 import { RoomDisplayNarration } from "@/components/display/room-display-narration";
 import { ConnectionStatus } from "@/components/ui/connection-status";
@@ -35,8 +35,11 @@ function DisplaySkeleton() {
   );
 }
 
-export default function SessionRoomDisplayPage() {
+function SessionRoomDisplayContent() {
   const params = useParams();
+  const searchParams = useSearchParams();
+  const displayToken = searchParams.get("t")?.trim() || null;
+
   const idParam = params.id;
   const sessionId =
     typeof idParam === "string"
@@ -63,13 +66,50 @@ export default function SessionRoomDisplayPage() {
 
   useEffect(() => {
     setHydrated(false);
-  }, [sessionId]);
+  }, [sessionId, displayToken]);
 
-  useSessionChannel(sessionId || null);
+  useSessionChannel(
+    sessionId || null,
+    displayToken
+      ? { displayToken, participateInPresence: false }
+      : undefined,
+  );
 
   useEffect(() => {
     if (!sessionId) return;
     setSessionId(sessionId);
+
+    if (displayToken) {
+      const token = displayToken;
+      let cancelled = false;
+      async function load() {
+        try {
+          setLoadError(null);
+          const res = await fetch(
+            `/api/sessions/${sessionId}/display-state?t=${encodeURIComponent(token)}`,
+          );
+          if (cancelled) return;
+          if (!res.ok) {
+            setLoadError(`Failed to load session (${res.status})`);
+            return;
+          }
+          const data = (await res.json()) as SessionStatePayload;
+          if (cancelled) return;
+          hydrate(data);
+        } catch {
+          if (!cancelled) {
+            setLoadError("Network error — could not load session.");
+          }
+        } finally {
+          if (!cancelled) setHydrated(true);
+        }
+      }
+      void load();
+      return () => {
+        cancelled = true;
+      };
+    }
+
     if (authStatus === "loading") return;
     if (authStatus !== "authenticated" || !authSession?.user?.id) {
       setHydrated(true);
@@ -107,6 +147,7 @@ export default function SessionRoomDisplayPage() {
     };
   }, [
     sessionId,
+    displayToken,
     authStatus,
     authSession?.user?.id,
     setSessionId,
@@ -176,5 +217,20 @@ export default function SessionRoomDisplayPage() {
         />
       </div>
     </div>
+  );
+}
+
+export default function SessionRoomDisplayPage() {
+  return (
+    <Suspense
+      fallback={
+        <>
+          <DisplaySkeleton />
+          <ConnectionStatus />
+        </>
+      }
+    >
+      <SessionRoomDisplayContent />
+    </Suspense>
   );
 }

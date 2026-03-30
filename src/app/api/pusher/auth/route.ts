@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 
 import { apiError, handleApiError } from "@/lib/api/errors";
+import { verifyDisplayToken } from "@/lib/display-token";
 import { requireUser, unauthorizedResponse } from "@/lib/auth/guards";
 import { db } from "@/lib/db";
 import { players } from "@/lib/db/schema";
@@ -17,8 +18,6 @@ const PRIVATE_SESSION_PREFIX = "private-session-";
 
 export async function POST(request: NextRequest) {
   try {
-    const user = await requireUser();
-    if (!user) return unauthorizedResponse();
     const contentType = request.headers.get("content-type") ?? "";
     let socketId: string | undefined;
     let channelName: string | undefined;
@@ -49,6 +48,26 @@ export async function POST(request: NextRequest) {
     if (!z.string().uuid().safeParse(sessionId).success) {
       return apiError("Forbidden", 403);
     }
+
+    const authHeader = request.headers.get("authorization") ?? "";
+    const bearer = authHeader.startsWith("Bearer ")
+      ? authHeader.slice(7).trim()
+      : "";
+
+    if (bearer) {
+      const verified = await verifyDisplayToken(bearer);
+      if (!verified || verified.sessionId !== sessionId) {
+        return apiError("Forbidden", 403);
+      }
+      if (!pusherServer) {
+        return apiError("Pusher not configured", 503);
+      }
+      const auth = pusherServer.authorizeChannel(socketId, channelName);
+      return NextResponse.json(auth);
+    }
+
+    const user = await requireUser();
+    if (!user) return unauthorizedResponse();
     const [member] = await db
       .select({ id: players.id })
       .from(players)

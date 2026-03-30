@@ -2,8 +2,8 @@
 
 import { AnimatePresence, motion } from "framer-motion";
 import { signIn, useSession } from "next-auth/react";
-import { usePathname } from "next/navigation";
-import { useEffect, useState } from "react";
+import { usePathname, useSearchParams } from "next/navigation";
+import { Suspense, useEffect, useState } from "react";
 
 import { GlassCard } from "@/components/ui/glass-card";
 import { GoldButton } from "@/components/ui/gold-button";
@@ -12,8 +12,23 @@ import { RouteLoadingUI } from "@/components/ui/route-loading";
 const GUEST_STORAGE_KEY = "ashveil.guest_id";
 const DISPLAY_NAME_STORAGE_KEY = "ashveil.display_name";
 
-export function AuthGate({ children }: { children: React.ReactNode }) {
+const SESSION_DISPLAY_PATH =
+  /^\/session\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\/display$/i;
+
+function looksLikeSignedDisplayToken(t: string): boolean {
+  const parts = t.split(".");
+  if (parts.length !== 3) return false;
+  return parts.every((p) => p.length > 0);
+}
+
+function AuthGateInner({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const displayToken = searchParams.get("t")?.trim() ?? "";
+  const displayBypass =
+    SESSION_DISPLAY_PATH.test(pathname) &&
+    looksLikeSignedDisplayToken(displayToken);
+
   const { data: session, status } = useSession();
   const [guestId, setGuestId] = useState<string | null>(null);
   const [displayName, setDisplayName] = useState("Adventurer");
@@ -22,6 +37,7 @@ export function AuthGate({ children }: { children: React.ReactNode }) {
   const [autoAttempted, setAutoAttempted] = useState(false);
 
   useEffect(() => {
+    if (displayBypass) return;
     try {
       let id = localStorage.getItem(GUEST_STORAGE_KEY);
       if (!id || !/^[0-9a-f-]{36}$/i.test(id)) {
@@ -34,7 +50,7 @@ export function AuthGate({ children }: { children: React.ReactNode }) {
     } catch {
       setGuestId(crypto.randomUUID());
     }
-  }, []);
+  }, [displayBypass]);
 
   async function handleGuest() {
     if (!guestId || busy) return;
@@ -60,11 +76,12 @@ export function AuthGate({ children }: { children: React.ReactNode }) {
     }
   }
 
-  const loading = status === "loading" || !guestId;
+  const loading = displayBypass ? false : status === "loading" || !guestId;
   const isHome = pathname === "/" || pathname === "";
 
   useEffect(() => {
     if (
+      displayBypass ||
       loading ||
       session?.user?.id ||
       !guestId ||
@@ -77,7 +94,15 @@ export function AuthGate({ children }: { children: React.ReactNode }) {
     setAutoAttempted(true);
     void handleGuest();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [loading, session?.user?.id, guestId, busy, autoAttempted, displayName]);
+  }, [
+    displayBypass,
+    loading,
+    session?.user?.id,
+    guestId,
+    busy,
+    autoAttempted,
+    displayName,
+  ]);
 
   return (
     <AnimatePresence mode="wait">
@@ -103,7 +128,16 @@ export function AuthGate({ children }: { children: React.ReactNode }) {
             <RouteLoadingUI />
           </motion.div>
         )
-      ) : !session?.user?.id ? (
+      ) : displayBypass || session?.user?.id ? (
+        <motion.div
+          key="app"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ duration: 0.3 }}
+        >
+          {children}
+        </motion.div>
+      ) : (
         <motion.div
           key="gate"
           initial={{ opacity: 0 }}
@@ -146,16 +180,25 @@ export function AuthGate({ children }: { children: React.ReactNode }) {
             ) : null}
           </GlassCard>
         </motion.div>
-      ) : (
-        <motion.div
-          key="app"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ duration: 0.3 }}
-        >
-          {children}
-        </motion.div>
       )}
     </AnimatePresence>
+  );
+}
+
+export function AuthGate({ children }: { children: React.ReactNode }) {
+  return (
+    <Suspense
+      fallback={
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          className="min-h-dvh flex flex-col bg-[var(--color-obsidian)]"
+        >
+          <RouteLoadingUI />
+        </motion.div>
+      }
+    >
+      <AuthGateInner>{children}</AuthGateInner>
+    </Suspense>
   );
 }

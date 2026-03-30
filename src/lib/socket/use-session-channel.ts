@@ -29,7 +29,17 @@ import type {
 } from "@/lib/state/game-store";
 import { useGameStore } from "@/lib/state/game-store";
 
-import { getPusherClient, getSessionChannel } from "./client";
+import {
+  createPusherClientWithDisplayAuth,
+  getPusherClient,
+  getSessionChannel,
+} from "./client";
+
+export type UseSessionChannelOptions = {
+  displayToken?: string | null;
+  /** When false, skip `/disconnect` beacons (read-only TV). Defaults to false if displayToken is set. */
+  participateInPresence?: boolean;
+};
 
 function nowIso() {
   return new Date().toISOString();
@@ -73,12 +83,24 @@ function feedTurnFieldsExplicit(data: {
   return o;
 }
 
-export function useSessionChannel(sessionId: string | null) {
+export function useSessionChannel(
+  sessionId: string | null,
+  options?: UseSessionChannelOptions,
+) {
+  const displayTokenOpt = options?.displayToken?.trim() || null;
+  const participateInPresence =
+    options?.participateInPresence ?? !displayTokenOpt;
+
   useEffect(() => {
     if (!sessionId) return;
 
     const channelName = getSessionChannel(sessionId);
-    const pusherClient = getPusherClient();
+    const pusherClient = displayTokenOpt
+      ? createPusherClientWithDisplayAuth(displayTokenOpt)
+      : getPusherClient();
+    const stateUrl = displayTokenOpt
+      ? `/api/sessions/${sessionId}/display-state?t=${encodeURIComponent(displayTokenOpt)}`
+      : `/api/sessions/${sessionId}/state`;
     const channel = pusherClient?.subscribe(channelName) ?? null;
 
     let accessForbidden = false;
@@ -111,7 +133,7 @@ export function useSessionChannel(sessionId: string | null) {
 
     async function fetchSessionState(): Promise<SessionStatePayload | null> {
       if (accessForbidden) return null;
-      const res = await fetch(`/api/sessions/${sessionId}/state`);
+      const res = await fetch(stateUrl);
       if (res.status === 401 || res.status === 403) {
         markAccessForbidden();
         return null;
@@ -605,14 +627,18 @@ export function useSessionChannel(sessionId: string | null) {
       }
     }
 
-    window.addEventListener("beforeunload", signalDisconnect);
-    window.addEventListener("pagehide", signalDisconnect);
+    if (participateInPresence) {
+      window.addEventListener("beforeunload", signalDisconnect);
+      window.addEventListener("pagehide", signalDisconnect);
+    }
 
     return () => {
       document.removeEventListener("visibilitychange", onVisibilityChange);
       window.removeEventListener("pageshow", onPageShow);
-      window.removeEventListener("beforeunload", signalDisconnect);
-      window.removeEventListener("pagehide", signalDisconnect);
+      if (participateInPresence) {
+        window.removeEventListener("beforeunload", signalDisconnect);
+        window.removeEventListener("pagehide", signalDisconnect);
+      }
       stopScenePoll();
       if (channel) {
         channel.unbind("player-joined", onPlayerJoined);
@@ -640,7 +666,14 @@ export function useSessionChannel(sessionId: string | null) {
         } catch {
           /* no-op */
         }
+        if (displayTokenOpt) {
+          try {
+            pusherClient.disconnect();
+          } catch {
+            /* no-op */
+          }
+        }
       }
     };
-  }, [sessionId]);
+  }, [sessionId, displayTokenOpt, participateInPresence]);
 }

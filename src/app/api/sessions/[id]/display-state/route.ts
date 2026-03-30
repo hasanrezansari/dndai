@@ -1,38 +1,40 @@
 import { NextRequest, NextResponse } from "next/server";
-import { and, eq } from "drizzle-orm";
 import { z } from "zod";
 
 import { apiError, handleApiError } from "@/lib/api/errors";
-import {
-  isSessionMember,
-  requireUser,
-  unauthorizedResponse,
-} from "@/lib/auth/guards";
-import { db } from "@/lib/db";
-import { players } from "@/lib/db/schema";
+import { verifyDisplayToken } from "@/lib/display-token";
 import { loadSessionStatePayload } from "@/server/services/session-state-payload";
 
+function tokenFromRequest(request: NextRequest): string | null {
+  const url = new URL(request.url);
+  const q = url.searchParams.get("t")?.trim();
+  if (q) return q;
+  const auth = request.headers.get("authorization");
+  if (auth?.startsWith("Bearer ")) {
+    return auth.slice(7).trim() || null;
+  }
+  return null;
+}
+
 export async function GET(
-  _request: NextRequest,
+  request: NextRequest,
   context: { params: Promise<{ id: string }> },
 ) {
   try {
-    const user = await requireUser();
-    if (!user) return unauthorizedResponse();
     const { id: sessionId } = await context.params;
     if (!z.string().uuid().safeParse(sessionId).success) {
       return apiError("Invalid session id", 400);
     }
-    if (!(await isSessionMember(sessionId, user.id))) {
-      return apiError("Forbidden", 403);
+
+    const raw = tokenFromRequest(request);
+    if (!raw) {
+      return apiError("Missing token", 401);
     }
 
-    await db
-      .update(players)
-      .set({ is_connected: true })
-      .where(
-        and(eq(players.session_id, sessionId), eq(players.user_id, user.id)),
-      );
+    const verified = await verifyDisplayToken(raw);
+    if (!verified || verified.sessionId !== sessionId) {
+      return apiError("Forbidden", 403);
+    }
 
     const payload = await loadSessionStatePayload(sessionId);
     if (!payload) {
