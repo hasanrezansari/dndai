@@ -232,7 +232,7 @@ interface GameState {
 }
 
 /** Round rollup rows use `detail: "Round N"` — skip when attaching scene art. */
-function isRoundRollupNarration(entry: FeedEntry): boolean {
+export function isRoundRollupNarration(entry: FeedEntry): boolean {
   return (
     entry.type === "narration" &&
     typeof entry.detail === "string" &&

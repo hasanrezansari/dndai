@@ -2,7 +2,10 @@
 
 import { useMemo, useState } from "react";
 
-import { filterStaleScenePendingRows } from "@/lib/feed/display-feed-filters";
+import {
+  filterChronicleDisplayEntries,
+  filterStaleScenePendingRows,
+} from "@/lib/feed/display-feed-filters";
 import {
   filterFeedBySemantic,
   type FeedSemanticFilter,
@@ -67,14 +70,7 @@ function segmentHeading(
 /** No full story beat — skip heavy card chrome so the log stays out of the way. */
 function segmentUsesCompactShell(segment: FeedTurnSegment): boolean {
   if (segment.entries.length === 0) return true;
-  if (
-    segment.entries.every(
-      (e) =>
-        e.type === "system" ||
-        e.type === "state_change" ||
-        e.type === "dice",
-    )
-  ) {
+  if (segment.entries.every((e) => e.type === "system" || e.type === "dice")) {
     return true;
   }
   if (
@@ -292,26 +288,53 @@ export interface ChronicleFeedProps {
   className?: string;
 }
 
+function ChronicleTableMetaCaption() {
+  const session = useGameStore((s) => s.session);
+  const feed = useGameStore((s) => s.feed);
+
+  const lastSync = useMemo(() => {
+    for (let i = feed.length - 1; i >= 0; i--) {
+      const e = feed[i]!;
+      if (e.type === "state_change") return e;
+    }
+    return null;
+  }, [feed]);
+
+  if (!session) return null;
+
+  const parts = [`Round ${session.currentRound}`];
+  if (lastSync) {
+    parts.push(
+      lastSync.detail
+        ? `${lastSync.text} · ${lastSync.detail}`
+        : lastSync.text,
+    );
+  }
+
+  return (
+    <p
+      className="px-0.5 text-[8px] uppercase tracking-[0.12em] text-[var(--outline)]/38"
+      aria-live="polite"
+    >
+      {parts.join(" · ")}
+    </p>
+  );
+}
+
 export function ChronicleFeed({ entries, className = "" }: ChronicleFeedProps) {
   const players = useGameStore((s) => s.players);
   const scenePending = useGameStore((s) => s.scenePending);
   const [semanticFilter, setSemanticFilter] =
     useState<FeedSemanticFilter>("all");
 
-  const filtered = useMemo(
-    () => filterStaleScenePendingRows(entries, scenePending),
-    [entries, scenePending],
-  );
-
-  /** Sync lines are for debugging — hide in Chronicle unless “System” filter is on. */
-  const withoutSyncNoise = useMemo(() => {
-    if (semanticFilter === "system") return filtered;
-    return filtered.filter((e) => e.type !== "state_change");
-  }, [filtered, semanticFilter]);
+  const filtered = useMemo(() => {
+    const staleOk = filterStaleScenePendingRows(entries, scenePending);
+    return filterChronicleDisplayEntries(staleOk);
+  }, [entries, scenePending]);
 
   const semanticsFiltered = useMemo(
-    () => filterFeedBySemantic(withoutSyncNoise, semanticFilter),
-    [withoutSyncNoise, semanticFilter],
+    () => filterFeedBySemantic(filtered, semanticFilter),
+    [filtered, semanticFilter],
   );
 
   const segments = useMemo(
@@ -330,6 +353,7 @@ export function ChronicleFeed({ entries, className = "" }: ChronicleFeedProps) {
         onChange={setSemanticFilter}
         className="sticky top-0 z-[1] -mx-1 bg-[var(--color-obsidian)]/90 px-1 pb-2 pt-0 backdrop-blur-sm"
       />
+      <ChronicleTableMetaCaption />
       {segments.length === 0 ? (
         <p className="text-center text-sm text-[var(--color-silver-dim)]">
           {filtered.length === 0
