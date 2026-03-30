@@ -647,7 +647,7 @@ export async function runTurnPipeline(params: {
       provider,
     });
 
-  let statePatches: StatePatch[] = actionDenied
+  const statePatches: StatePatch[] = actionDenied
     ? []
     : consequenceResult!.usage.model === "fallback"
       ? fallbackPatches
