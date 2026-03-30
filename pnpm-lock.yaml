@@ -58,6 +58,9 @@ dependencies:
     version: 5.0.12(@types/react@19.2.14)(react@19.2.4)
 
 devDependencies:
+  '@next/env':
+    specifier: 16.2.1
+    version: 16.2.1
   '@tailwindcss/postcss':
     specifier: ^4
     version: 4.2.2
@@ -1408,7 +1411,6 @@ packages:
 
   /@next/env@16.2.1:
     resolution: {integrity: sha512-n8P/HCkIWW+gVal2Z8XqXJ6aB3J0tuM29OcHpCsobWlChH/SITBs1DFBk/HajgrwDkqqBXPbuUuzgDvUekREPg==}
-    dev: false
 
   /@next/eslint-plugin-next@16.2.1:
     resolution: {integrity: sha512-r0epZGo24eT4g08jJlg2OEryBphXqO8aL18oajoTKLzHJ6jVr6P6FI58DLMug04MwD3j8Fj0YK0slyzneKVyzA==}
