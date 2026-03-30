@@ -6,10 +6,7 @@ import { useEffect, useState } from "react";
 
 import { RoomDisplayNarration } from "@/components/display/room-display-narration";
 import { ConnectionStatus } from "@/components/ui/connection-status";
-import {
-  SkeletonCard,
-  SkeletonText,
-} from "@/components/ui/loading-skeleton";
+import { SkeletonText } from "@/components/ui/loading-skeleton";
 import { SceneHeader } from "@/components/game/scene-header";
 import { useSessionChannel } from "@/lib/socket/use-session-channel";
 import {
@@ -27,9 +24,12 @@ function DisplaySkeleton() {
         />
       </div>
       <div className="relative z-[2] flex min-h-0 flex-1 flex-col gap-4 px-4 pb-8 pt-6 sm:px-8">
-        <SkeletonCard className="min-h-[200px] flex-1">
+        <div
+          className="flex min-h-[200px] flex-1 flex-col rounded-[var(--radius-card)] border border-[rgba(77,70,53,0.18)] bg-[var(--surface-container)]/35 px-6 py-6 sm:px-10 sm:py-8"
+          aria-hidden
+        >
           <SkeletonText lines={8} />
-        </SkeletonCard>
+        </div>
       </div>
     </div>
   );
