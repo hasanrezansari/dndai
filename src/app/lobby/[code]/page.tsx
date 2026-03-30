@@ -494,6 +494,14 @@ export default function LobbyPage() {
                   {shareDisplayHint}
                 </p>
               ) : null}
+              {session?.join_code ? (
+                <p className="text-[10px] text-[var(--color-silver-dim)] text-center leading-relaxed px-1">
+                  On a TV: home → Watch on TV → code{" "}
+                  <span className="font-mono text-[var(--color-gold-support)] tracking-[0.15em]">
+                    {session.join_code}
+                  </span>
+                </p>
+              ) : null}
             </div>
           ) : null}
 

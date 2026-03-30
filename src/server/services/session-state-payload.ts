@@ -47,6 +47,7 @@ function mapSession(row: typeof sessions.$inferSelect): GameSessionView {
     campaignTitle: row.campaign_title,
     stateVersion: row.state_version,
     finalChapterPublished: false,
+    joinCode: row.join_code,
   };
 }
 

@@ -700,6 +700,14 @@ export default function SessionGameplayPage() {
               {displayLinkHint}
             </p>
           ) : null}
+          {session?.joinCode ? (
+            <p className="mt-2 text-[10px] text-[var(--color-silver-dim)] text-center leading-relaxed px-0.5">
+              TV: home → Watch on TV →{" "}
+              <span className="font-mono text-[var(--color-gold-support)] tracking-[0.12em]">
+                {session.joinCode}
+              </span>
+            </p>
+          ) : null}
         </div>
       </div>
 

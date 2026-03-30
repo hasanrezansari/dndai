@@ -41,7 +41,9 @@ export async function GET(
       return apiError("Not found", 404);
     }
 
-    return NextResponse.json(payload);
+    const sessionForDisplay = { ...payload.session };
+    delete sessionForDisplay.joinCode;
+    return NextResponse.json({ ...payload, session: sessionForDisplay });
   } catch (e) {
     return handleApiError(e);
   }

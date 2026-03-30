@@ -49,6 +49,8 @@ export interface GameSessionView {
   campaignTitle: string | null;
   stateVersion: number;
   finalChapterPublished?: boolean;
+  /** Room code for TV watch flow; omitted in read-only display API responses. */
+  joinCode?: string;
 }
 
 export interface QuestProgressView {
