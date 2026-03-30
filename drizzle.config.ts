@@ -5,6 +5,7 @@ export default defineConfig({
   out: "./drizzle",
   dialect: "postgresql",
   dbCredentials: {
-    url: process.env.DATABASE_URL!,
+    // Supabase/Postgres: use direct (session) URL for migrations; pooler breaks some DDL.
+    url: process.env.DIRECT_URL ?? process.env.DATABASE_URL!,
   },
 });

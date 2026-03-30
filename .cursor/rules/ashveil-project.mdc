@@ -14,7 +14,7 @@ Mobile-first multiplayer AI-powered tabletop RPG. 2-6 players, shared canonical 
 - React 19.2.4, Tailwind CSS v4 (`@tailwindcss/postcss`), Framer Motion 12.x
 - Zustand 5.x for client state (`src/lib/state/game-store.ts`)
 - Zod 4.x for all validation — use `z.iso.datetime()` not `z.string().datetime()`
-- Neon Postgres + Drizzle ORM 0.45.x (`src/lib/db/`)
+- Postgres (e.g. Supabase) + Drizzle ORM 0.45.x (`src/lib/db/`, `pg` pool)
 - Upstash Redis for rate limiting and locks (`src/lib/redis.ts`)
 - Pusher for realtime (`src/lib/socket/`)
 - NextAuth 5.0.0-beta.30 with Drizzle adapter + JWT strategy

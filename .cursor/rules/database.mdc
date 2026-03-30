@@ -12,13 +12,13 @@ alwaysApply: false
 ## DB Client
 ```typescript
 import { db } from "@/lib/db";
-// Uses Neon HTTP driver + Drizzle ORM. Lazy singleton, safe for serverless.
+// Uses node-postgres (pg Pool) + Drizzle ORM. Lazy singleton; tune DATABASE_POOL_MAX on serverless.
 ```
 
 ## Migration Workflow
 1. Edit `src/lib/db/schema.ts`
 2. Run `npm run db:generate` (creates SQL migration in `drizzle/`)
-3. Run `npm run db:migrate` (applies to Neon)
+3. Run `npm run db:migrate` (uses `DIRECT_URL` when set; applies to your Postgres host)
 4. NEVER edit migration SQL files directly after they've been applied
 
 ## Complete Table Reference
