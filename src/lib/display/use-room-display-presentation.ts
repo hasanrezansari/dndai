@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useShallow } from "zustand/react/shallow";
 
 import { useGameStore } from "@/lib/state/game-store";
 
@@ -102,12 +103,15 @@ export function useRoomDisplayPresentation(
     }
   }, [diceOverlay, hold, flushFromStore]);
 
-  const storeSnap = useGameStore((s) => ({
-    narrativeText: s.narrativeText,
-    sceneImage: s.sceneImage,
-    previousSceneImage: s.previousSceneImage,
-    scenePending: s.scenePending,
-  }));
+  /** Shallow compare so dice/feed/etc. store updates do not re-render TV on every tick. */
+  const storeSnap = useGameStore(
+    useShallow((s) => ({
+      narrativeText: s.narrativeText,
+      sceneImage: s.sceneImage,
+      previousSceneImage: s.previousSceneImage,
+      scenePending: s.scenePending,
+    })),
+  );
 
   const visible: RoomDisplayVisible = hold
     ? mapUrls(frozen ?? storeSnap, sessionId, displayToken)

@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { motion } from "framer-motion";
 
 export interface NarrativeTypewriterProps {
@@ -40,6 +40,10 @@ export function NarrativeTypewriter({
     [text, groupSize],
   );
   const [finished, setFinished] = useState(false);
+
+  useEffect(() => {
+    setFinished(false);
+  }, [text]);
 
   if (groups.length === 0) {
     return (
