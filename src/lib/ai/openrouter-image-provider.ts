@@ -1,8 +1,18 @@
 const BASE_URL = "https://openrouter.ai/api/v1/chat/completions";
 const PRIMARY_IMAGE_MODEL = "google/gemini-2.5-flash-image";
-const FALLBACK_IMAGE_MODEL =
-  process.env.OPENROUTER_IMAGE_FALLBACK_MODEL ??
-  "google/gemini-2.0-flash-exp:free";
+const DEFAULT_FALLBACK_IMAGE_MODEL = "google/gemini-2.5-flash-image";
+
+const DEPRECATED_IMAGE_MODELS = new Set([
+  // OpenRouter removed this endpoint; keeping it breaks image gen with 404.
+  "google/gemini-2.0-flash-exp:free",
+]);
+
+function normalizeModelId(raw: string | undefined | null): string | null {
+  const m = raw?.trim() || "";
+  if (!m) return null;
+  if (DEPRECATED_IMAGE_MODELS.has(m)) return null;
+  return m;
+}
 
 interface OpenRouterImageResponse {
   choices?: Array<{
@@ -136,8 +146,12 @@ export async function generateSceneImageOpenRouter(params: {
     : params.prompt;
 
   const primary =
-    process.env.OPENROUTER_IMAGE_MODEL?.trim() || PRIMARY_IMAGE_MODEL;
-  const models = [primary, FALLBACK_IMAGE_MODEL].filter(
+    normalizeModelId(process.env.OPENROUTER_IMAGE_MODEL) || PRIMARY_IMAGE_MODEL;
+  const fallback =
+    normalizeModelId(process.env.OPENROUTER_IMAGE_FALLBACK_MODEL) ||
+    DEFAULT_FALLBACK_IMAGE_MODEL;
+
+  const models = [primary, fallback].filter(
     (m, i, a) => m.length > 0 && a.indexOf(m) === i,
   );
 
