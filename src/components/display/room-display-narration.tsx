@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 
 import { COPY } from "@/lib/copy/ashveil";
+import { NarrativeTypewriter } from "@/components/game/narrative-typewriter";
 
 export interface RoomDisplayNarrationProps {
   narrativeText: string | null;
@@ -63,9 +64,13 @@ export function RoomDisplayNarration({
             </motion.p>
           </AnimatePresence>
         ) : (
-          <p className="text-fantasy text-base leading-relaxed text-[var(--color-silver-muted)] sm:text-lg md:text-xl md:leading-relaxed">
-            {(narrativeText?.trim() || "The tale begins…").trim()}
-          </p>
+          <div className="text-fantasy text-base leading-relaxed text-[var(--color-silver-muted)] sm:text-lg md:text-xl md:leading-relaxed">
+            <NarrativeTypewriter
+              text={narrativeText?.trim() ?? ""}
+              groupSize={3}
+              delayPerGroup={0.06}
+            />
+          </div>
         )}
       </div>
     </section>
