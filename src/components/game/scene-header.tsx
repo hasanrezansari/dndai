@@ -1,7 +1,7 @@
 "use client";
 
 import { AnimatePresence, motion } from "framer-motion";
-import { useCallback, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 
 import { COPY } from "@/lib/copy/ashveil";
 
@@ -63,12 +63,16 @@ function SceneHeaderRoomImages({
   const [frontReady, setFrontReady] = useState(false);
   const [frontSrc, setFrontSrc] = useState(sceneImage);
   const [prevSrc, setPrevSrc] = useState(previousSceneImage);
+  const retryRef = useRef({ front: 0, prev: 0 });
+  const MAX_RETRIES = 2;
 
   const onFrontError = useCallback(() => {
+    if (retryRef.current.front >= MAX_RETRIES) return;
+    retryRef.current.front += 1;
     try {
       const u = new URL(frontSrc ?? sceneImage, window.location.href);
       u.searchParams.set("cb", String(Date.now()));
-      setFrontSrc(u.pathname + u.search);
+      setFrontSrc(u.toString());
       setFrontReady(false);
     } catch {
       setFrontSrc((s) =>
@@ -80,10 +84,12 @@ function SceneHeaderRoomImages({
 
   const onPrevError = useCallback(() => {
     if (!previousSceneImage) return;
+    if (retryRef.current.prev >= MAX_RETRIES) return;
+    retryRef.current.prev += 1;
     try {
       const u = new URL(prevSrc ?? previousSceneImage, window.location.href);
       u.searchParams.set("cb", String(Date.now()));
-      setPrevSrc(u.pathname + u.search);
+      setPrevSrc(u.toString());
     } catch {
       setPrevSrc((s) =>
         s ? `${s.split("?")[0]}?cb=${Date.now()}` : s,
