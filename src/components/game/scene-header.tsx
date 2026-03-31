@@ -63,10 +63,13 @@ function SceneHeaderRoomImages({
   const [frontReady, setFrontReady] = useState(false);
   const [frontSrc, setFrontSrc] = useState(sceneImage);
   const [prevSrc, setPrevSrc] = useState(previousSceneImage);
+  const [frontFailed, setFrontFailed] = useState(false);
+  const [prevFailed, setPrevFailed] = useState(false);
   const retryRef = useRef({ front: 0, prev: 0 });
-  const MAX_RETRIES = 2;
+  const MAX_RETRIES = 1;
 
   const onFrontError = useCallback(() => {
+    if (frontFailed) return;
     if (retryRef.current.front >= MAX_RETRIES) return;
     retryRef.current.front += 1;
     try {
@@ -80,10 +83,12 @@ function SceneHeaderRoomImages({
       );
       setFrontReady(false);
     }
-  }, [frontSrc, sceneImage]);
+    setFrontFailed(true);
+  }, [frontFailed, frontSrc, sceneImage]);
 
   const onPrevError = useCallback(() => {
     if (!previousSceneImage) return;
+    if (prevFailed) return;
     if (retryRef.current.prev >= MAX_RETRIES) return;
     retryRef.current.prev += 1;
     try {
@@ -95,7 +100,8 @@ function SceneHeaderRoomImages({
         s ? `${s.split("?")[0]}?cb=${Date.now()}` : s,
       );
     }
-  }, [prevSrc, previousSceneImage]);
+    setPrevFailed(true);
+  }, [prevFailed, prevSrc, previousSceneImage]);
 
   const showGate =
     Boolean(sceneImage) && !frontReady && !scenePending;
@@ -113,23 +119,25 @@ function SceneHeaderRoomImages({
       ) : null}
 
       <AnimatePresence initial={false}>
-        <motion.img
-          key={sceneImage}
-          src={frontSrc ?? sceneImage}
-          alt=""
-          loading="eager"
-          decoding="async"
-          onLoad={() => {
-            setFrontReady(true);
-          }}
-          onError={onFrontError}
-          className={`absolute inset-0 z-[1] h-full w-full object-cover ${
-            !frontReady ? "opacity-0" : ""
-          }`}
-          initial={{ opacity: 1 }}
-          animate={{ opacity: !frontReady ? 0 : 1 }}
-          transition={{ duration: 0.4 }}
-        />
+        {!frontFailed ? (
+          <motion.img
+            key={sceneImage}
+            src={frontSrc ?? sceneImage}
+            alt=""
+            loading="eager"
+            decoding="async"
+            onLoad={() => {
+              setFrontReady(true);
+            }}
+            onError={onFrontError}
+            className={`absolute inset-0 z-[1] h-full w-full object-cover ${
+              !frontReady ? "opacity-0" : ""
+            }`}
+            initial={{ opacity: 1 }}
+            animate={{ opacity: !frontReady ? 0 : 1 }}
+            transition={{ duration: 0.4 }}
+          />
+        ) : null}
       </AnimatePresence>
 
       {!sceneImage && previousSceneImage ? (
