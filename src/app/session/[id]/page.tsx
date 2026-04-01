@@ -157,6 +157,7 @@ export default function SessionGameplayPage() {
 
   const { data: authSession, status: authStatus } = useSession();
   const { toast } = useToast();
+  const [saveBusy, setSaveBusy] = useState(false);
   const [hydrated, setHydrated] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [voteBusy, setVoteBusy] = useState(false);
@@ -632,6 +633,32 @@ export default function SessionGameplayPage() {
           previousSceneImage={previousSceneImage}
           sceneTitle={sceneTitle}
           narrativeText={narrativeText}
+          onSaveProgress={() => {
+            toast("Progress saved.", "success");
+          }}
+          onSaveAndExit={() => {
+            if (saveBusy) return;
+            setSaveBusy(true);
+            void (async () => {
+              try {
+                const st = useGameStore.getState();
+                const pid = st.currentPlayerId;
+                if (pid && sessionId) {
+                  await fetch(`/api/sessions/${sessionId}/disconnect`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ playerId: pid }),
+                  });
+                }
+              } catch {
+                // best effort
+              } finally {
+                toast("Saved. See you soon.", "success");
+                setSaveBusy(false);
+                router.push("/adventures");
+              }
+            })();
+          }}
         />
       </BottomSheet>
       <BottomSheet

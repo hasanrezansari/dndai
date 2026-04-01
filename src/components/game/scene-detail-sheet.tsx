@@ -1,10 +1,15 @@
 "use client";
 
+import { GoldButton } from "@/components/ui/gold-button";
+import { GhostButton } from "@/components/ui/ghost-button";
+
 export interface SceneDetailPanelProps {
   sceneImage: string | null;
   previousSceneImage: string | null;
   sceneTitle: string | null;
   narrativeText: string | null;
+  onSaveProgress?: () => void;
+  onSaveAndExit?: () => void;
 }
 
 /**
@@ -15,6 +20,8 @@ export function SceneDetailPanel({
   previousSceneImage,
   sceneTitle,
   narrativeText,
+  onSaveProgress,
+  onSaveAndExit,
 }: SceneDetailPanelProps) {
   const src = sceneImage ?? previousSceneImage;
 
@@ -55,6 +62,33 @@ export function SceneDetailPanel({
           </p>
         )}
       </div>
+
+      {onSaveProgress || onSaveAndExit ? (
+        <div className="px-1 pt-1 space-y-2">
+          {onSaveProgress ? (
+            <GhostButton
+              type="button"
+              className="w-full min-h-[44px] text-[10px] font-bold uppercase tracking-[0.15em]"
+              onClick={onSaveProgress}
+            >
+              Save progress
+            </GhostButton>
+          ) : null}
+          {onSaveAndExit ? (
+            <GoldButton
+              type="button"
+              size="md"
+              className="w-full min-h-[44px]"
+              onClick={onSaveAndExit}
+            >
+              Save &amp; exit
+            </GoldButton>
+          ) : null}
+          <p className="text-[10px] uppercase tracking-[0.18em] text-[var(--outline)] text-center">
+            Your story is saved automatically.
+          </p>
+        </div>
+      ) : null}
     </div>
   );
 }
