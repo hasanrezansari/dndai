@@ -1,4 +1,4 @@
-import { desc, eq, and, gt } from "drizzle-orm";
+import { desc, eq, and } from "drizzle-orm";
 
 import type { AIProvider } from "@/lib/ai/types";
 import { db } from "@/lib/db";

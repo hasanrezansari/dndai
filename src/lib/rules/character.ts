@@ -182,10 +182,6 @@ export function getStartingAbilities(characterClass: string): StartingAbility[] 
   }
 }
 
-function modifier(score: number): number {
-  return Math.floor((score - 10) / 2);
-}
-
 export function calculateHP(
   characterClass: string,
   conModifier: number,

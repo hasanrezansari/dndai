@@ -43,6 +43,8 @@ export interface GameSessionView {
   status: string;
   mode: string;
   phase: string;
+  campaignMode?: string;
+  moduleKey?: string | null;
   currentRound: number;
   currentTurnIndex: number;
   currentPlayerId: string | null;
@@ -229,6 +231,7 @@ interface GameState {
   setQuest: (quest: QuestProgressView | null) => void;
   setRollingMemories: (memories: RollingMemoryView[]) => void;
   addStatPopups: (popups: StatPopup[]) => void;
+  removeStatPopup: (id: string) => void;
   setHpFlash: (flash: Record<string, "damage" | "heal">) => void;
   setActiveTurnId: (id: string | null) => void;
 }
@@ -342,6 +345,9 @@ export const useGameStore = create<GameState>((set) => ({
 
   addStatPopups: (popups) =>
     set((s) => ({ statPopups: [...s.statPopups, ...popups] })),
+
+  removeStatPopup: (id) =>
+    set((s) => ({ statPopups: s.statPopups.filter((p) => p.id !== id) })),
 
   setHpFlash: (flash) => set({ hpFlash: flash }),
 

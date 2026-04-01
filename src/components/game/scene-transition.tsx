@@ -1,7 +1,7 @@
 "use client";
 
 import { AnimatePresence, motion } from "framer-motion";
-import { useEffect, useRef, useState } from "react";
+import { useMemo } from "react";
 
 interface SceneTransitionProps {
   imageUrl: string | null;
@@ -16,17 +16,11 @@ export function SceneTransition({
   trigger,
   duration = 3000,
 }: SceneTransitionProps) {
-  const [visible, setVisible] = useState(false);
-  const prevTrigger = useRef(false);
-
-  useEffect(() => {
-    if (trigger && !prevTrigger.current) {
-      setVisible(true);
-      const timer = setTimeout(() => setVisible(false), duration);
-      return () => clearTimeout(timer);
-    }
-    prevTrigger.current = trigger;
-  }, [trigger, duration]);
+  const visible = trigger;
+  const transition = useMemo(
+    () => ({ duration: Math.max(0.2, duration / 1000), ease: "easeInOut" as const }),
+    [duration],
+  );
 
   return (
     <AnimatePresence>
@@ -36,7 +30,7 @@ export function SceneTransition({
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
-          transition={{ duration: 0.8, ease: "easeInOut" }}
+          transition={transition}
         >
           {imageUrl ? (
             <motion.div

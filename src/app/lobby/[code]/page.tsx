@@ -138,7 +138,7 @@ export default function LobbyPage() {
       channel.unbind("session-started");
       pusher.unsubscribe(name);
     };
-  }, [sessionId, refetchSession]);
+  }, [sessionId, refetchSession, router]);
 
   const me = useMemo(
     () => session?.players.find((p) => p.id === currentPlayerId),

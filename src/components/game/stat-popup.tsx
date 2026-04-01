@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 
 import type { StatPopup as StatPopupData } from "@/lib/state/game-store";
@@ -35,19 +35,10 @@ function PopupChip({ popup, onDone }: { popup: StatPopupData; onDone: () => void
 export function StatPopupOverlay() {
   const popups = useGameStore((s) => s.statPopups);
   const players = useGameStore((s) => s.players);
-  const [active, setActive] = useState<StatPopupData[]>([]);
-
-  useEffect(() => {
-    if (popups.length === 0) return;
-    setActive((prev) => [...prev, ...popups]);
-  }, [popups]);
-
-  function removePopup(id: string) {
-    setActive((prev) => prev.filter((p) => p.id !== id));
-  }
+  const removeStatPopup = useGameStore((s) => s.removeStatPopup);
 
   const grouped = new Map<string, StatPopupData[]>();
-  for (const p of active) {
+  for (const p of popups) {
     const existing = grouped.get(p.playerId) ?? [];
     existing.push(p);
     grouped.set(p.playerId, existing);
@@ -70,7 +61,7 @@ export function StatPopupOverlay() {
             >
               <PopupChip
                 popup={popup}
-                onDone={() => removePopup(popup.id)}
+                onDone={() => removeStatPopup(popup.id)}
               />
             </motion.div>
           ));

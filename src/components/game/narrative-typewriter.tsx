@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { motion } from "framer-motion";
 
 export interface NarrativeTypewriterProps {
@@ -39,11 +39,8 @@ export function NarrativeTypewriter({
     () => splitWordGroups(text, groupSize),
     [text, groupSize],
   );
-  const [finished, setFinished] = useState(false);
-
-  useEffect(() => {
-    setFinished(false);
-  }, [text]);
+  const [finishedForText, setFinishedForText] = useState<string | null>(null);
+  const finished = finishedForText === text;
 
   if (groups.length === 0) {
     return (
@@ -80,7 +77,7 @@ export function NarrativeTypewriter({
           className="inline"
           onAnimationComplete={() => {
             if (i === groups.length - 1) {
-              setFinished(true);
+              setFinishedForText(text);
               onComplete?.();
             }
           }}

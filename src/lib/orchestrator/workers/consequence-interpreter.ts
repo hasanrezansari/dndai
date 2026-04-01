@@ -6,7 +6,7 @@ import {
   type ActionIntent,
   type ConsequenceOutput,
 } from "@/lib/schemas/ai-io";
-import type { CharacterStats, DiceRoll } from "@/lib/schemas/domain";
+import type { DiceRoll } from "@/lib/schemas/domain";
 import type { StatePatch } from "@/lib/schemas/state-patches";
 
 interface PartyMember {

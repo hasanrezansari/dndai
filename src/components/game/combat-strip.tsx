@@ -11,14 +11,6 @@ export interface CombatStripProps {
   onInspectEnemy?: (npcId: string) => void;
 }
 
-function avatarLetterPlayer(p: GamePlayerView) {
-  const n = p.character?.name?.trim();
-  if (n && n.length > 0) return n[0]!.toUpperCase();
-  const d = p.displayName?.trim();
-  if (d && d.length > 0) return d[0]!.toUpperCase();
-  return "?";
-}
-
 /** Deterministic avatar when `visual_profile.portrait_url` was never set (no extra API calls from us). */
 function playerPortraitSrc(p: GamePlayerView): string {
   const custom = p.character?.portraitUrl?.trim();

@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useState } from "react";
 
 const STORAGE_KEY = "ashveil.guidedTurnUi";
 
@@ -16,11 +16,7 @@ function readStoredGuided(): boolean {
  * Guided mode: turn hint, four intent chips, optional target sheet. Fast mode: text + submit only.
  */
 export function useGuidedTurnUi() {
-  const [guidedTurnUi, setGuidedState] = useState(true);
-
-  useEffect(() => {
-    setGuidedState(readStoredGuided());
-  }, []);
+  const [guidedTurnUi, setGuidedState] = useState(() => readStoredGuided());
 
   const setGuidedTurnUi = useCallback((guided: boolean) => {
     setGuidedState(guided);

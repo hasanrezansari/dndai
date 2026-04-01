@@ -27,17 +27,17 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  title: "Ashveil — A Living World Awaits",
+  title: "Falvos — A Living World Awaits",
   description:
     "Mobile-first multiplayer AI-powered tabletop RPG. Play with friends online — AI or Human DM.",
   metadataBase: new URL(
     process.env.NEXTAUTH_URL ?? "https://playdndai.com",
   ),
   openGraph: {
-    title: "Ashveil — A Living World Awaits",
+    title: "Falvos — A Living World Awaits",
     description:
       "Mobile-first multiplayer AI-powered tabletop RPG. Play with friends online.",
-    siteName: "Ashveil",
+    siteName: "Falvos",
     type: "website",
   },
 };
@@ -61,6 +61,7 @@ export default function RootLayout({
       className={`dark ${notoSerif.variable} ${manrope.variable} ${inter.variable}`}
     >
       <head>
+        {/* eslint-disable-next-line @next/next/no-page-custom-font */}
         <link
           href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap"
           rel="stylesheet"

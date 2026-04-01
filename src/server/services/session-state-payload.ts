@@ -41,6 +41,8 @@ function mapSession(row: typeof sessions.$inferSelect): GameSessionView {
     status: row.status,
     mode: row.mode,
     phase: row.phase,
+    campaignMode: row.campaign_mode,
+    moduleKey: row.module_key,
     currentRound: row.current_round,
     currentTurnIndex: row.current_turn_index,
     currentPlayerId: row.current_player_id,

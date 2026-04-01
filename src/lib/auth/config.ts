@@ -3,6 +3,7 @@ import { eq } from "drizzle-orm";
 import NextAuth from "next-auth";
 import type { NextAuthResult } from "next-auth";
 import Credentials from "next-auth/providers/credentials";
+import Google from "next-auth/providers/google";
 import { z } from "zod";
 
 import { getDb } from "@/lib/db";
@@ -79,6 +80,11 @@ function getNextAuth(): NextAuthResult {
             });
             return { id: guestId, name: displayName, email };
           },
+        }),
+        Google({
+          clientId: process.env.GOOGLE_CLIENT_ID ?? "",
+          clientSecret: process.env.GOOGLE_CLIENT_SECRET ?? "",
+          allowDangerousEmailAccountLinking: false,
         }),
       ],
       callbacks: {

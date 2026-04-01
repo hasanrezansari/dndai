@@ -27,6 +27,7 @@ import { SceneHeader } from "@/components/game/scene-header";
 import { TurnBanner } from "@/components/game/turn-banner";
 import { SceneTransition } from "@/components/game/scene-transition";
 import { StatPopupOverlay } from "@/components/game/stat-popup";
+import { TutorialOverlay } from "@/components/game/tutorial-overlay";
 import { ChronicleFeed } from "@/components/feed/chronicle-feed";
 import { FeedList } from "@/components/feed/feed-list";
 import { BeatStrip } from "@/components/game/beat-strip";
@@ -38,6 +39,7 @@ import {
   useGameStore,
   type SessionStatePayload,
 } from "@/lib/state/game-store";
+import { useToast } from "@/components/ui/toast";
 
 function formatPhaseLabel(phase: string | undefined): string | null {
   if (!phase?.trim()) return null;
@@ -154,6 +156,7 @@ export default function SessionGameplayPage() {
   const setIsThinking = useGameStore((s) => s.setIsThinking);
 
   const { data: authSession, status: authStatus } = useSession();
+  const { toast } = useToast();
   const [hydrated, setHydrated] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [voteBusy, setVoteBusy] = useState(false);
@@ -172,6 +175,12 @@ export default function SessionGameplayPage() {
   );
   const { mode: sessionUiMode, setMode: setSessionUiMode } = useSessionUiMode();
   const { guidedTurnUi, toggleGuidedTurnUi } = useGuidedTurnUi();
+  const myActionCount = useMemo(() => {
+    if (!currentPlayerId) return 0;
+    return feed.filter(
+      (e) => e.type === "action" && e.playerId === currentPlayerId,
+    ).length;
+  }, [feed, currentPlayerId]);
 
   const phaseLabel = useMemo(
     () => formatPhaseLabel(session?.phase),
@@ -225,6 +234,16 @@ export default function SessionGameplayPage() {
         hydrate(data);
         const me = data.players.find((p) => p.userId === userId);
         if (me) setCurrentPlayerId(me.id);
+        const title = data.sceneTitle?.trim();
+        const recap = data.narrativeText?.trim();
+        if (title || recap) {
+          toast(
+            title
+              ? `Resumed: ${title}`
+              : `Resumed: ${(recap ?? "").slice(0, 56)}${(recap?.length ?? 0) > 56 ? "…" : ""}`,
+            "info",
+          );
+        }
       } catch {
         if (!cancelled) setLoadError("Network error — could not load session.");
       } finally {
@@ -244,6 +263,7 @@ export default function SessionGameplayPage() {
     setSessionId,
     setCurrentPlayerId,
     hydrate,
+    toast,
   ]);
 
   useEffect(() => {
@@ -259,7 +279,7 @@ export default function SessionGameplayPage() {
     if (!sceneTitle || sceneTitle === prevSceneTitle) return;
     if (prevSceneTitle !== null) {
       setSceneTransitionTrigger(true);
-      const timer = setTimeout(() => setSceneTransitionTrigger(false), 100);
+      const timer = setTimeout(() => setSceneTransitionTrigger(false), 3000);
       return () => clearTimeout(timer);
     }
     setPrevSceneTitle(sceneTitle);
@@ -562,6 +582,13 @@ export default function SessionGameplayPage() {
         trigger={sceneTransitionTrigger}
       />
       <ConnectionStatus />
+      <TutorialOverlay
+        moduleKey={session?.moduleKey}
+        myActionCount={myActionCount}
+        currentTurnIndex={session?.currentTurnIndex ?? 0}
+        userEmail={authSession?.user?.email ?? null}
+        onFinish={() => router.push("/")}
+      />
       {activeSheet === "character" && (
         <BottomSheet isOpen onClose={closeSheet} title="Character">
           <CharacterSheet />

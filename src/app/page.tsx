@@ -1,12 +1,13 @@
 "use client";
 
-import { useSession } from "next-auth/react";
+import { signIn, useSession } from "next-auth/react";
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 
 import { COPY } from "@/lib/copy/ashveil";
 import { GoldButton } from "@/components/ui/gold-button";
+import { GhostButton } from "@/components/ui/ghost-button";
 import { ModeCardsSkeleton } from "@/components/ui/loading-skeleton";
 import { PillSelect } from "@/components/ui/pill-select";
 import type { CampaignMode, SessionMode } from "@/lib/schemas/enums";
@@ -22,6 +23,7 @@ const PARTY_SIZES = [2, 3, 4, 5, 6] as const;
 export default function Home() {
   const router = useRouter();
   const { data: authSession, status: authStatus } = useSession();
+  const [tutorialComplete, setTutorialComplete] = useState<boolean>(false);
   const [mode, setMode] = useState<SessionMode | null>(null);
   const [campaignMode, setCampaignMode] = useState<CampaignMode>("user_prompt");
   const [maxPlayers, setMaxPlayers] = useState<(typeof PARTY_SIZES)[number]>(4);
@@ -33,6 +35,25 @@ export default function Home() {
   const [createLoading, setCreateLoading] = useState(false);
   const [joinLoading, setJoinLoading] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
+
+  useEffect(() => {
+    try {
+      setTutorialComplete(
+        window.localStorage.getItem("falvos.tutorial.complete") === "1",
+      );
+    } catch {
+      setTutorialComplete(false);
+    }
+  }, []);
+
+  async function handleUpgradeToGoogle() {
+    try {
+      await fetch("/api/auth/upgrade/prepare", { method: "POST" });
+    } catch {
+      // Ignore; upgrade page will show error if missing context.
+    }
+    await signIn("google", { callbackUrl: "/auth/upgrade" });
+  }
 
   async function handleCreate() {
     if (!mode || createLoading) return;
@@ -124,7 +145,7 @@ export default function Home() {
         <div className="flex flex-col items-center gap-[var(--void-gap-lg)] w-full max-w-md">
           <header className="text-center flex flex-col gap-3 mt-6">
             <h1 className="text-fantasy text-4xl font-bold text-[var(--color-gold-rare)] tracking-[0.15em] uppercase">
-              ASHVEIL
+              FALVOS
             </h1>
             <p className="text-[var(--color-silver-dim)] text-sm italic tracking-wide font-serif">
               &ldquo;{COPY.tagline}&rdquo;
@@ -145,20 +166,54 @@ export default function Home() {
         {/* Brand */}
         <header className="text-center flex flex-col gap-2">
           <h1 className="text-fantasy text-4xl font-black text-[var(--color-gold-rare)] tracking-tight uppercase">
-            ASHVEIL
+            FALVOS
           </h1>
           <p className="text-[var(--color-silver-dim)] text-sm italic tracking-wide font-serif">
             &ldquo;{COPY.tagline}&rdquo;
           </p>
           {authSession?.user?.name ? (
-            <p className="text-[10px] text-[var(--outline)] uppercase tracking-[0.15em] mt-1">
-              Signed in as {authSession.user.name}
-            </p>
+            <div className="flex flex-col items-center gap-2 mt-1">
+              <p className="text-[10px] text-[var(--outline)] uppercase tracking-[0.15em]">
+                Signed in as {authSession.user.name}
+              </p>
+              <Link
+                href="/profile"
+                className="text-[10px] uppercase tracking-[0.18em] text-[var(--color-silver-dim)] underline decoration-[rgba(212,175,55,0.25)] underline-offset-4 hover:text-[var(--color-gold-rare)]"
+              >
+                Edit profile
+              </Link>
+              <Link
+                href="/adventures"
+                className="text-[10px] uppercase tracking-[0.18em] text-[var(--color-silver-dim)] underline decoration-[rgba(212,175,55,0.18)] underline-offset-4 hover:text-[var(--color-gold-rare)]"
+              >
+                My adventures
+              </Link>
+              {typeof authSession.user.email === "string" &&
+              authSession.user.email.endsWith("@ashveil.guest") ? (
+                <GhostButton
+                  type="button"
+                  size="sm"
+                  className="min-h-[36px]"
+                  onClick={() => void handleUpgradeToGoogle()}
+                >
+                  Upgrade to Google
+                </GhostButton>
+              ) : null}
+            </div>
           ) : null}
         </header>
 
         {/* Mode Selection */}
         <section className="space-y-4">
+          {!tutorialComplete ? (
+            <Link
+              href="/tutorial"
+              className="w-full flex items-center justify-center gap-2 min-h-[48px] rounded-[var(--radius-card)] border border-[rgba(77,70,53,0.25)] bg-[var(--surface-container)]/40 text-[var(--color-silver-muted)] text-[10px] font-bold uppercase tracking-[0.14em] hover:border-[var(--color-gold-rare)]/30 hover:text-[var(--color-gold-rare)] transition-colors"
+            >
+              <span className="material-symbols-outlined text-lg">school</span>
+              Start tutorial
+            </Link>
+          ) : null}
           <div className="flex items-center gap-3 mb-2">
             <span className="w-1.5 h-6 bg-[var(--color-gold-rare)]" />
             <h2 className="text-fantasy font-bold text-base uppercase tracking-[0.12em] text-[var(--color-silver-dim)]">

@@ -20,7 +20,7 @@ export function RouteLoadingUI() {
                 "0 0 40px rgba(212, 175, 55, 0.35), 0 0 80px rgba(123, 45, 142, 0.12)",
             }}
           >
-            ASHVEIL
+            FALVOS
           </h1>
         </div>
         <p className="text-base text-[var(--color-silver-muted)] tracking-wide">

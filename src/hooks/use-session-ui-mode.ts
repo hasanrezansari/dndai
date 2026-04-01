@@ -1,9 +1,8 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useState } from "react";
 
 import {
-  DEFAULT_SESSION_UI_MODE,
   readSessionUiModeFromStorage,
   type SessionUiMode,
   writeSessionUiModeToStorage,
@@ -13,12 +12,9 @@ export function useSessionUiMode(): {
   mode: SessionUiMode;
   setMode: (mode: SessionUiMode) => void;
 } {
-  const [mode, setModeState] =
-    useState<SessionUiMode>(DEFAULT_SESSION_UI_MODE);
-
-  useEffect(() => {
-    setModeState(readSessionUiModeFromStorage());
-  }, []);
+  const [mode, setModeState] = useState<SessionUiMode>(() =>
+    readSessionUiModeFromStorage(),
+  );
 
   const setMode = useCallback((next: SessionUiMode) => {
     setModeState(next);
