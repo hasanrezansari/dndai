@@ -139,6 +139,10 @@ export default function Home() {
     }
   }
 
+  const isGuest =
+    typeof authSession?.user?.email === "string" &&
+    authSession.user.email.endsWith("@ashveil.guest");
+
   if (authStatus === "loading") {
     return (
       <main className="min-h-dvh flex flex-col items-center px-6 pt-16 pb-8 bg-[var(--color-obsidian)]">
@@ -161,46 +165,67 @@ export default function Home() {
   }
 
   return (
-    <main className="min-h-dvh flex flex-col items-center px-6 pb-8 bg-[var(--color-obsidian)]">
+    <main className="min-h-dvh flex flex-col items-center px-6 pb-10 bg-[var(--color-obsidian)]">
       <div className="flex flex-col gap-[var(--void-gap-lg)] w-full max-w-md pt-10">
         {/* Brand */}
-        <header className="text-center flex flex-col gap-2">
-          <h1 className="text-fantasy text-4xl font-black text-[var(--color-gold-rare)] tracking-tight uppercase">
-            FALVOS
-          </h1>
-          <p className="text-[var(--color-silver-dim)] text-sm italic tracking-wide font-serif">
-            &ldquo;{COPY.tagline}&rdquo;
-          </p>
-          {authSession?.user?.name ? (
-            <div className="flex flex-col items-center gap-2 mt-1">
-              <p className="text-[10px] text-[var(--outline)] uppercase tracking-[0.15em]">
-                Signed in as {authSession.user.name}
-              </p>
+        <header className="relative overflow-hidden rounded-[var(--radius-card)] border border-[rgba(77,70,53,0.18)] bg-[var(--surface-container)]/25 p-6">
+          <div className="pointer-events-none absolute inset-0 opacity-70">
+            <div className="absolute -top-16 -left-24 h-56 w-56 rounded-full bg-[rgba(212,175,55,0.10)] blur-3xl" />
+            <div className="absolute -bottom-20 -right-28 h-72 w-72 rounded-full bg-[rgba(120,74,32,0.18)] blur-3xl" />
+            <div className="absolute inset-0 bg-gradient-to-b from-transparent via-transparent to-[var(--color-obsidian)]" />
+          </div>
+
+          <div className="relative text-center flex flex-col gap-2">
+            <p className="text-[10px] uppercase tracking-[0.22em] text-[var(--outline)]">
+              Multiplayer AI tabletop
+            </p>
+            <h1 className="text-fantasy text-4xl font-black text-[var(--color-gold-rare)] tracking-tight uppercase">
+              FALVOS
+            </h1>
+            <p className="text-[var(--color-silver-dim)] text-sm italic tracking-wide font-serif">
+              &ldquo;{COPY.tagline}&rdquo;
+            </p>
+
+            <div className="mt-3 flex items-center justify-center gap-2">
               <Link
                 href="/profile"
-                className="text-[10px] uppercase tracking-[0.18em] text-[var(--color-silver-dim)] underline decoration-[rgba(212,175,55,0.25)] underline-offset-4 hover:text-[var(--color-gold-rare)]"
+                className="min-h-[36px] px-3 rounded-[var(--radius-chip)] border border-white/10 bg-black/10 text-[10px] font-bold uppercase tracking-[0.15em] text-[var(--color-silver-dim)] hover:text-[var(--color-gold-rare)] hover:border-[var(--color-gold-rare)]/25 transition-colors"
               >
-                Edit profile
+                Profile
               </Link>
               <Link
                 href="/adventures"
-                className="text-[10px] uppercase tracking-[0.18em] text-[var(--color-silver-dim)] underline decoration-[rgba(212,175,55,0.18)] underline-offset-4 hover:text-[var(--color-gold-rare)]"
+                className="min-h-[36px] px-3 rounded-[var(--radius-chip)] border border-white/10 bg-black/10 text-[10px] font-bold uppercase tracking-[0.15em] text-[var(--color-silver-dim)] hover:text-[var(--color-gold-rare)] hover:border-[var(--color-gold-rare)]/25 transition-colors"
               >
-                My adventures
+                Adventures
               </Link>
-              {typeof authSession.user.email === "string" &&
-              authSession.user.email.endsWith("@ashveil.guest") ? (
-                <GhostButton
-                  type="button"
-                  size="sm"
-                  className="min-h-[36px]"
-                  onClick={() => void handleUpgradeToGoogle()}
-                >
-                  Upgrade to Google
-                </GhostButton>
-              ) : null}
+              <Link
+                href="/tv"
+                className="min-h-[36px] px-3 rounded-[var(--radius-chip)] border border-white/10 bg-black/10 text-[10px] font-bold uppercase tracking-[0.15em] text-[var(--color-silver-dim)] hover:text-[var(--color-gold-rare)] hover:border-[var(--color-gold-rare)]/25 transition-colors"
+              >
+                TV
+              </Link>
             </div>
-          ) : null}
+
+            {authSession?.user?.name ? (
+              <div className="mt-2 flex flex-col items-center gap-2">
+                <p className="text-[10px] text-[var(--outline)] uppercase tracking-[0.18em]">
+                  Welcome, {authSession.user.name}
+                  {isGuest ? " (Guest)" : ""}
+                </p>
+                {isGuest ? (
+                  <GhostButton
+                    type="button"
+                    size="sm"
+                    className="min-h-[36px]"
+                    onClick={() => void handleUpgradeToGoogle()}
+                  >
+                    Upgrade to Google
+                  </GhostButton>
+                ) : null}
+              </div>
+            ) : null}
+          </div>
         </header>
 
         {/* Mode Selection */}

@@ -101,6 +101,22 @@ export default function ProfilePage() {
     return raw as Record<string, unknown>;
   }, [inspectedHero]);
 
+  function kitAbilities(raw: Record<string, unknown>): Array<Record<string, unknown>> {
+    const a = raw.abilities;
+    if (!Array.isArray(a)) return [];
+    return a
+      .filter((x): x is Record<string, unknown> => Boolean(x) && typeof x === "object" && !Array.isArray(x))
+      .slice(0, 12);
+  }
+
+  function kitGear(raw: Record<string, unknown>): Array<Record<string, unknown>> {
+    const g = raw.starting_gear;
+    if (!Array.isArray(g)) return [];
+    return g
+      .filter((x): x is Record<string, unknown> => Boolean(x) && typeof x === "object" && !Array.isArray(x))
+      .slice(0, 12);
+  }
+
   useEffect(() => {
     if (status === "loading") return;
     if (status !== "authenticated") {
@@ -837,42 +853,48 @@ export default function ProfilePage() {
                         </p>
                       ) : null}
 
-                      {Array.isArray(inspectedHeroKit.abilities) ? (
+                      {kitAbilities(inspectedHeroKit).length ? (
                         <div>
                           <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[var(--outline)]">
                             Abilities
                           </p>
                           <div className="mt-2 space-y-2">
-                            {(inspectedHeroKit.abilities as unknown[]).slice(0, 8).map((a, idx) => {
-                              const ability =
-                                a && typeof a === "object" && !Array.isArray(a)
-                                  ? (a as Record<string, unknown>)
-                                  : null;
+                            {kitAbilities(inspectedHeroKit).slice(0, 8).map((ability, idx) => {
                               const name =
-                                ability && typeof ability.name === "string"
-                                  ? ability.name
-                                  : `Ability ${idx + 1}`;
+                                typeof ability.name === "string" ? ability.name : `Ability ${idx + 1}`;
                               const kind =
-                                ability && typeof ability.effect_kind === "string"
-                                  ? ability.effect_kind
-                                  : null;
-                              const type =
-                                ability && typeof ability.type === "string"
-                                  ? ability.type
-                                  : null;
+                                typeof ability.effect_kind === "string" ? ability.effect_kind : null;
+                              const type = typeof ability.type === "string" ? ability.type : null;
+                              const cost =
+                                typeof ability.resource_cost === "number" ? ability.resource_cost : null;
+                              const cd = typeof ability.cooldown === "number" ? ability.cooldown : null;
                               return (
                                 <div
                                   key={`${name}-${idx}`}
                                   className="rounded-[var(--radius-card)] border border-white/10 bg-black/15 px-3 py-2"
                                 >
-                                  <p className="text-sm text-[var(--color-silver-muted)]">
-                                    {name}
-                                  </p>
-                                  {(kind || type) && (
+                                  <div className="flex items-start justify-between gap-3">
+                                    <p className="text-sm text-[var(--color-silver-muted)]">
+                                      {name}
+                                    </p>
+                                    <div className="flex items-center gap-1.5">
+                                      {typeof cost === "number" ? (
+                                        <span className="text-[9px] font-black uppercase tracking-[0.18em] text-[var(--outline)] border border-white/10 rounded-[var(--radius-chip)] px-2 py-1 bg-black/20">
+                                          {cost} MP
+                                        </span>
+                                      ) : null}
+                                      {typeof cd === "number" ? (
+                                        <span className="text-[9px] font-black uppercase tracking-[0.18em] text-[var(--outline)] border border-white/10 rounded-[var(--radius-chip)] px-2 py-1 bg-black/20">
+                                          CD {cd}
+                                        </span>
+                                      ) : null}
+                                    </div>
+                                  </div>
+                                  {(kind || type) ? (
                                     <p className="text-[10px] uppercase tracking-[0.18em] text-[var(--outline)]">
                                       {[type, kind].filter(Boolean).join(" · ")}
                                     </p>
-                                  )}
+                                  ) : null}
                                 </div>
                               );
                             })}
@@ -880,43 +902,32 @@ export default function ProfilePage() {
                         </div>
                       ) : null}
 
-                      {Array.isArray(inspectedHeroKit.starting_gear) ? (
+                      {kitGear(inspectedHeroKit).length ? (
                         <div>
                           <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[var(--outline)]">
                             Starting gear
                           </p>
                           <div className="mt-2 grid grid-cols-2 gap-2">
-                            {(inspectedHeroKit.starting_gear as unknown[])
-                              .slice(0, 10)
-                              .map((g, idx) => {
-                                const gear =
-                                  g && typeof g === "object" && !Array.isArray(g)
-                                    ? (g as Record<string, unknown>)
-                                    : null;
-                                const name =
-                                  gear && typeof gear.name === "string"
-                                    ? gear.name
-                                    : `Gear ${idx + 1}`;
-                                const type =
-                                  gear && typeof gear.type === "string"
-                                    ? gear.type
-                                    : null;
-                                return (
-                                  <div
-                                    key={`${name}-${idx}`}
-                                    className="rounded-[var(--radius-card)] border border-white/10 bg-black/15 px-3 py-2"
-                                  >
-                                    <p className="text-xs text-[var(--color-silver-muted)]">
-                                      {name}
+                            {kitGear(inspectedHeroKit).slice(0, 10).map((gear, idx) => {
+                              const name =
+                                typeof gear.name === "string" ? gear.name : `Gear ${idx + 1}`;
+                              const type = typeof gear.type === "string" ? gear.type : null;
+                              return (
+                                <div
+                                  key={`${name}-${idx}`}
+                                  className="rounded-[var(--radius-card)] border border-white/10 bg-black/15 px-3 py-2"
+                                >
+                                  <p className="text-xs text-[var(--color-silver-muted)]">
+                                    {name}
+                                  </p>
+                                  {type ? (
+                                    <p className="text-[10px] uppercase tracking-[0.18em] text-[var(--outline)]">
+                                      {type}
                                     </p>
-                                    {type ? (
-                                      <p className="text-[10px] uppercase tracking-[0.18em] text-[var(--outline)]">
-                                        {type}
-                                      </p>
-                                    ) : null}
-                                  </div>
-                                );
-                              })}
+                                  ) : null}
+                                </div>
+                              );
+                            })}
                           </div>
                         </div>
                       ) : null}
@@ -996,9 +1007,110 @@ export default function ProfilePage() {
                     <p className="mt-2 text-sm text-[var(--color-silver-dim)]">
                       This is what will be saved into your hero’s build.
                     </p>
-                    <pre className="mt-3 max-h-[220px] overflow-auto rounded-[var(--radius-card)] border border-white/10 bg-black/20 p-3 text-[10px] leading-relaxed text-[var(--outline)]">
-                      {JSON.stringify(heroKit, null, 2)}
-                    </pre>
+                    <div className="mt-3 space-y-3">
+                      {typeof (heroKit as Record<string, unknown>).fantasy === "string" &&
+                      String((heroKit as Record<string, unknown>).fantasy).trim() ? (
+                        <p className="text-sm text-[var(--color-silver-dim)] italic leading-relaxed">
+                          {String((heroKit as Record<string, unknown>).fantasy).trim()}
+                        </p>
+                      ) : null}
+
+                      {kitAbilities(heroKit as Record<string, unknown>).length ? (
+                        <div>
+                          <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[var(--outline)]">
+                            Abilities
+                          </p>
+                          <div className="mt-2 space-y-2">
+                            {kitAbilities(heroKit as Record<string, unknown>)
+                              .slice(0, 8)
+                              .map((ability, idx) => {
+                                const name =
+                                  typeof ability.name === "string"
+                                    ? ability.name
+                                    : `Ability ${idx + 1}`;
+                                const kind =
+                                  typeof ability.effect_kind === "string"
+                                    ? ability.effect_kind
+                                    : null;
+                                const type =
+                                  typeof ability.type === "string" ? ability.type : null;
+                                const cost =
+                                  typeof ability.resource_cost === "number"
+                                    ? ability.resource_cost
+                                    : null;
+                                const cd =
+                                  typeof ability.cooldown === "number"
+                                    ? ability.cooldown
+                                    : null;
+                                return (
+                                  <div
+                                    key={`${name}-${idx}`}
+                                    className="rounded-[var(--radius-card)] border border-white/10 bg-black/15 px-3 py-2"
+                                  >
+                                    <div className="flex items-start justify-between gap-3">
+                                      <p className="text-sm text-[var(--color-silver-muted)]">
+                                        {name}
+                                      </p>
+                                      <div className="flex items-center gap-1.5">
+                                        {typeof cost === "number" ? (
+                                          <span className="text-[9px] font-black uppercase tracking-[0.18em] text-[var(--outline)] border border-white/10 rounded-[var(--radius-chip)] px-2 py-1 bg-black/20">
+                                            {cost} MP
+                                          </span>
+                                        ) : null}
+                                        {typeof cd === "number" ? (
+                                          <span className="text-[9px] font-black uppercase tracking-[0.18em] text-[var(--outline)] border border-white/10 rounded-[var(--radius-chip)] px-2 py-1 bg-black/20">
+                                            CD {cd}
+                                          </span>
+                                        ) : null}
+                                      </div>
+                                    </div>
+                                    {(kind || type) ? (
+                                      <p className="text-[10px] uppercase tracking-[0.18em] text-[var(--outline)]">
+                                        {[type, kind].filter(Boolean).join(" · ")}
+                                      </p>
+                                    ) : null}
+                                  </div>
+                                );
+                              })}
+                          </div>
+                        </div>
+                      ) : null}
+
+                      {kitGear(heroKit as Record<string, unknown>).length ? (
+                        <div>
+                          <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[var(--outline)]">
+                            Starting gear
+                          </p>
+                          <div className="mt-2 grid grid-cols-2 gap-2">
+                            {kitGear(heroKit as Record<string, unknown>)
+                              .slice(0, 10)
+                              .map((gear, idx) => {
+                                const name =
+                                  typeof gear.name === "string"
+                                    ? gear.name
+                                    : `Gear ${idx + 1}`;
+                                const type =
+                                  typeof gear.type === "string" ? gear.type : null;
+                                return (
+                                  <div
+                                    key={`${name}-${idx}`}
+                                    className="rounded-[var(--radius-card)] border border-white/10 bg-black/15 px-3 py-2"
+                                  >
+                                    <p className="text-xs text-[var(--color-silver-muted)]">
+                                      {name}
+                                    </p>
+                                    {type ? (
+                                      <p className="text-[10px] uppercase tracking-[0.18em] text-[var(--outline)]">
+                                        {type}
+                                      </p>
+                                    ) : null}
+                                  </div>
+                                );
+                              })}
+                          </div>
+                        </div>
+                      ) : null}
+                    </div>
                   </div>
                 ) : null}
 

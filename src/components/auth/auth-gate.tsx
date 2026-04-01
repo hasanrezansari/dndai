@@ -128,6 +128,15 @@ function AuthGateInner({ children }: { children: React.ReactNode }) {
             <RouteLoadingUI />
           </motion.div>
         )
+      ) : isHome ? (
+        <motion.div
+          key="home"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ duration: 0.25 }}
+        >
+          {children}
+        </motion.div>
       ) : displayBypass || session?.user?.id ? (
         <motion.div
           key="app"
