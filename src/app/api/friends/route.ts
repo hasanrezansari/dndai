@@ -3,7 +3,7 @@ import { z } from "zod";
 
 import { apiError, handleApiError } from "@/lib/api/errors";
 import { requireUser, unauthorizedResponse } from "@/lib/auth/guards";
-import { addFriendEdge, listFriendsForUser } from "@/server/services/friend-service";
+import { listFriendsForUser, sendFriendRequest } from "@/server/services/friend-service";
 
 const AddBodySchema = z.object({
   friendUserId: z.string().min(1),
@@ -32,8 +32,11 @@ export async function POST(request: NextRequest) {
     }
     const parsed = AddBodySchema.safeParse(json);
     if (!parsed.success) return apiError("Invalid body", 400);
-    await addFriendEdge({ userId: user.id, friendUserId: parsed.data.friendUserId });
-    return NextResponse.json({ ok: true }, { status: 201 });
+    const out = await sendFriendRequest({
+      userId: user.id,
+      toUserId: parsed.data.friendUserId,
+    });
+    return NextResponse.json({ ok: true, ...out }, { status: 201 });
   } catch (e) {
     return handleApiError(e);
   }

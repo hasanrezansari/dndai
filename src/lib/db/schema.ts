@@ -97,6 +97,36 @@ export const friendEdges = pgTable(
   }),
 );
 
+export const friendRequests = pgTable(
+  "friend_requests",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    from_user_id: text("from_user_id")
+      .notNull()
+      .references(() => authUsers.id, { onDelete: "cascade" }),
+    to_user_id: text("to_user_id")
+      .notNull()
+      .references(() => authUsers.id, { onDelete: "cascade" }),
+    status: text("status").notNull().default("pending"),
+    created_at: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    responded_at: timestamp("responded_at", { withTimezone: true }),
+  },
+  (t) => [
+    index("friend_requests_to_status_created_idx").on(
+      t.to_user_id,
+      t.status,
+      t.created_at,
+    ),
+    index("friend_requests_from_status_created_idx").on(
+      t.from_user_id,
+      t.status,
+      t.created_at,
+    ),
+  ],
+);
+
 export const authAccounts = pgTable(
   "accounts",
   {

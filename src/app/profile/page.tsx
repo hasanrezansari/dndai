@@ -70,6 +70,13 @@ export default function ProfilePage() {
       lastActivityAt: string;
     }>
   >([]);
+  const [requestsLoading, setRequestsLoading] = useState(true);
+  const [incomingRequests, setIncomingRequests] = useState<
+    Array<{ id: string; fromUserId: string; fromName: string; fromImage: string | null }>
+  >([]);
+  const [outgoingRequests, setOutgoingRequests] = useState<
+    Array<{ id: string; toUserId: string; toName: string; toImage: string | null }>
+  >([]);
 
   const avatarPreview = useMemo(() => {
     if (image?.trim()) return image.trim();
@@ -140,13 +147,16 @@ export default function ProfilePage() {
     async function loadSocial() {
       setFriendsLoading(true);
       setPlayedWithLoading(true);
+      setRequestsLoading(true);
       try {
-        const [friendsRes, playedRes] = await Promise.all([
+        const [friendsRes, playedRes, reqRes] = await Promise.all([
           fetch("/api/friends"),
           fetch("/api/friends/played-with?limit=20"),
+          fetch("/api/friends/requests"),
         ]);
         const friendsJson: unknown = await friendsRes.json().catch(() => ({}));
         const playedJson: unknown = await playedRes.json().catch(() => ({}));
+        const reqJson: unknown = await reqRes.json().catch(() => ({}));
         if (cancelled) return;
         if (friendsRes.ok) {
           const d = friendsJson as {
@@ -166,10 +176,29 @@ export default function ProfilePage() {
           };
           setPlayedWith(Array.isArray(d.users) ? d.users : []);
         }
+        if (reqRes.ok) {
+          const d = reqJson as {
+            incoming?: Array<{
+              id: string;
+              fromUserId: string;
+              fromName: string;
+              fromImage: string | null;
+            }>;
+            outgoing?: Array<{
+              id: string;
+              toUserId: string;
+              toName: string;
+              toImage: string | null;
+            }>;
+          };
+          setIncomingRequests(Array.isArray(d.incoming) ? d.incoming : []);
+          setOutgoingRequests(Array.isArray(d.outgoing) ? d.outgoing : []);
+        }
       } finally {
         if (!cancelled) {
           setFriendsLoading(false);
           setPlayedWithLoading(false);
+          setRequestsLoading(false);
         }
       }
     }
@@ -351,9 +380,10 @@ export default function ProfilePage() {
   }
 
   async function refreshSocial() {
-    const [friendsRes, playedRes] = await Promise.all([
+    const [friendsRes, playedRes, reqRes] = await Promise.all([
       fetch("/api/friends"),
       fetch("/api/friends/played-with?limit=20"),
+      fetch("/api/friends/requests"),
     ]);
     if (friendsRes.ok) {
       const j = (await friendsRes.json().catch(() => ({}))) as {
@@ -373,6 +403,14 @@ export default function ProfilePage() {
       };
       setPlayedWith(Array.isArray(j.users) ? j.users : []);
     }
+    if (reqRes.ok) {
+      const j = (await reqRes.json().catch(() => ({}))) as {
+        incoming?: Array<{ id: string; fromUserId: string; fromName: string; fromImage: string | null }>;
+        outgoing?: Array<{ id: string; toUserId: string; toName: string; toImage: string | null }>;
+      };
+      setIncomingRequests(Array.isArray(j.incoming) ? j.incoming : []);
+      setOutgoingRequests(Array.isArray(j.outgoing) ? j.outgoing : []);
+    }
   }
 
   async function handleAddFriend(friendUserId: string) {
@@ -384,13 +422,31 @@ export default function ProfilePage() {
       });
       if (!res.ok) {
         const j = (await res.json().catch(() => ({}))) as { error?: string };
-        toast(j.error ?? "Could not add friend", "error");
+        toast(j.error ?? "Could not send request", "error");
         return;
       }
-      toast("Friend added", "success");
+      toast("Friend request sent", "success");
       await refreshSocial();
     } catch {
-      toast("Network error adding friend", "error");
+      toast("Network error sending request", "error");
+    }
+  }
+
+  async function handleRespondToRequest(requestId: string, action: "accept" | "decline") {
+    try {
+      const res = await fetch(`/api/friends/requests/${requestId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action }),
+      });
+      if (!res.ok) {
+        toast("Could not update request", "error");
+        return;
+      }
+      toast(action === "accept" ? "Friend added" : "Request declined", "success");
+      await refreshSocial();
+    } catch {
+      toast("Network error updating request", "error");
     }
   }
 
@@ -857,6 +913,57 @@ export default function ProfilePage() {
 
           <div className="mt-6">
             <p className="text-[10px] uppercase tracking-[0.18em] text-[var(--outline)]">
+              Friend requests
+            </p>
+            {requestsLoading ? (
+              <p className="mt-2 text-sm text-[var(--color-silver-dim)]">Loading…</p>
+            ) : incomingRequests.length === 0 ? (
+              <p className="mt-2 text-sm text-[var(--color-silver-dim)]">
+                No requests.
+              </p>
+            ) : (
+              <div className="mt-3 space-y-2">
+                {incomingRequests.map((r) => (
+                  <div
+                    key={r.id}
+                    className="flex items-center gap-3 rounded-[var(--radius-card)] border border-white/10 bg-black/15 px-3 py-3"
+                  >
+                    <div className="h-10 w-10 overflow-hidden rounded-[var(--radius-avatar)] border border-white/10 bg-black/20 shrink-0">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={r.fromImage?.trim() || dicebearInitialsUrl(r.fromName)}
+                        alt=""
+                        className="h-full w-full object-cover"
+                      />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm text-[var(--color-silver-muted)]">
+                        {r.fromName}
+                      </p>
+                      <p className="text-[10px] text-[var(--color-silver-dim)]">
+                        wants to be friends
+                      </p>
+                    </div>
+                    <GhostButton
+                      size="sm"
+                      onClick={() => void handleRespondToRequest(r.id, "decline")}
+                    >
+                      Decline
+                    </GhostButton>
+                    <GhostButton
+                      size="sm"
+                      onClick={() => void handleRespondToRequest(r.id, "accept")}
+                    >
+                      Accept
+                    </GhostButton>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          <div className="mt-6">
+            <p className="text-[10px] uppercase tracking-[0.18em] text-[var(--outline)]">
               People you played with
             </p>
             {playedWithLoading ? (
@@ -869,6 +976,9 @@ export default function ProfilePage() {
               <div className="mt-3 space-y-2">
                 {playedWith.map((u) => {
                   const alreadyFriend = friends.some((f) => f.userId === u.userId);
+                  const alreadyRequested = outgoingRequests.some(
+                    (r) => r.toUserId === u.userId,
+                  );
                   return (
                     <div
                       key={u.userId}
@@ -893,6 +1003,10 @@ export default function ProfilePage() {
                       {alreadyFriend ? (
                         <span className="text-[10px] uppercase tracking-[0.18em] text-[var(--outline)]">
                           Added
+                        </span>
+                      ) : alreadyRequested ? (
+                        <span className="text-[10px] uppercase tracking-[0.18em] text-[var(--outline)]">
+                          Requested
                         </span>
                       ) : (
                         <GhostButton

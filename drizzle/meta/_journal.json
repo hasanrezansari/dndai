@@ -43,6 +43,13 @@
       "when": 1775050412320,
       "tag": "0005_spotty_maria_hill",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1775052181736,
+      "tag": "0006_minor_nova",
+      "breakpoints": true
     }
   ]
 }
