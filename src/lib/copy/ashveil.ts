@@ -1,5 +1,5 @@
 export const COPY = {
-  tagline: "A living world awaits",
+  tagline: "Gather friends, write your story, go on adventure together.",
   thinking: [
     "The world shifts…",
     "Fate stirs…",
