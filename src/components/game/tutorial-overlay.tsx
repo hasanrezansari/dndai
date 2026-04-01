@@ -81,7 +81,7 @@ export function TutorialOverlay(props: {
 
         {showUpgradeNudge ? (
           <p className="mt-2 text-[10px] uppercase tracking-[0.18em] text-[var(--outline)]">
-            Tip: upgrade to Google on the home screen to keep your adventures across devices.
+            Tip: sign in with Google on the home screen to keep your adventures across devices.
           </p>
         ) : null}
 

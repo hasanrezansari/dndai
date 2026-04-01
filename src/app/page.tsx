@@ -143,6 +143,34 @@ export default function Home() {
     typeof authSession?.user?.email === "string" &&
     authSession.user.email.endsWith("@ashveil.guest");
 
+  const GoogleIcon = (
+    <svg
+      width="16"
+      height="16"
+      viewBox="0 0 48 48"
+      aria-hidden
+      className="shrink-0"
+    >
+      <path
+        fill="#EA4335"
+        d="M24 9.5c3.54 0 6.72 1.22 9.23 3.6l6.9-6.9C35.95 2.38 30.37 0 24 0 14.62 0 6.51 5.38 2.56 13.22l8.03 6.24C12.45 13.06 17.77 9.5 24 9.5z"
+      />
+      <path
+        fill="#4285F4"
+        d="M46.1 24.5c0-1.64-.15-3.21-.43-4.73H24v9.0h12.4c-.54 2.9-2.18 5.36-4.65 7.02l7.18 5.57C43.22 37.38 46.1 31.55 46.1 24.5z"
+      />
+      <path
+        fill="#FBBC05"
+        d="M10.59 28.46c-.5-1.5-.78-3.1-.78-4.76s.28-3.26.78-4.76l-8.03-6.24C.92 16.0 0 19.86 0 23.7s.92 7.7 2.56 11.0l8.03-6.24z"
+      />
+      <path
+        fill="#34A853"
+        d="M24 47.4c6.37 0 11.74-2.1 15.65-5.72l-7.18-5.57c-1.99 1.34-4.54 2.13-8.47 2.13-6.23 0-11.55-3.56-13.41-8.72l-8.03 6.24C6.51 42.02 14.62 47.4 24 47.4z"
+      />
+      <path fill="none" d="M0 0h48v48H0z" />
+    </svg>
+  );
+
   if (authStatus === "loading") {
     return (
       <main className="min-h-dvh flex flex-col items-center px-6 pt-16 pb-8 bg-[var(--color-obsidian)]">
@@ -165,8 +193,8 @@ export default function Home() {
   }
 
   return (
-    <main className="min-h-dvh flex flex-col items-center px-6 pb-10 bg-[var(--color-obsidian)]">
-      <div className="flex flex-col gap-[var(--void-gap-lg)] w-full max-w-md pt-10">
+    <main className="min-h-dvh flex flex-col items-center px-5 pb-28 bg-[var(--color-obsidian)]">
+      <div className="flex flex-col gap-[var(--void-gap)] w-full max-w-md pt-8">
         {/* Brand */}
         <header className="relative overflow-hidden rounded-[var(--radius-card)] border border-[rgba(77,70,53,0.18)] bg-[var(--surface-container)]/25 p-6">
           <div className="pointer-events-none absolute inset-0 opacity-70">
@@ -220,7 +248,10 @@ export default function Home() {
                     className="min-h-[36px]"
                     onClick={() => void handleUpgradeToGoogle()}
                   >
-                    Upgrade to Google
+                    <span className="flex items-center justify-center gap-2">
+                      {GoogleIcon}
+                      Sign in with Google
+                    </span>
                   </GhostButton>
                 ) : null}
               </div>
@@ -259,8 +290,12 @@ export default function Home() {
                   : "bg-[var(--color-midnight)] border border-[rgba(77,70,53,0.2)] opacity-70 hover:opacity-100 hover:bg-[var(--surface-container)]"
               }`}
             >
+              <div className="pointer-events-none absolute inset-0 opacity-70">
+                <div className="absolute inset-0 bg-gradient-to-br from-[rgba(242,202,80,0.18)] via-transparent to-[rgba(123,45,142,0.16)]" />
+                <div className="absolute inset-0 bg-gradient-to-t from-[var(--color-obsidian)] via-[var(--color-obsidian)]/30 to-transparent" />
+              </div>
               {mode === "ai_dm" && (
-                <div className="flex items-center gap-2 mb-1">
+                <div className="relative flex items-center gap-2 mb-1">
                   <span
                     className="material-symbols-outlined text-[var(--color-gold-rare)] text-sm"
                     style={{ fontVariationSettings: "'FILL' 1" }}
@@ -272,12 +307,14 @@ export default function Home() {
                   </span>
                 </div>
               )}
-              <h3 className="text-fantasy font-bold text-xl text-[var(--color-silver-muted)]">
+              <div className="relative">
+                <h3 className="text-fantasy font-bold text-xl text-[var(--color-silver-muted)]">
                 AI Dungeon Master
-              </h3>
-              <p className="text-xs text-[var(--color-silver-dim)] leading-relaxed mt-1">
+                </h3>
+                <p className="text-xs text-[var(--color-silver-dim)] leading-relaxed mt-1">
                 Boundless worlds generated in real-time by the obsidian core.
-              </p>
+                </p>
+              </div>
             </div>
           </button>
 
@@ -294,8 +331,12 @@ export default function Home() {
                   : "bg-[var(--color-midnight)] border border-[rgba(77,70,53,0.2)] opacity-70 hover:opacity-100 hover:bg-[var(--surface-container)]"
               }`}
             >
+              <div className="pointer-events-none absolute inset-0 opacity-70">
+                <div className="absolute inset-0 bg-gradient-to-br from-[rgba(242,202,80,0.10)] via-transparent to-[rgba(139,37,0,0.22)]" />
+                <div className="absolute inset-0 bg-gradient-to-t from-[var(--color-obsidian)] via-[var(--color-obsidian)]/30 to-transparent" />
+              </div>
               {mode === "human_dm" && (
-                <div className="flex items-center gap-2 mb-1">
+                <div className="relative flex items-center gap-2 mb-1">
                   <span
                     className="material-symbols-outlined text-[var(--color-gold-rare)] text-sm"
                     style={{ fontVariationSettings: "'FILL' 1" }}
@@ -307,13 +348,14 @@ export default function Home() {
                   </span>
                 </div>
               )}
-              <h3 className="text-fantasy font-bold text-xl text-[var(--color-silver-muted)]">
-                Human Dungeon Master
-              </h3>
-              <p className="text-xs text-[var(--color-silver-dim)] leading-relaxed mt-1">
-                Host a session for your party with manual control and custom
-                lore.
-              </p>
+              <div className="relative">
+                <h3 className="text-fantasy font-bold text-xl text-[var(--color-silver-muted)]">
+                  Human Dungeon Master
+                </h3>
+                <p className="text-xs text-[var(--color-silver-dim)] leading-relaxed mt-1">
+                  Host a session for your party with manual control and custom lore.
+                </p>
+              </div>
             </div>
           </button>
         </section>
@@ -389,46 +431,36 @@ export default function Home() {
           </div>
         ) : null}
 
-        {/* Actions */}
-        <div className="flex flex-col gap-4 w-full mt-auto pt-4">
-          <GoldButton
-            type="button"
-            size="lg"
-            className="w-full min-h-[56px] flex items-center justify-center gap-3 relative overflow-hidden text-lg"
-            disabled={!mode || createLoading}
-            onClick={handleCreate}
-          >
-            {createLoading ? (
-              <>
-                <span>Opening portal…</span>
-                <span
-                  className="absolute inset-0 animate-shimmer opacity-40 pointer-events-none"
-                  aria-hidden
-                />
-              </>
-            ) : (
-              <>
-                <span>Create Session</span>
-                <span className="material-symbols-outlined text-lg">
-                  swords
-                </span>
-              </>
-            )}
-          </GoldButton>
-
-          <Link
-            href="/tv"
-            className="w-full flex items-center justify-center gap-2 min-h-[48px] rounded-[var(--radius-card)] border border-[rgba(77,70,53,0.25)] bg-[var(--surface-container)]/40 text-[var(--color-silver-muted)] text-[10px] font-bold uppercase tracking-[0.14em] hover:border-[var(--color-gold-rare)]/30 hover:text-[var(--color-gold-rare)] transition-colors"
-          >
-            <span className="material-symbols-outlined text-lg">tv</span>
-            Watch on TV
-          </Link>
-
-          {joinOpen ? (
-            <form
-              onSubmit={handleJoinSubmit}
-              className="flex flex-col gap-4 w-full bg-[var(--surface-high)] rounded-[var(--radius-card)] p-6 border border-[rgba(77,70,53,0.3)] animate-slide-up"
+        {/* Bottom action bar (phone-first thumb zone) */}
+      </div>
+      <div className="fixed inset-x-0 bottom-0 z-40 px-5 pb-5">
+        <div className="mx-auto w-full max-w-md rounded-[var(--radius-card)] border border-[rgba(77,70,53,0.25)] bg-[var(--surface-high)]/85 backdrop-blur-md p-4 shadow-[0_24px_80px_rgba(0,0,0,0.65)]">
+          <div className="flex flex-col gap-3">
+            <GoldButton
+              type="button"
+              size="lg"
+              className="w-full min-h-[56px] flex items-center justify-center gap-3 relative overflow-hidden text-lg"
+              disabled={!mode || createLoading}
+              onClick={handleCreate}
             >
+              {createLoading ? (
+                <>
+                  <span>Opening portal…</span>
+                  <span
+                    className="absolute inset-0 animate-shimmer opacity-40 pointer-events-none"
+                    aria-hidden
+                  />
+                </>
+              ) : (
+                <>
+                  <span>Create Session</span>
+                  <span className="material-symbols-outlined text-lg">swords</span>
+                </>
+              )}
+            </GoldButton>
+
+            {joinOpen ? (
+              <form onSubmit={handleJoinSubmit} className="flex flex-col gap-3 w-full">
               <div className="text-center mb-2">
                 <h3 className="text-fantasy text-xl text-[var(--color-silver-muted)] tracking-tight">
                   Summoning Ritual
@@ -488,24 +520,29 @@ export default function Home() {
                 Back to Create Session
               </button>
             </form>
-          ) : (
-            <button
-              type="button"
-              className="w-full flex items-center justify-center gap-2 py-3 group transition-colors"
-              onClick={() => {
-                setJoinOpen(true);
-                setJoinError(null);
-                setJoinShakeKey(0);
-              }}
-            >
-              <span className="text-[var(--outline)] text-[10px] font-bold uppercase tracking-[0.15em] group-hover:text-[var(--color-gold-rare)] transition-colors">
-                Already have a scroll?
-              </span>
-              <span className="text-[var(--color-gold-rare)] font-black uppercase text-xs tracking-[0.1em] border-b border-[var(--color-gold-rare)]/20 group-hover:border-[var(--color-gold-rare)] transition-all pb-0.5">
-                Join with Code
-              </span>
-            </button>
-          )}
+            ) : (
+              <div className="flex items-center justify-between gap-3">
+                <button
+                  type="button"
+                  className="flex-1 min-h-[44px] rounded-[var(--radius-card)] border border-white/10 bg-black/10 text-[10px] font-bold uppercase tracking-[0.14em] text-[var(--color-silver-dim)] hover:text-[var(--color-gold-rare)] hover:border-[var(--color-gold-rare)]/25 transition-colors"
+                  onClick={() => {
+                    setJoinOpen(true);
+                    setJoinError(null);
+                    setJoinShakeKey(0);
+                  }}
+                >
+                  Join with code
+                </button>
+                <Link
+                  href="/tv"
+                  className="flex-1 min-h-[44px] rounded-[var(--radius-card)] border border-white/10 bg-black/10 text-[10px] font-bold uppercase tracking-[0.14em] text-[var(--color-silver-dim)] hover:text-[var(--color-gold-rare)] hover:border-[var(--color-gold-rare)]/25 transition-colors flex items-center justify-center gap-2"
+                >
+                  <span className="material-symbols-outlined text-lg">tv</span>
+                  TV
+                </Link>
+              </div>
+            )}
+          </div>
         </div>
       </div>
     </main>
