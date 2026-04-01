@@ -9,7 +9,25 @@ import { GoldButton } from "@/components/ui/gold-button";
 import { GhostButton } from "@/components/ui/ghost-button";
 import { useToast } from "@/components/ui/toast";
 import { HeroKitPreview } from "@/components/character/hero-kit-preview";
-import { ClassProfileSchema, type ClassProfile } from "@/lib/schemas/domain";
+import { PillSelect } from "@/components/ui/pill-select";
+import {
+  ClassProfileSchema,
+  type ClassProfile,
+  type CharacterStats,
+} from "@/lib/schemas/domain";
+
+const ABILITY_BUDGET_CAP = 10;
+const GEAR_BUDGET_CAP = 7;
+const STAT_BIAS_CAP = 5;
+
+const STAT_ORDER: { key: keyof CharacterStats; label: string }[] = [
+  { key: "str", label: "STR" },
+  { key: "dex", label: "DEX" },
+  { key: "con", label: "CON" },
+  { key: "int", label: "INT" },
+  { key: "wis", label: "WIS" },
+  { key: "cha", label: "CHA" },
+];
 
 type ProfileHero = {
   id: string;
@@ -115,6 +133,28 @@ export default function ProfilePage() {
     return parsed.success ? parsed.data : null;
   }, [heroKit]);
 
+  const customAbilityBudget = useMemo(
+    () =>
+      builderClassProfile?.abilities.reduce((sum, a) => sum + a.power_cost, 0) ?? 0,
+    [builderClassProfile],
+  );
+  const customGearBudget = useMemo(
+    () =>
+      builderClassProfile?.starting_gear.reduce((sum, g) => sum + g.power_cost, 0) ??
+      0,
+    [builderClassProfile],
+  );
+  const customStatBiasBudget = useMemo(
+    () =>
+      builderClassProfile
+        ? Object.values(builderClassProfile.stat_bias).reduce(
+            (sum, n) => sum + Math.max(0, n),
+            0,
+          )
+        : 0,
+    [builderClassProfile],
+  );
+
   useEffect(() => {
     if (status === "loading") return;
     if (status !== "authenticated") {
@@ -169,7 +209,7 @@ export default function ProfilePage() {
         setHeroBuilderOpen(false);
         setInspectedHeroId(null);
       } finally {
-        if (!cancelled) setHeroesLoading(false);
+        setHeroesLoading(false);
       }
     }
     void loadHeroes();
@@ -388,6 +428,9 @@ export default function ProfilePage() {
         toast(j.error ?? "Could not create hero", "error");
         return;
       }
+      const created = (await res.json().catch(() => ({}))) as {
+        hero?: { id?: string };
+      };
       toast("Saved hero created", "success");
       setHeroName("");
       setHeroIsPublic(false);
@@ -399,6 +442,10 @@ export default function ProfilePage() {
       setHeroBackstory("");
       setHeroAppearance("");
       await refreshHeroes();
+      setHeroBuilderOpen(false);
+      if (created.hero?.id) {
+        setInspectedHeroId(created.hero.id);
+      }
     } catch {
       toast("Network error creating hero", "error");
     } finally {
@@ -429,7 +476,12 @@ export default function ProfilePage() {
         toast("Could not generate kit", "error");
         return;
       }
-      setHeroKit(data.classProfile);
+      const parsed = ClassProfileSchema.safeParse(data.classProfile);
+      if (!parsed.success) {
+        toast("Generated kit was invalid. Try again.", "error");
+        return;
+      }
+      setHeroKit(parsed.data);
       toast("Kit generated", "success");
     } catch {
       toast("Network error generating kit", "error");
@@ -921,8 +973,323 @@ export default function ProfilePage() {
                     <p className="mt-2 text-sm text-[var(--color-silver-dim)]">
                       This is what will be saved into your hero’s build.
                     </p>
-                    <div className="mt-3">
-                      <HeroKitPreview profile={builderClassProfile} />
+                    <div className="mt-4 space-y-4">
+                      <div className="space-y-3">
+                        <p className="text-[10px] uppercase tracking-[0.12em] text-[var(--outline)]">
+                          Ability Budget {customAbilityBudget}/{ABILITY_BUDGET_CAP}
+                        </p>
+                        <div className="h-2 w-full overflow-hidden rounded-full border border-white/10 bg-black/20">
+                          <div
+                            className="h-full bg-[var(--color-gold-rare)]/70"
+                            style={{
+                              width: `${Math.max(
+                                2,
+                                Math.min(
+                                  100,
+                                  Math.round(
+                                    (customAbilityBudget / ABILITY_BUDGET_CAP) * 100,
+                                  ),
+                                ),
+                              )}%`,
+                            }}
+                          />
+                        </div>
+
+                        <div className="flex flex-col gap-2">
+                          {builderClassProfile.abilities.map((ability, idx) => (
+                            <div
+                              key={`${ability.name}-${idx}`}
+                              className="grid grid-cols-2 gap-2"
+                            >
+                              <input
+                                type="text"
+                                value={ability.name}
+                                onChange={(e) =>
+                                  setHeroKit((prev: unknown) => {
+                                    const parsed = ClassProfileSchema.safeParse(prev);
+                                    if (!parsed.success) return prev;
+                                    const next = [...parsed.data.abilities];
+                                    next[idx] = {
+                                      ...next[idx]!,
+                                      name: e.target.value.slice(0, 40),
+                                    };
+                                    return { ...parsed.data, abilities: next };
+                                  })
+                                }
+                                className="col-span-2 w-full min-h-[40px] rounded-[var(--radius-button)] bg-[var(--color-deep-void)] border border-[rgba(77,70,53,0.2)] px-3 text-sm text-[var(--color-silver-muted)] focus:outline-none focus:border-[var(--color-gold-rare)]/40 transition-colors"
+                              />
+                              <PillSelect
+                                options={[
+                                  { value: "active", label: "Active" },
+                                  { value: "passive", label: "Passive" },
+                                ]}
+                                value={ability.type}
+                                onChange={(value) =>
+                                  setHeroKit((prev: unknown) => {
+                                    const parsed = ClassProfileSchema.safeParse(prev);
+                                    if (!parsed.success) return prev;
+                                    const next = [...parsed.data.abilities];
+                                    next[idx] = {
+                                      ...next[idx]!,
+                                      type: value as typeof ability.type,
+                                    };
+                                    return { ...parsed.data, abilities: next };
+                                  })
+                                }
+                                size="sm"
+                                wrap={false}
+                                className="w-full overflow-x-auto scrollbar-hide pb-1"
+                              />
+                              <PillSelect
+                                options={[
+                                  { value: "damage", label: "Damage" },
+                                  { value: "heal", label: "Heal" },
+                                  { value: "shield", label: "Shield" },
+                                  { value: "buff", label: "Buff" },
+                                  { value: "debuff", label: "Debuff" },
+                                  { value: "mobility", label: "Mobility" },
+                                  { value: "utility", label: "Utility" },
+                                ]}
+                                value={ability.effect_kind}
+                                onChange={(value) =>
+                                  setHeroKit((prev: unknown) => {
+                                    const parsed = ClassProfileSchema.safeParse(prev);
+                                    if (!parsed.success) return prev;
+                                    const next = [...parsed.data.abilities];
+                                    next[idx] = {
+                                      ...next[idx]!,
+                                      effect_kind: value as typeof ability.effect_kind,
+                                    };
+                                    return { ...parsed.data, abilities: next };
+                                  })
+                                }
+                                size="sm"
+                                wrap={false}
+                                className="w-full overflow-x-auto scrollbar-hide pb-1"
+                              />
+                              <label className="text-[10px] uppercase tracking-[0.12em] text-[var(--outline)]">
+                                Resource
+                                <input
+                                  type="number"
+                                  min={0}
+                                  max={6}
+                                  value={ability.resource_cost}
+                                  onChange={(e) =>
+                                    setHeroKit((prev: unknown) => {
+                                      const parsed = ClassProfileSchema.safeParse(prev);
+                                      if (!parsed.success) return prev;
+                                      const next = [...parsed.data.abilities];
+                                      next[idx] = {
+                                        ...next[idx]!,
+                                        resource_cost: Math.max(
+                                          0,
+                                          Math.min(6, Number(e.target.value) || 0),
+                                        ),
+                                      };
+                                      return { ...parsed.data, abilities: next };
+                                    })
+                                  }
+                                  className="mt-1 w-full min-h-[36px] rounded-[var(--radius-button)] bg-[var(--color-deep-void)] border border-[rgba(77,70,53,0.2)] px-3 text-sm text-[var(--color-silver-muted)] focus:outline-none focus:border-[var(--color-gold-rare)]/40 transition-colors"
+                                />
+                              </label>
+                              <label className="text-[10px] uppercase tracking-[0.12em] text-[var(--outline)]">
+                                Cooldown
+                                <input
+                                  type="number"
+                                  min={0}
+                                  max={6}
+                                  value={ability.cooldown}
+                                  onChange={(e) =>
+                                    setHeroKit((prev: unknown) => {
+                                      const parsed = ClassProfileSchema.safeParse(prev);
+                                      if (!parsed.success) return prev;
+                                      const next = [...parsed.data.abilities];
+                                      next[idx] = {
+                                        ...next[idx]!,
+                                        cooldown: Math.max(
+                                          0,
+                                          Math.min(6, Number(e.target.value) || 0),
+                                        ),
+                                      };
+                                      return { ...parsed.data, abilities: next };
+                                    })
+                                  }
+                                  className="mt-1 w-full min-h-[36px] rounded-[var(--radius-button)] bg-[var(--color-deep-void)] border border-[rgba(77,70,53,0.2)] px-3 text-sm text-[var(--color-silver-muted)] focus:outline-none focus:border-[var(--color-gold-rare)]/40 transition-colors"
+                                />
+                              </label>
+                              <label className="text-[10px] uppercase tracking-[0.12em] text-[var(--outline)]">
+                                Power Cost
+                                <input
+                                  type="number"
+                                  min={1}
+                                  max={6}
+                                  value={ability.power_cost}
+                                  onChange={(e) =>
+                                    setHeroKit((prev: unknown) => {
+                                      const parsed = ClassProfileSchema.safeParse(prev);
+                                      if (!parsed.success) return prev;
+                                      const next = [...parsed.data.abilities];
+                                      next[idx] = {
+                                        ...next[idx]!,
+                                        power_cost: Math.max(
+                                          1,
+                                          Math.min(6, Number(e.target.value) || 1),
+                                        ),
+                                      };
+                                      return { ...parsed.data, abilities: next };
+                                    })
+                                  }
+                                  className="mt-1 w-full min-h-[36px] rounded-[var(--radius-button)] bg-[var(--color-deep-void)] border border-[rgba(77,70,53,0.2)] px-3 text-sm text-[var(--color-silver-muted)] focus:outline-none focus:border-[var(--color-gold-rare)]/40 transition-colors"
+                                />
+                              </label>
+                            </div>
+                          ))}
+                        </div>
+
+                        <p className="text-[10px] uppercase tracking-[0.12em] text-[var(--outline)]">
+                          Gear Budget {customGearBudget}/{GEAR_BUDGET_CAP}
+                        </p>
+                        <div className="h-2 w-full overflow-hidden rounded-full border border-white/10 bg-black/20">
+                          <div
+                            className="h-full bg-[var(--color-gold-rare)]/70"
+                            style={{
+                              width: `${Math.max(
+                                2,
+                                Math.min(
+                                  100,
+                                  Math.round((customGearBudget / GEAR_BUDGET_CAP) * 100),
+                                ),
+                              )}%`,
+                            }}
+                          />
+                        </div>
+
+                        <div className="flex flex-col gap-2">
+                          {builderClassProfile.starting_gear.map((gear, idx) => (
+                            <div
+                              key={`${gear.name}-${idx}`}
+                              className="grid grid-cols-2 gap-2"
+                            >
+                              <input
+                                type="text"
+                                value={gear.name}
+                                onChange={(e) =>
+                                  setHeroKit((prev: unknown) => {
+                                    const parsed = ClassProfileSchema.safeParse(prev);
+                                    if (!parsed.success) return prev;
+                                    const next = [...parsed.data.starting_gear];
+                                    next[idx] = {
+                                      ...next[idx]!,
+                                      name: e.target.value.slice(0, 40),
+                                    };
+                                    return { ...parsed.data, starting_gear: next };
+                                  })
+                                }
+                                className="col-span-2 w-full min-h-[40px] rounded-[var(--radius-button)] bg-[var(--color-deep-void)] border border-[rgba(77,70,53,0.2)] px-3 text-sm text-[var(--color-silver-muted)] focus:outline-none focus:border-[var(--color-gold-rare)]/40 transition-colors"
+                              />
+                              <PillSelect
+                                options={[
+                                  { value: "weapon", label: "Weapon" },
+                                  { value: "armor", label: "Armor" },
+                                  { value: "focus", label: "Focus" },
+                                  { value: "tool", label: "Tool" },
+                                  { value: "cyberware", label: "Cyberware" },
+                                ]}
+                                value={gear.type}
+                                onChange={(value) =>
+                                  setHeroKit((prev: unknown) => {
+                                    const parsed = ClassProfileSchema.safeParse(prev);
+                                    if (!parsed.success) return prev;
+                                    const next = [...parsed.data.starting_gear];
+                                    next[idx] = {
+                                      ...next[idx]!,
+                                      type: value as typeof gear.type,
+                                    };
+                                    return { ...parsed.data, starting_gear: next };
+                                  })
+                                }
+                                size="sm"
+                                wrap={false}
+                                className="w-full overflow-x-auto scrollbar-hide pb-1"
+                              />
+                              <label className="text-[10px] uppercase tracking-[0.12em] text-[var(--outline)]">
+                                Power Cost
+                                <input
+                                  type="number"
+                                  min={1}
+                                  max={4}
+                                  value={gear.power_cost}
+                                  onChange={(e) =>
+                                    setHeroKit((prev: unknown) => {
+                                      const parsed = ClassProfileSchema.safeParse(prev);
+                                      if (!parsed.success) return prev;
+                                      const next = [...parsed.data.starting_gear];
+                                      next[idx] = {
+                                        ...next[idx]!,
+                                        power_cost: Math.max(
+                                          1,
+                                          Math.min(4, Number(e.target.value) || 1),
+                                        ),
+                                      };
+                                      return { ...parsed.data, starting_gear: next };
+                                    })
+                                  }
+                                  className="mt-1 w-full min-h-[36px] rounded-[var(--radius-button)] bg-[var(--color-deep-void)] border border-[rgba(77,70,53,0.2)] px-3 text-sm text-[var(--color-silver-muted)] focus:outline-none focus:border-[var(--color-gold-rare)]/40 transition-colors"
+                                />
+                              </label>
+                            </div>
+                          ))}
+                        </div>
+
+                        <p className="text-[10px] uppercase tracking-[0.12em] text-[var(--outline)]">
+                          Stat Bias Budget {customStatBiasBudget}/{STAT_BIAS_CAP}
+                        </p>
+                        <div className="h-2 w-full overflow-hidden rounded-full border border-white/10 bg-black/20">
+                          <div
+                            className="h-full bg-[var(--color-gold-rare)]/70"
+                            style={{
+                              width: `${Math.max(
+                                2,
+                                Math.min(
+                                  100,
+                                  Math.round(
+                                    (customStatBiasBudget / STAT_BIAS_CAP) * 100,
+                                  ),
+                                ),
+                              )}%`,
+                            }}
+                          />
+                        </div>
+                        <div className="grid grid-cols-3 gap-2">
+                          {STAT_ORDER.map(({ key, label }) => (
+                            <label
+                              key={key}
+                              className="text-[10px] uppercase tracking-[0.12em] text-[var(--outline)]"
+                            >
+                              {label}
+                              <input
+                                type="number"
+                                min={-2}
+                                max={3}
+                                value={builderClassProfile.stat_bias[key]}
+                                onChange={(e) =>
+                                  setHeroKit((prev: unknown) => {
+                                    const parsed = ClassProfileSchema.safeParse(prev);
+                                    if (!parsed.success) return prev;
+                                    const nextBias = { ...parsed.data.stat_bias };
+                                    nextBias[key] = Math.max(
+                                      -2,
+                                      Math.min(3, Number(e.target.value) || 0),
+                                    );
+                                    return { ...parsed.data, stat_bias: nextBias };
+                                  })
+                                }
+                                className="mt-1 w-full min-h-[36px] rounded-[var(--radius-button)] bg-[var(--color-deep-void)] border border-[rgba(77,70,53,0.2)] px-3 text-sm text-[var(--color-silver-muted)] focus:outline-none focus:border-[var(--color-gold-rare)]/40 transition-colors"
+                              />
+                            </label>
+                          ))}
+                        </div>
+                      </div>
                     </div>
                   </div>
                 ) : null}
@@ -933,22 +1300,27 @@ export default function ProfilePage() {
                   </p>
                   <div className="mt-2 flex items-center gap-3">
                     <div className="h-14 w-14 overflow-hidden rounded-[var(--radius-avatar)] border border-white/10 bg-black/20 shrink-0">
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img
-                        src={
-                          heroPortraitUrl.trim() ||
-                          dicebearHeroPortrait(`${heroName} ${heroConcept}`)
-                        }
-                        alt="Hero portrait preview"
-                        className="h-full w-full object-cover"
-                      />
+                      {heroPortraitUrl.trim() ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img
+                          src={heroPortraitUrl.trim()}
+                          alt="Hero portrait preview"
+                          className="h-full w-full object-cover"
+                        />
+                      ) : (
+                        <div className="h-full w-full flex items-center justify-center text-[var(--outline)] text-xs">
+                          —
+                        </div>
+                      )}
                     </div>
-                    <input
-                      value={heroPortraitUrl}
-                      onChange={(e) => setHeroPortraitUrl(e.target.value)}
-                      placeholder="(optional) https://…"
-                      className="w-full min-h-[44px] rounded-[var(--radius-card)] bg-[var(--color-deep-void)] border border-[rgba(255,255,255,0.08)] px-4 text-[var(--color-silver-muted)] text-sm focus:outline-none focus:border-[rgba(212,175,55,0.25)]"
-                    />
+                    <div className="flex-1">
+                      <p className="text-sm text-[var(--color-silver-dim)]">
+                        Generate one portrait from your concept.
+                      </p>
+                      <p className="mt-1 text-[10px] uppercase tracking-[0.18em] text-[var(--outline)]">
+                        Rerolls are paid later.
+                      </p>
+                    </div>
                   </div>
                   <div className="mt-3 flex gap-3">
                     <GhostButton
@@ -958,18 +1330,6 @@ export default function ProfilePage() {
                       className="w-full"
                     >
                       {heroBuilderPortraitBusy ? "Generating…" : "Generate AI portrait"}
-                    </GhostButton>
-                    <GhostButton
-                      size="sm"
-                      disabled={heroBusy}
-                      onClick={() =>
-                        setHeroPortraitUrl(
-                          dicebearHeroPortrait(`${heroName} ${heroConcept}`),
-                        )
-                      }
-                      className="w-full"
-                    >
-                      Auto portrait
                     </GhostButton>
                     <GhostButton
                       size="sm"
