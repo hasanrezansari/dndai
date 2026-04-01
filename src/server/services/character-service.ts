@@ -116,6 +116,7 @@ export async function createCharacter(params: {
   characterClass: string;
   race: string;
   stats: CharacterStats;
+  portraitUrl?: string;
   pronouns?: string;
   traits?: string[];
   backstory?: string;
@@ -180,6 +181,7 @@ export async function createCharacter(params: {
       abilities,
       conditions: [],
       visual_profile: {
+        portrait_url: params.portraitUrl?.trim() || undefined,
         pronouns: params.pronouns?.trim() || "they/them",
         traits: (params.traits ?? []).filter(Boolean).slice(0, 5),
         backstory: (params.backstory ?? "").trim().slice(0, 500),

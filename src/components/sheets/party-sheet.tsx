@@ -1,25 +1,158 @@
 "use client";
 
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import { useGameStore } from "@/lib/state/game-store";
+import { useToast } from "@/components/ui/toast";
+
+type PublicProfileResponse = {
+  user: { id: string; name: string; image: string | null };
+  heroes: Array<{
+    id: string;
+    name: string;
+    heroClass: string;
+    race: string;
+  }>;
+};
 
 export function PartySheet() {
   const players = useGameStore((s) => s.players);
   const currentTurnPlayerId = useGameStore(
     (s) => s.session?.currentPlayerId ?? null,
   );
+  const { toast } = useToast();
+
+  const [viewUserId, setViewUserId] = useState<string | null>(null);
+  const [profileLoading, setProfileLoading] = useState(false);
+  const [profileError, setProfileError] = useState<string | null>(null);
+  const [profile, setProfile] = useState<PublicProfileResponse | null>(null);
+  const [copyBusyId, setCopyBusyId] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!profileError) return;
+    const t = window.setTimeout(() => setProfileError(null), 3500);
+    return () => window.clearTimeout(t);
+  }, [profileError]);
 
   const ordered = useMemo(
     () => [...players].sort((a, b) => a.seatIndex - b.seatIndex),
     [players],
   );
 
+  async function openProfile(userId: string) {
+    setViewUserId(userId);
+    setProfile(null);
+    setProfileError(null);
+    setProfileLoading(true);
+    try {
+      const res = await fetch(`/api/users/${userId}/profile`);
+      const data: unknown = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        const j = data as { error?: string };
+        setProfileError(j.error ?? "This player has no public profile.");
+        return;
+      }
+      setProfile(data as PublicProfileResponse);
+    } catch {
+      setProfileError("Could not load profile.");
+    } finally {
+      setProfileLoading(false);
+    }
+  }
+
+  async function copyHero(fromHeroId: string) {
+    if (copyBusyId) return;
+    setCopyBusyId(fromHeroId);
+    try {
+      const res = await fetch("/api/profile/heroes/copy", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ fromHeroId }),
+      });
+      if (!res.ok) {
+        const j = (await res.json().catch(() => ({}))) as { error?: string };
+        const msg = j.error ?? "Could not copy hero.";
+        setProfileError(msg);
+        toast(msg, "error");
+        return;
+      }
+      setProfileError(null);
+      toast("Hero copied to your profile", "success");
+    } catch {
+      setProfileError("Could not copy hero.");
+      toast("Could not copy hero", "error");
+    } finally {
+      setCopyBusyId(null);
+    }
+  }
+
   if (ordered.length === 0) {
     return (
       <p className="text-center text-sm text-[var(--color-silver-dim)]">
         No party members yet.
       </p>
+    );
+  }
+
+  if (viewUserId) {
+    const title = profile?.user?.name ?? "Profile";
+    return (
+      <div className="pb-6">
+        <button
+          type="button"
+          onClick={() => {
+            setViewUserId(null);
+            setProfile(null);
+            setProfileError(null);
+          }}
+          className="min-h-[40px] rounded-[var(--radius-chip)] border border-white/10 bg-[var(--surface-container)]/20 px-3 text-xs font-bold uppercase tracking-[0.14em] text-[var(--color-silver-muted)]"
+        >
+          ← Back to party
+        </button>
+
+        <div className="mt-4 rounded-[var(--radius-card)] border border-white/10 bg-[var(--surface-container)]/25 p-4">
+          <p className="text-fantasy text-xl text-[var(--color-silver-muted)]">
+            {title}
+          </p>
+          {profileLoading ? (
+            <p className="mt-2 text-sm text-[var(--color-silver-dim)]">Loading…</p>
+          ) : profileError ? (
+            <p className="mt-2 text-sm text-[var(--color-silver-dim)]">
+              {profileError}
+            </p>
+          ) : profile ? (
+            <div className="mt-3 space-y-3">
+              {profile.heroes.length === 0 ? (
+                <p className="text-sm text-[var(--color-silver-dim)]">
+                  No public heroes shared.
+                </p>
+              ) : (
+                profile.heroes.map((h) => (
+                  <div
+                    key={h.id}
+                    className="rounded-[var(--radius-card)] border border-white/10 bg-black/15 p-4"
+                  >
+                    <p className="text-fantasy text-base text-[var(--color-silver-muted)]">
+                      {h.name}
+                    </p>
+                    <p className="text-xs capitalize text-[var(--color-silver-dim)]">
+                      {h.heroClass} · {h.race}
+                    </p>
+                    <button
+                      type="button"
+                      disabled={copyBusyId === h.id}
+                      onClick={() => void copyHero(h.id)}
+                      className="mt-3 min-h-[40px] w-full rounded-[var(--radius-chip)] border border-[rgba(212,175,55,0.35)] bg-[var(--surface-high)]/35 text-[10px] font-black uppercase tracking-[0.18em] text-[var(--color-gold-rare)]"
+                    >
+                      {copyBusyId === h.id ? "Copying…" : "Copy hero"}
+                    </button>
+                  </div>
+                ))
+              )}
+            </div>
+          ) : null}
+        </div>
+      </div>
     );
   }
 
@@ -85,6 +218,13 @@ export function PartySheet() {
                 )}
               </div>
             </div>
+            <button
+              type="button"
+              onClick={() => void openProfile(p.userId)}
+              className="mt-3 w-full min-h-[40px] rounded-[var(--radius-chip)] border border-white/10 bg-[var(--surface-container)]/20 text-[10px] font-black uppercase tracking-[0.18em] text-[var(--outline)]"
+            >
+              View profile
+            </button>
           </li>
         );
       })}

@@ -21,6 +21,82 @@ export const authUsers = pgTable("users", {
   image: text("image"),
 });
 
+export const userProfileSettings = pgTable(
+  "user_profile_settings",
+  {
+    user_id: text("user_id")
+      .primaryKey()
+      .references(() => authUsers.id, { onDelete: "cascade" }),
+    public_profile_enabled: boolean("public_profile_enabled")
+      .notNull()
+      .default(false),
+    free_portrait_uses: integer("free_portrait_uses").notNull().default(0),
+    created_at: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updated_at: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [index("user_profile_settings_public_idx").on(t.public_profile_enabled)],
+);
+
+export const profileHeroes = pgTable(
+  "profile_heroes",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    user_id: text("user_id")
+      .notNull()
+      .references(() => authUsers.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    hero_class: text("hero_class").notNull(),
+    race: text("race").notNull(),
+    stats_template: jsonb("stats_template")
+      .$type<Record<string, unknown>>()
+      .notNull()
+      .default(sql`'{}'::jsonb`),
+    abilities_template: jsonb("abilities_template")
+      .$type<unknown[]>()
+      .notNull()
+      .default(sql`'[]'::jsonb`),
+    visual_profile: jsonb("visual_profile")
+      .$type<Record<string, unknown>>()
+      .notNull()
+      .default(sql`'{}'::jsonb`),
+    is_public: boolean("is_public").notNull().default(false),
+    created_at: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updated_at: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [
+    index("profile_heroes_user_idx").on(t.user_id),
+    index("profile_heroes_public_idx").on(t.is_public),
+  ],
+);
+
+export const friendEdges = pgTable(
+  "friend_edges",
+  {
+    user_id: text("user_id")
+      .notNull()
+      .references(() => authUsers.id, { onDelete: "cascade" }),
+    friend_user_id: text("friend_user_id")
+      .notNull()
+      .references(() => authUsers.id, { onDelete: "cascade" }),
+    created_at: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => ({
+    pk: primaryKey({ columns: [t.user_id, t.friend_user_id] }),
+    userIdx: index("friend_edges_user_idx").on(t.user_id),
+    friendIdx: index("friend_edges_friend_idx").on(t.friend_user_id),
+  }),
+);
+
 export const authAccounts = pgTable(
   "accounts",
   {

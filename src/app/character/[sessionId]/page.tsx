@@ -10,6 +10,7 @@ import { GoldButton } from "@/components/ui/gold-button";
 import { GhostButton } from "@/components/ui/ghost-button";
 import { SkeletonCard } from "@/components/ui/loading-skeleton";
 import { PillSelect } from "@/components/ui/pill-select";
+import { useToast } from "@/components/ui/toast";
 import {
   ClassProfileSchema,
   type CharacterStats,
@@ -37,6 +38,13 @@ const STAT_ORDER: { key: keyof CharacterStats; label: string }[] = [
   { key: "wis", label: "WIS" },
   { key: "cha", label: "CHA" },
 ];
+
+type SavedHero = {
+  id: string;
+  name: string;
+  heroClass: string;
+  race: string;
+};
 
 export default function CharacterCreationPage() {
   const params = useParams();
@@ -72,6 +80,12 @@ export default function CharacterCreationPage() {
     null,
   );
   const { data: authSession, status: authStatus } = useSession();
+  const { toast } = useToast();
+  const [savedHeroesLoading, setSavedHeroesLoading] = useState(false);
+  const [savedHeroes, setSavedHeroes] = useState<SavedHero[]>([]);
+  const [selectedHeroId, setSelectedHeroId] = useState<string | null>(null);
+  const [portraitUrl, setPortraitUrl] = useState<string | null>(null);
+  const [portraitBusy, setPortraitBusy] = useState(false);
 
   useEffect(() => {
     try {
@@ -134,6 +148,27 @@ export default function CharacterCreationPage() {
     if (!sessionId) return;
     void fetchStats(false);
   }, [sessionId, fetchStats]);
+
+  useEffect(() => {
+    if (authStatus !== "authenticated") return;
+    let cancelled = false;
+    setSavedHeroesLoading(true);
+    void (async () => {
+      try {
+        const res = await fetch("/api/profile/heroes");
+        const data: unknown = await res.json().catch(() => ({}));
+        if (!res.ok || cancelled) return;
+        const d = data as { heroes?: SavedHero[] };
+        const heroes = Array.isArray(d.heroes) ? d.heroes : [];
+        if (!cancelled) setSavedHeroes(heroes);
+      } finally {
+        if (!cancelled) setSavedHeroesLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [authStatus]);
 
   const equipment = useMemo(
     () =>
@@ -228,6 +263,32 @@ export default function CharacterCreationPage() {
   async function handleSubmit() {
     const playerId = resolvePlayerId();
     if (!sessionId || !playerId || !stats) return;
+    if (selectedHeroId) {
+      setSubmitLoading(true);
+      setError(null);
+      try {
+        const res = await fetch(`/api/sessions/${sessionId}/select-hero`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            playerId,
+            heroId: selectedHeroId,
+            statsOverride: stats,
+          }),
+        });
+        if (!res.ok) {
+          const j = (await res.json().catch(() => ({}))) as { error?: string };
+          setError(j.error ?? "Could not use saved hero");
+          return;
+        }
+        router.push(`/session/${sessionId}`);
+      } catch {
+        setError("Could not use saved hero");
+      } finally {
+        setSubmitLoading(false);
+      }
+      return;
+    }
     if (classMode === "custom") {
       if (!customClassProfile) {
         setError("Generate a custom class profile before entering.");
@@ -256,6 +317,7 @@ export default function CharacterCreationPage() {
               : characterClass,
           race,
           stats,
+          portraitUrl: portraitUrl?.trim() || undefined,
           pronouns: pronouns.trim() || "they/them",
           traits: traits.trim()
             ? traits
@@ -278,6 +340,47 @@ export default function CharacterCreationPage() {
       setError("Could not create character");
     } finally {
       setSubmitLoading(false);
+    }
+  }
+
+  async function handleGeneratePortrait() {
+    if (portraitBusy) return;
+    if (!name.trim()) {
+      toast("Enter a name first", "error");
+      return;
+    }
+    setPortraitBusy(true);
+    setError(null);
+    try {
+      const res = await fetch("/api/characters/portrait", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: name.trim(),
+          heroClass:
+            classMode === "custom"
+              ? (customClassProfile?.display_name.trim() || customConcept.trim() || "custom")
+              : characterClass,
+          race,
+          concept: classMode === "custom" ? customConcept.trim() : undefined,
+          appearance: appearance.trim() || undefined,
+        }),
+      });
+      const j = (await res.json().catch(() => ({}))) as { portraitUrl?: string; error?: string };
+      if (!res.ok) {
+        toast(j.error ?? "Could not generate portrait", "error");
+        return;
+      }
+      if (!j.portraitUrl) {
+        toast("Could not generate portrait", "error");
+        return;
+      }
+      setPortraitUrl(j.portraitUrl);
+      toast("Portrait generated", "success");
+    } catch {
+      toast("Network error generating portrait", "error");
+    } finally {
+      setPortraitBusy(false);
     }
   }
 
@@ -309,9 +412,72 @@ export default function CharacterCreationPage() {
           Forge Your Hero
         </h1>
         <p className="text-[10px] text-[var(--outline)] uppercase tracking-[0.2em]">
-          Shape the vessel that enters Ashveil
+          Shape the vessel that enters Falvos
         </p>
       </header>
+
+      {/* Saved Hero */}
+      <section className="rounded-[var(--radius-card)] border border-[rgba(77,70,53,0.15)] bg-[var(--surface-container)]/30 p-5">
+        <p className="text-[10px] font-black uppercase tracking-[0.2em] text-[var(--outline)]">
+          Use saved hero
+        </p>
+        <p className="mt-2 text-sm text-[var(--color-silver-dim)]">
+          If you’ve saved a hero on your profile, you can bring them into this adventure.
+          Stats can still be rerolled for this world.
+        </p>
+        {savedHeroesLoading ? (
+          <p className="mt-3 text-sm text-[var(--color-silver-dim)]">Loading…</p>
+        ) : savedHeroes.length === 0 ? (
+          <p className="mt-3 text-sm text-[var(--color-silver-dim)]">
+            No saved heroes yet.
+          </p>
+        ) : (
+          <div className="mt-4 space-y-3">
+            {savedHeroes.map((h) => {
+              const active = selectedHeroId === h.id;
+              return (
+                <button
+                  key={h.id}
+                  type="button"
+                  onClick={() => {
+                    setSelectedHeroId(h.id);
+                    setName(h.name);
+                    // Deliberately do not force preset class/race UI here.
+                    // Saved heroes can be fully freeform; the session instantiation uses the saved template server-side.
+                  }}
+                  className={`w-full text-left rounded-[var(--radius-card)] border px-4 py-4 transition-colors ${
+                    active
+                      ? "border-[rgba(212,175,55,0.45)] bg-[var(--surface-high)]/35"
+                      : "border-white/10 bg-black/15 hover:bg-white/5"
+                  }`}
+                >
+                  <p className="text-fantasy text-lg text-[var(--color-silver-muted)]">
+                    {h.name}
+                  </p>
+                  <p className="mt-1 text-xs capitalize text-[var(--color-silver-dim)]">
+                    {h.heroClass} · {h.race}
+                  </p>
+                  {active ? (
+                    <p className="mt-2 text-[10px] font-black uppercase tracking-[0.18em] text-[var(--color-gold-rare)]">
+                      Selected
+                    </p>
+                  ) : null}
+                </button>
+              );
+            })}
+            {selectedHeroId ? (
+              <GhostButton
+                type="button"
+                size="sm"
+                onClick={() => setSelectedHeroId(null)}
+                className="w-full"
+              >
+                Use a different hero
+              </GhostButton>
+            ) : null}
+          </div>
+        )}
+      </section>
 
       {/* Class Preview */}
       <div className="relative overflow-hidden rounded-[var(--radius-card)] border border-[rgba(77,70,53,0.15)] bg-gradient-to-b from-[var(--surface-container)] to-[var(--color-obsidian)] p-6 flex flex-col items-center gap-3">
@@ -345,6 +511,50 @@ export default function CharacterCreationPage() {
           ) : null}
         </div>
       </div>
+
+      {/* Portrait */}
+      <section className="rounded-[var(--radius-card)] border border-[rgba(77,70,53,0.15)] bg-[var(--surface-container)]/30 p-5">
+        <p className="text-[10px] font-black uppercase tracking-[0.2em] text-[var(--outline)]">
+          Portrait
+        </p>
+        <p className="mt-2 text-sm text-[var(--color-silver-dim)]">
+          Generate a single hero image. Changing it later is a paid reroll.
+        </p>
+        <div className="mt-4 flex items-center gap-4">
+          <div className="h-16 w-16 overflow-hidden rounded-[var(--radius-avatar)] border border-white/10 bg-black/20 shrink-0">
+            {portraitUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={portraitUrl} alt="" className="h-full w-full object-cover" />
+            ) : (
+              <div className="h-full w-full flex items-center justify-center text-[var(--outline)] text-xs">
+                —
+              </div>
+            )}
+          </div>
+          <div className="flex-1">
+            <GhostButton
+              type="button"
+              size="sm"
+              disabled={portraitBusy}
+              onClick={() => void handleGeneratePortrait()}
+              className="w-full"
+            >
+              {portraitBusy ? "Generating…" : portraitUrl ? "Re-generate (paid)" : "Generate portrait"}
+            </GhostButton>
+            {portraitUrl ? (
+              <GhostButton
+                type="button"
+                size="sm"
+                disabled={portraitBusy}
+                onClick={() => setPortraitUrl(null)}
+                className="w-full mt-2"
+              >
+                Clear
+              </GhostButton>
+            ) : null}
+          </div>
+        </div>
+      </section>
 
       {/* Name */}
       <section className="flex flex-col gap-3">
