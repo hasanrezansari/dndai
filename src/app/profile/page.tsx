@@ -60,6 +60,7 @@ export default function ProfilePage() {
   const [saving, setSaving] = useState(false);
   const [name, setName] = useState("");
   const [image, setImage] = useState<string | null>(null);
+  const [avatarUploadBusy, setAvatarUploadBusy] = useState(false);
   const [heroesLoading, setHeroesLoading] = useState(true);
   const [heroes, setHeroes] = useState<ProfileHero[]>([]);
   const [heroFreeSlots, setHeroFreeSlots] = useState(1);
@@ -314,6 +315,38 @@ export default function ProfilePage() {
 
   function resetAvatarToAuto() {
     setImage(null);
+  }
+
+  async function handleAvatarUpload(file: File | null) {
+    if (!file) return;
+    if (!file.type.startsWith("image/")) {
+      toast("Please choose an image file", "error");
+      return;
+    }
+    // Keep DB payloads reasonable for now (data URL stored in authUsers.image).
+    if (file.size > 1_500_000) {
+      toast("Image too large (max 1.5MB).", "error");
+      return;
+    }
+    setAvatarUploadBusy(true);
+    try {
+      const dataUrl = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onerror = () => reject(new Error("read_failed"));
+        reader.onload = () => resolve(String(reader.result || ""));
+        reader.readAsDataURL(file);
+      });
+      if (!dataUrl.startsWith("data:image/")) {
+        toast("Could not read image", "error");
+        return;
+      }
+      setImage(dataUrl);
+      toast("Avatar ready — hit Save", "success");
+    } catch {
+      toast("Could not read image", "error");
+    } finally {
+      setAvatarUploadBusy(false);
+    }
   }
 
   async function refreshHeroes() {
@@ -717,19 +750,38 @@ export default function ProfilePage() {
 
           <div className="mt-6">
             <p className="text-xs uppercase tracking-[0.12em] text-[var(--outline)]">
-              Avatar (optional URL)
+              Avatar
             </p>
-            <input
-              value={image ?? ""}
-              onChange={(e) => setImage(e.target.value || null)}
-              placeholder="https://…"
-              disabled={loading}
-              className="mt-2 w-full min-h-[44px] rounded-[var(--radius-card)] bg-[var(--color-deep-void)] border border-[rgba(255,255,255,0.08)] px-4 text-[var(--color-silver-muted)] text-sm focus:outline-none focus:border-[rgba(212,175,55,0.25)]"
-            />
-            <div className="mt-3 flex gap-3">
+            <div className="mt-2 flex items-center gap-3">
+              <label
+                className={`flex-1 min-h-[44px] rounded-[var(--radius-card)] border border-[rgba(255,255,255,0.08)] bg-[var(--color-deep-void)] px-4 flex items-center justify-center text-[10px] font-bold uppercase tracking-[0.16em] transition-colors ${
+                  loading || avatarUploadBusy
+                    ? "opacity-60"
+                    : "text-[var(--color-silver-dim)] hover:text-[var(--color-gold-rare)] hover:border-[rgba(212,175,55,0.25)] cursor-pointer"
+                }`}
+              >
+                <input
+                  type="file"
+                  accept="image/*"
+                  disabled={loading || avatarUploadBusy}
+                  className="hidden"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0] ?? null;
+                    // allow re-picking same file
+                    e.currentTarget.value = "";
+                    void handleAvatarUpload(file);
+                  }}
+                />
+                {avatarUploadBusy ? "Reading image…" : "Upload avatar"}
+              </label>
               <GhostButton size="sm" onClick={resetAvatarToAuto} disabled={loading}>
-                Use auto avatar
+                Use auto
               </GhostButton>
+            </div>
+            <p className="mt-2 text-[10px] text-[var(--color-silver-dim)]">
+              Uses your phone’s photo picker. PNG/JPG/WebP under 1.5MB.
+            </p>
+            <div className="mt-3 flex gap-3">
               <GoldButton
                 size="sm"
                 className="ml-auto"

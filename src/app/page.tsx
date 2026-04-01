@@ -193,7 +193,7 @@ export default function Home() {
   }
 
   return (
-    <main className="min-h-dvh flex flex-col items-center px-5 pb-28 bg-[var(--color-obsidian)]">
+    <main className="min-h-dvh flex flex-col items-center px-5 pb-[calc(2rem+env(safe-area-inset-bottom))] bg-[var(--color-obsidian)]">
       <div className="flex flex-col gap-[var(--void-gap)] w-full max-w-md pt-8">
         {/* Brand */}
         <header className="relative overflow-hidden rounded-[var(--radius-card)] border border-[rgba(77,70,53,0.18)] bg-[var(--surface-container)]/25 p-6">
@@ -217,21 +217,30 @@ export default function Home() {
             <div className="mt-3 flex items-center justify-center gap-2">
               <Link
                 href="/profile"
-                className="min-h-[36px] px-3 rounded-[var(--radius-chip)] border border-white/10 bg-black/10 text-[10px] font-bold uppercase tracking-[0.15em] text-[var(--color-silver-dim)] hover:text-[var(--color-gold-rare)] hover:border-[var(--color-gold-rare)]/25 transition-colors"
+                className="min-h-[38px] px-3.5 rounded-[var(--radius-chip)] border border-[rgba(255,255,255,0.10)] bg-gradient-to-b from-[rgba(255,255,255,0.06)] to-[rgba(0,0,0,0.14)] text-[10px] font-black uppercase tracking-[0.16em] text-[var(--color-silver-dim)] hover:text-[var(--color-gold-rare)] hover:border-[rgba(242,202,80,0.28)] transition-colors shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]"
               >
-                Profile
+                <span className="flex items-center justify-center gap-2">
+                  <span className="material-symbols-outlined text-sm">person</span>
+                  Profile
+                </span>
               </Link>
               <Link
                 href="/adventures"
-                className="min-h-[36px] px-3 rounded-[var(--radius-chip)] border border-white/10 bg-black/10 text-[10px] font-bold uppercase tracking-[0.15em] text-[var(--color-silver-dim)] hover:text-[var(--color-gold-rare)] hover:border-[var(--color-gold-rare)]/25 transition-colors"
+                className="min-h-[38px] px-3.5 rounded-[var(--radius-chip)] border border-[rgba(255,255,255,0.10)] bg-gradient-to-b from-[rgba(255,255,255,0.06)] to-[rgba(0,0,0,0.14)] text-[10px] font-black uppercase tracking-[0.16em] text-[var(--color-silver-dim)] hover:text-[var(--color-gold-rare)] hover:border-[rgba(242,202,80,0.28)] transition-colors shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]"
               >
-                Adventures
+                <span className="flex items-center justify-center gap-2">
+                  <span className="material-symbols-outlined text-sm">travel_explore</span>
+                  Adventures
+                </span>
               </Link>
               <Link
                 href="/tv"
-                className="min-h-[36px] px-3 rounded-[var(--radius-chip)] border border-white/10 bg-black/10 text-[10px] font-bold uppercase tracking-[0.15em] text-[var(--color-silver-dim)] hover:text-[var(--color-gold-rare)] hover:border-[var(--color-gold-rare)]/25 transition-colors"
+                className="min-h-[38px] px-3.5 rounded-[var(--radius-chip)] border border-[rgba(255,255,255,0.10)] bg-gradient-to-b from-[rgba(255,255,255,0.06)] to-[rgba(0,0,0,0.14)] text-[10px] font-black uppercase tracking-[0.16em] text-[var(--color-silver-dim)] hover:text-[var(--color-gold-rare)] hover:border-[rgba(242,202,80,0.28)] transition-colors shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]"
               >
-                TV
+                <span className="flex items-center justify-center gap-2">
+                  <span className="material-symbols-outlined text-sm">tv</span>
+                  TV
+                </span>
               </Link>
             </div>
 
@@ -284,12 +293,25 @@ export default function Home() {
             className="text-left w-full min-h-[44px] transition-all duration-200 active:scale-[0.98] focus:outline-none"
           >
             <div
-              className={`h-44 rounded-[var(--radius-card)] p-6 flex flex-col justify-end overflow-hidden transition-all duration-300 ${
+              className={`relative h-44 rounded-[var(--radius-card)] p-6 flex flex-col justify-end overflow-hidden transition-all duration-300 ${
                 mode === "ai_dm"
                   ? "bg-[var(--surface-high)] selected-glow metallic-edge"
                   : "bg-[var(--color-midnight)] border border-[rgba(77,70,53,0.2)] opacity-70 hover:opacity-100 hover:bg-[var(--surface-container)]"
               }`}
             >
+              <div className="relative z-10 flex items-start justify-between gap-3 mb-auto">
+                <div className="min-h-[24px] px-2 rounded-[var(--radius-chip)] border border-white/10 bg-black/20 text-[9px] font-black uppercase tracking-[0.2em] text-[var(--outline)] flex items-center gap-1.5">
+                  <span className="material-symbols-outlined text-[14px]">
+                    auto_awesome
+                  </span>
+                  AI
+                </div>
+                <div className="h-10 w-10 rounded-[var(--radius-avatar)] border border-white/10 bg-black/20 grid place-items-center text-[var(--outline)]">
+                  <span className="material-symbols-outlined text-base">
+                    image
+                  </span>
+                </div>
+              </div>
               <div className="pointer-events-none absolute inset-0 opacity-70">
                 <div className="absolute inset-0 bg-gradient-to-br from-[rgba(242,202,80,0.18)] via-transparent to-[rgba(123,45,142,0.16)]" />
                 <div className="absolute inset-0 bg-gradient-to-t from-[var(--color-obsidian)] via-[var(--color-obsidian)]/30 to-transparent" />
@@ -325,12 +347,23 @@ export default function Home() {
             className="text-left w-full min-h-[44px] transition-all duration-200 active:scale-[0.98] focus:outline-none"
           >
             <div
-              className={`h-44 rounded-[var(--radius-card)] p-6 flex flex-col justify-end overflow-hidden transition-all duration-300 ${
+              className={`relative h-44 rounded-[var(--radius-card)] p-6 flex flex-col justify-end overflow-hidden transition-all duration-300 ${
                 mode === "human_dm"
                   ? "bg-[var(--surface-high)] selected-glow metallic-edge"
                   : "bg-[var(--color-midnight)] border border-[rgba(77,70,53,0.2)] opacity-70 hover:opacity-100 hover:bg-[var(--surface-container)]"
               }`}
             >
+              <div className="relative z-10 flex items-start justify-between gap-3 mb-auto">
+                <div className="min-h-[24px] px-2 rounded-[var(--radius-chip)] border border-white/10 bg-black/20 text-[9px] font-black uppercase tracking-[0.2em] text-[var(--outline)] flex items-center gap-1.5">
+                  <span className="material-symbols-outlined text-[14px]">handshake</span>
+                  Human
+                </div>
+                <div className="h-10 w-10 rounded-[var(--radius-avatar)] border border-white/10 bg-black/20 grid place-items-center text-[var(--outline)]">
+                  <span className="material-symbols-outlined text-base">
+                    image
+                  </span>
+                </div>
+              </div>
               <div className="pointer-events-none absolute inset-0 opacity-70">
                 <div className="absolute inset-0 bg-gradient-to-br from-[rgba(242,202,80,0.10)] via-transparent to-[rgba(139,37,0,0.22)]" />
                 <div className="absolute inset-0 bg-gradient-to-t from-[var(--color-obsidian)] via-[var(--color-obsidian)]/30 to-transparent" />
@@ -431,10 +464,8 @@ export default function Home() {
           </div>
         ) : null}
 
-        {/* Bottom action bar (phone-first thumb zone) */}
-      </div>
-      <div className="fixed inset-x-0 bottom-0 z-40 px-5 pb-5">
-        <div className="mx-auto w-full max-w-md rounded-[var(--radius-card)] border border-[rgba(77,70,53,0.25)] bg-[var(--surface-high)]/85 backdrop-blur-md p-4 shadow-[0_24px_80px_rgba(0,0,0,0.65)]">
+        {/* Bottom actions (not floating) */}
+        <section className="mt-2 rounded-[var(--radius-card)] border border-[rgba(77,70,53,0.25)] bg-[var(--surface-high)]/60 backdrop-blur-md p-4 shadow-[0_24px_80px_rgba(0,0,0,0.45)]">
           <div className="flex flex-col gap-3">
             <GoldButton
               type="button"
@@ -461,65 +492,65 @@ export default function Home() {
 
             {joinOpen ? (
               <form onSubmit={handleJoinSubmit} className="flex flex-col gap-3 w-full">
-              <div className="text-center mb-2">
-                <h3 className="text-fantasy text-xl text-[var(--color-silver-muted)] tracking-tight">
-                  Summoning Ritual
-                </h3>
-                <p className="text-[var(--color-silver-dim)] text-xs mt-1">
-                  Enter the ancient cipher to join your party.
-                </p>
-              </div>
-              <div>
-                <label className="block text-[10px] font-bold uppercase tracking-[0.2em] text-[var(--color-gold-rare)]/70 mb-2 ml-1">
-                  Join Code
-                </label>
-                <input
-                  key={joinShakeKey}
-                  type="text"
-                  value={joinCode}
-                  onChange={(e) => {
-                    setJoinCode(e.target.value.toUpperCase());
+                <div className="text-center mb-2">
+                  <h3 className="text-fantasy text-xl text-[var(--color-silver-muted)] tracking-tight">
+                    Summoning Ritual
+                  </h3>
+                  <p className="text-[var(--color-silver-dim)] text-xs mt-1">
+                    Enter the ancient cipher to join your party.
+                  </p>
+                </div>
+                <div>
+                  <label className="block text-[10px] font-bold uppercase tracking-[0.2em] text-[var(--color-gold-rare)]/70 mb-2 ml-1">
+                    Join Code
+                  </label>
+                  <input
+                    key={joinShakeKey}
+                    type="text"
+                    value={joinCode}
+                    onChange={(e) => {
+                      setJoinCode(e.target.value.toUpperCase());
+                      setJoinError(null);
+                    }}
+                    placeholder="A7-G42"
+                    autoComplete="off"
+                    autoCapitalize="characters"
+                    maxLength={8}
+                    className={`w-full h-16 bg-[var(--color-deep-void)] border-none text-center text-2xl font-serif tracking-[0.3em] text-[var(--color-gold-rare)] placeholder:text-[var(--outline)]/40 rounded-[var(--radius-card)] focus:ring-1 focus:ring-[var(--color-failure)]/50 shadow-[inset_0_2px_8px_rgba(0,0,0,0.8)] transition-all uppercase ${joinShakeKey > 0 ? "animate-shake-once" : ""}`}
+                  />
+                </div>
+                {joinError ? (
+                  <p className="text-sm text-[var(--color-failure)] text-center">
+                    {joinError}
+                  </p>
+                ) : null}
+                <GoldButton
+                  type="submit"
+                  size="lg"
+                  className="w-full min-h-[48px] flex items-center justify-center gap-3"
+                  disabled={joinLoading}
+                >
+                  <span>{joinLoading ? "Joining…" : "Enter Portal"}</span>
+                  {!joinLoading && (
+                    <span className="material-symbols-outlined text-lg">
+                      login
+                    </span>
+                  )}
+                </GoldButton>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setJoinOpen(false);
                     setJoinError(null);
                   }}
-                  placeholder="A7-G42"
-                  autoComplete="off"
-                  autoCapitalize="characters"
-                  maxLength={8}
-                  className={`w-full h-16 bg-[var(--color-deep-void)] border-none text-center text-2xl font-serif tracking-[0.3em] text-[var(--color-gold-rare)] placeholder:text-[var(--outline)]/40 rounded-[var(--radius-card)] focus:ring-1 focus:ring-[var(--color-failure)]/50 shadow-[inset_0_2px_8px_rgba(0,0,0,0.8)] transition-all uppercase ${joinShakeKey > 0 ? "animate-shake-once" : ""}`}
-                />
-              </div>
-              {joinError ? (
-                <p className="text-sm text-[var(--color-failure)] text-center">
-                  {joinError}
-                </p>
-              ) : null}
-              <GoldButton
-                type="submit"
-                size="lg"
-                className="w-full min-h-[48px] flex items-center justify-center gap-3"
-                disabled={joinLoading}
-              >
-                <span>{joinLoading ? "Joining…" : "Enter Portal"}</span>
-                {!joinLoading && (
-                  <span className="material-symbols-outlined text-lg">
-                    login
+                  className="w-full py-2 text-[var(--color-silver-dim)] hover:text-[var(--color-gold-rare)] text-xs uppercase tracking-[0.15em] transition-colors flex items-center justify-center gap-2"
+                >
+                  <span className="material-symbols-outlined text-sm">
+                    arrow_back
                   </span>
-                )}
-              </GoldButton>
-              <button
-                type="button"
-                onClick={() => {
-                  setJoinOpen(false);
-                  setJoinError(null);
-                }}
-                className="w-full py-2 text-[var(--color-silver-dim)] hover:text-[var(--color-gold-rare)] text-xs uppercase tracking-[0.15em] transition-colors flex items-center justify-center gap-2"
-              >
-                <span className="material-symbols-outlined text-sm">
-                  arrow_back
-                </span>
-                Back to Create Session
-              </button>
-            </form>
+                  Back to Create Session
+                </button>
+              </form>
             ) : (
               <div className="flex items-center justify-between gap-3">
                 <button
@@ -543,7 +574,7 @@ export default function Home() {
               </div>
             )}
           </div>
-        </div>
+        </section>
       </div>
     </main>
   );
