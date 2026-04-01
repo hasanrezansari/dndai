@@ -93,7 +93,7 @@ export async function setPublicProfileEnabled(userId: string, enabled: boolean) 
 
 export class PortraitPaymentRequiredError extends Error {
   constructor() {
-    super("Portrait generation requires payment");
+    super("Portrait generation costs Sparks");
     this.name = "PortraitPaymentRequiredError";
   }
 }
@@ -101,7 +101,7 @@ export class PortraitPaymentRequiredError extends Error {
 /**
  * Guardrail for image costs:
  * - Each user gets 1 free AI portrait generation total (v0).
- * - After that, callers should route through wallet/payment before retrying.
+ * - After that, callers should route through Sparks wallet before retrying.
  */
 export async function assertAndConsumeFreePortraitUse(userId: string) {
   const settings = await getOrCreateProfileSettings(userId);

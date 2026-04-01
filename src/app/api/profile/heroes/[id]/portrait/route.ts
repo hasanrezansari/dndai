@@ -43,7 +43,7 @@ export async function POST(
     const existing = vp.portrait_url;
     if (typeof existing === "string" && existing.trim().length > 0) {
       // Rerolls are paid later (Sparks wallet).
-      return apiError("Portrait reroll requires payment", 402);
+    return apiError("Portrait reroll costs Sparks", 402);
     }
 
     let json: unknown = {};
@@ -59,7 +59,7 @@ export async function POST(
       await assertAndConsumeFreePortraitUse(user.id);
     } catch (e) {
       if (e instanceof PortraitPaymentRequiredError) {
-        return apiError("Portrait generation requires payment", 402);
+        return apiError("Portrait generation costs Sparks", 402);
       }
       throw e;
     }

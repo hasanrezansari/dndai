@@ -34,14 +34,14 @@ export async function POST(request: NextRequest) {
     if (!parsed.success) return apiError("Invalid body", 400);
 
     if (parsed.data.reroll) {
-      return apiError("Portrait reroll requires payment", 402);
+      return apiError("Portrait reroll costs Sparks", 402);
     }
 
     try {
       await assertAndConsumeFreePortraitUse(user.id);
     } catch (e) {
       if (e instanceof PortraitPaymentRequiredError) {
-        return apiError("Portrait generation requires payment", 402);
+        return apiError("Portrait generation costs Sparks", 402);
       }
       throw e;
     }

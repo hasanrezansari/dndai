@@ -361,7 +361,7 @@ export default function ProfilePage() {
       };
       if (!res.ok) {
         if (res.status === 402) {
-          toast(j.error ?? "Portrait generation requires payment", "error");
+          toast(j.error ?? "Portrait generation costs Sparks", "error");
         } else {
           toast(j.error ?? "Could not generate portrait", "error");
         }
@@ -511,7 +511,7 @@ export default function ProfilePage() {
       };
       if (!res.ok) {
         if (res.status === 402) {
-          toast(j.error ?? "Portrait reroll requires payment", "error");
+          toast(j.error ?? "Portrait reroll costs Sparks", "error");
         } else {
           toast(j.error ?? "Could not generate portrait", "error");
         }
@@ -836,11 +836,11 @@ export default function ProfilePage() {
                             size="sm"
                             disabled
                             onClick={() =>
-                              toast("Portrait reroll is paid (coming soon).", "info")
+                              toast("Portrait reroll costs Sparks (coming soon).", "info")
                             }
                             className="col-span-2"
                           >
-                            Reroll (paid)
+                            Reroll (Sparks)
                           </GhostButton>
                         )}
 
@@ -1359,7 +1359,7 @@ export default function ProfilePage() {
                         Generate one portrait from your concept.
                       </p>
                       <p className="mt-1 text-[10px] uppercase tracking-[0.18em] text-[var(--outline)]">
-                        Rerolls are paid later.
+                        Rerolls cost Sparks later.
                       </p>
                     </div>
                   </div>

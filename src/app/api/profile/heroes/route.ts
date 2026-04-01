@@ -74,7 +74,7 @@ export async function POST(request: NextRequest) {
     } catch (err) {
       if (err instanceof ProfileHeroSlotLimitError) {
         return apiError(
-          "Hero slot limit reached. Extra slots require payment.",
+          "Hero slot limit reached. Extra slots cost Sparks.",
           402,
         );
       }

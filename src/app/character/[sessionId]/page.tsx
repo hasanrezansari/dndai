@@ -352,7 +352,7 @@ export default function CharacterCreationPage() {
   async function handleGeneratePortrait() {
     if (portraitBusy) return;
     if (portraitUrl) {
-      toast("Portrait reroll is paid (coming soon).", "info");
+      toast("Portrait reroll costs Sparks (coming soon).", "info");
       return;
     }
     if (!name.trim()) {
@@ -583,7 +583,7 @@ export default function CharacterCreationPage() {
           Portrait
         </p>
         <p className="mt-2 text-sm text-[var(--color-silver-dim)]">
-          Generate a single hero image. Changing it later is a paid reroll.
+          Generate a single hero image. Changing it later costs Sparks.
         </p>
         <div className="mt-4 flex items-center gap-4">
           <div className="h-16 w-16 overflow-hidden rounded-[var(--radius-avatar)] border border-white/10 bg-black/20 shrink-0">
@@ -604,7 +604,7 @@ export default function CharacterCreationPage() {
               onClick={() => void handleGeneratePortrait()}
               className="w-full"
             >
-              {portraitBusy ? "Generating…" : portraitUrl ? "Reroll (paid)" : "Generate portrait"}
+              {portraitBusy ? "Generating…" : portraitUrl ? "Reroll (Sparks)" : "Generate portrait"}
             </GhostButton>
             {portraitUrl ? (
               <GhostButton
