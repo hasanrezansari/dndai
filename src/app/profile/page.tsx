@@ -16,6 +16,7 @@ type ProfileHero = {
   race: string;
   isPublic: boolean;
   portraitUrl?: string;
+  visualProfile?: Record<string, unknown>;
 };
 
 function dicebearInitialsUrl(seed: string): string {
@@ -42,6 +43,8 @@ export default function ProfilePage() {
   const [heroesLoading, setHeroesLoading] = useState(true);
   const [heroes, setHeroes] = useState<ProfileHero[]>([]);
   const [heroFreeSlots, setHeroFreeSlots] = useState(1);
+  const [heroBuilderOpen, setHeroBuilderOpen] = useState(false);
+  const [inspectedHeroId, setInspectedHeroId] = useState<string | null>(null);
   const [publicProfileEnabled, setPublicProfileEnabledState] = useState(false);
   const [heroName, setHeroName] = useState("");
   const [heroClass, setHeroClass] = useState("warrior");
@@ -57,6 +60,7 @@ export default function ProfilePage() {
   const [heroBackstory, setHeroBackstory] = useState("");
   const [heroAppearance, setHeroAppearance] = useState("");
   const [heroAiPortraitBusy, setHeroAiPortraitBusy] = useState(false);
+  const [heroBuilderPortraitBusy, setHeroBuilderPortraitBusy] = useState(false);
   const [friendsLoading, setFriendsLoading] = useState(true);
   const [friends, setFriends] = useState<
     Array<{ userId: string; name: string; image: string | null }>
@@ -83,6 +87,19 @@ export default function ProfilePage() {
     if (image?.trim()) return image.trim();
     return dicebearInitialsUrl(name || session?.user?.name || "Adventurer");
   }, [image, name, session?.user?.name]);
+
+  const inspectedHero = useMemo(() => {
+    if (!inspectedHeroId) return null;
+    return heroes.find((h) => h.id === inspectedHeroId) ?? null;
+  }, [heroes, inspectedHeroId]);
+
+  const inspectedHeroKit = useMemo(() => {
+    const vp = inspectedHero?.visualProfile;
+    if (!vp || typeof vp !== "object") return null;
+    const raw = (vp as Record<string, unknown>).class_profile;
+    if (!raw || typeof raw !== "object" || Array.isArray(raw)) return null;
+    return raw as Record<string, unknown>;
+  }, [inspectedHero]);
 
   useEffect(() => {
     if (status === "loading") return;
@@ -135,6 +152,8 @@ export default function ProfilePage() {
         setHeroFreeSlots(
           typeof d.freeSlots === "number" && d.freeSlots > 0 ? d.freeSlots : 1,
         );
+        setHeroBuilderOpen(false);
+        setInspectedHeroId(null);
       } finally {
         if (!cancelled) setHeroesLoading(false);
       }
@@ -255,6 +274,54 @@ export default function ProfilePage() {
     setHeroFreeSlots(
       typeof d.freeSlots === "number" && d.freeSlots > 0 ? d.freeSlots : 1,
     );
+  }
+
+  async function handleGenerateBuilderPortraitAI() {
+    if (heroBuilderPortraitBusy) return;
+    if (!heroName.trim()) {
+      toast("Enter a hero name first", "error");
+      return;
+    }
+    if (!heroConcept.trim() && !heroAppearance.trim()) {
+      toast("Add a concept or appearance first", "error");
+      return;
+    }
+    setHeroBuilderPortraitBusy(true);
+    try {
+      const res = await fetch("/api/characters/portrait", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: heroName.trim(),
+          heroClass: heroClass.trim(),
+          race: heroRace.trim(),
+          concept: heroConcept.trim() || undefined,
+          appearance: heroAppearance.trim() || undefined,
+        }),
+      });
+      const j = (await res.json().catch(() => ({}))) as {
+        portraitUrl?: string;
+        error?: string;
+      };
+      if (!res.ok) {
+        if (res.status === 402) {
+          toast(j.error ?? "Portrait generation requires payment", "error");
+        } else {
+          toast(j.error ?? "Could not generate portrait", "error");
+        }
+        return;
+      }
+      if (!j.portraitUrl) {
+        toast("Could not generate portrait", "error");
+        return;
+      }
+      setHeroPortraitUrl(j.portraitUrl);
+      toast("Portrait generated", "success");
+    } catch {
+      toast("Network error generating portrait", "error");
+    } finally {
+      setHeroBuilderPortraitBusy(false);
+    }
   }
 
   async function handleCreateHero() {
@@ -708,6 +775,17 @@ export default function ProfilePage() {
                         <GhostButton
                           size="sm"
                           disabled={heroBusy}
+                          onClick={() =>
+                            setInspectedHeroId((prev) => (prev === h.id ? null : h.id))
+                          }
+                          className="col-span-2"
+                        >
+                          {inspectedHeroId === h.id ? "Hide build" : "View build"}
+                        </GhostButton>
+
+                        <GhostButton
+                          size="sm"
+                          disabled={heroBusy}
                           onClick={() => void handleToggleHeroPublic(h.id, !h.isPublic)}
                         >
                           {h.isPublic ? "Private" : "Public"}
@@ -745,7 +823,135 @@ export default function ProfilePage() {
                 ))}
               </div>
 
-              {heroes.length === 0 ? (
+              {inspectedHero && inspectedHeroId ? (
+                <div className="rounded-[var(--radius-card)] border border-[rgba(77,70,53,0.2)] bg-[var(--color-midnight)] p-4">
+                  <p className="text-[10px] font-black uppercase tracking-[0.2em] text-[var(--outline)]">
+                    Build: {inspectedHero.name}
+                  </p>
+                  {inspectedHeroKit ? (
+                    <div className="mt-3 space-y-3">
+                      {typeof inspectedHeroKit.fantasy === "string" &&
+                      inspectedHeroKit.fantasy.trim() ? (
+                        <p className="text-sm text-[var(--color-silver-dim)] italic leading-relaxed">
+                          {inspectedHeroKit.fantasy.trim()}
+                        </p>
+                      ) : null}
+
+                      {Array.isArray(inspectedHeroKit.abilities) ? (
+                        <div>
+                          <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[var(--outline)]">
+                            Abilities
+                          </p>
+                          <div className="mt-2 space-y-2">
+                            {(inspectedHeroKit.abilities as unknown[]).slice(0, 8).map((a, idx) => {
+                              const ability =
+                                a && typeof a === "object" && !Array.isArray(a)
+                                  ? (a as Record<string, unknown>)
+                                  : null;
+                              const name =
+                                ability && typeof ability.name === "string"
+                                  ? ability.name
+                                  : `Ability ${idx + 1}`;
+                              const kind =
+                                ability && typeof ability.effect_kind === "string"
+                                  ? ability.effect_kind
+                                  : null;
+                              const type =
+                                ability && typeof ability.type === "string"
+                                  ? ability.type
+                                  : null;
+                              return (
+                                <div
+                                  key={`${name}-${idx}`}
+                                  className="rounded-[var(--radius-card)] border border-white/10 bg-black/15 px-3 py-2"
+                                >
+                                  <p className="text-sm text-[var(--color-silver-muted)]">
+                                    {name}
+                                  </p>
+                                  {(kind || type) && (
+                                    <p className="text-[10px] uppercase tracking-[0.18em] text-[var(--outline)]">
+                                      {[type, kind].filter(Boolean).join(" · ")}
+                                    </p>
+                                  )}
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      ) : null}
+
+                      {Array.isArray(inspectedHeroKit.starting_gear) ? (
+                        <div>
+                          <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[var(--outline)]">
+                            Starting gear
+                          </p>
+                          <div className="mt-2 grid grid-cols-2 gap-2">
+                            {(inspectedHeroKit.starting_gear as unknown[])
+                              .slice(0, 10)
+                              .map((g, idx) => {
+                                const gear =
+                                  g && typeof g === "object" && !Array.isArray(g)
+                                    ? (g as Record<string, unknown>)
+                                    : null;
+                                const name =
+                                  gear && typeof gear.name === "string"
+                                    ? gear.name
+                                    : `Gear ${idx + 1}`;
+                                const type =
+                                  gear && typeof gear.type === "string"
+                                    ? gear.type
+                                    : null;
+                                return (
+                                  <div
+                                    key={`${name}-${idx}`}
+                                    className="rounded-[var(--radius-card)] border border-white/10 bg-black/15 px-3 py-2"
+                                  >
+                                    <p className="text-xs text-[var(--color-silver-muted)]">
+                                      {name}
+                                    </p>
+                                    {type ? (
+                                      <p className="text-[10px] uppercase tracking-[0.18em] text-[var(--outline)]">
+                                        {type}
+                                      </p>
+                                    ) : null}
+                                  </div>
+                                );
+                              })}
+                          </div>
+                        </div>
+                      ) : null}
+                    </div>
+                  ) : (
+                    <p className="mt-2 text-sm text-[var(--color-silver-dim)]">
+                      No kit saved for this hero yet. Use the builder below to generate one
+                      and re-save.
+                    </p>
+                  )}
+                </div>
+              ) : null}
+
+              <div className="rounded-[var(--radius-card)] border border-white/10 bg-black/10 p-4">
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <p className="text-[10px] font-black uppercase tracking-[0.2em] text-[var(--outline)]">
+                      Hero builder
+                    </p>
+                    <p className="mt-1 text-sm text-[var(--color-silver-dim)]">
+                      Generate a kit (class, abilities, gear) and an AI portrait, then save.
+                      {heroes.length > 0 ? " This replaces your hero after you delete the old one." : ""}
+                    </p>
+                  </div>
+                  <GhostButton
+                    size="sm"
+                    disabled={heroBusy}
+                    onClick={() => setHeroBuilderOpen((v) => !v)}
+                  >
+                    {heroBuilderOpen ? "Hide" : heroes.length > 0 ? "Build new" : "Create"}
+                  </GhostButton>
+                </div>
+              </div>
+
+              {heroBuilderOpen ? (
                 <div className="space-y-3">
               <div className="grid grid-cols-2 gap-3">
                 <div className="col-span-2">
@@ -781,6 +987,21 @@ export default function ProfilePage() {
                     </GhostButton>
                   </div>
                 </div>
+
+                {heroKit && typeof heroKit === "object" ? (
+                  <div className="col-span-2 rounded-[var(--radius-card)] border border-[rgba(77,70,53,0.2)] bg-[var(--color-midnight)] p-4">
+                    <p className="text-[10px] font-black uppercase tracking-[0.2em] text-[var(--outline)]">
+                      Generated kit preview
+                    </p>
+                    <p className="mt-2 text-sm text-[var(--color-silver-dim)]">
+                      This is what will be saved into your hero’s build.
+                    </p>
+                    <pre className="mt-3 max-h-[220px] overflow-auto rounded-[var(--radius-card)] border border-white/10 bg-black/20 p-3 text-[10px] leading-relaxed text-[var(--outline)]">
+                      {JSON.stringify(heroKit, null, 2)}
+                    </pre>
+                  </div>
+                ) : null}
+
                 <div className="col-span-2">
                   <p className="text-[10px] uppercase tracking-[0.18em] text-[var(--outline)]">
                     Portrait (one image)
@@ -805,6 +1026,14 @@ export default function ProfilePage() {
                     />
                   </div>
                   <div className="mt-3 flex gap-3">
+                    <GhostButton
+                      size="sm"
+                      disabled={heroBusy || heroBuilderPortraitBusy}
+                      onClick={() => void handleGenerateBuilderPortraitAI()}
+                      className="w-full"
+                    >
+                      {heroBuilderPortraitBusy ? "Generating…" : "Generate AI portrait"}
+                    </GhostButton>
                     <GhostButton
                       size="sm"
                       disabled={heroBusy}
