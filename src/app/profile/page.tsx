@@ -8,6 +8,8 @@ import { GlassCard } from "@/components/ui/glass-card";
 import { GoldButton } from "@/components/ui/gold-button";
 import { GhostButton } from "@/components/ui/ghost-button";
 import { useToast } from "@/components/ui/toast";
+import { HeroKitPreview } from "@/components/character/hero-kit-preview";
+import { ClassProfileSchema, type ClassProfile } from "@/lib/schemas/domain";
 
 type ProfileHero = {
   id: string;
@@ -101,21 +103,17 @@ export default function ProfilePage() {
     return raw as Record<string, unknown>;
   }, [inspectedHero]);
 
-  function kitAbilities(raw: Record<string, unknown>): Array<Record<string, unknown>> {
-    const a = raw.abilities;
-    if (!Array.isArray(a)) return [];
-    return a
-      .filter((x): x is Record<string, unknown> => Boolean(x) && typeof x === "object" && !Array.isArray(x))
-      .slice(0, 12);
-  }
+  const inspectedHeroClassProfile = useMemo((): ClassProfile | null => {
+    if (!inspectedHeroKit) return null;
+    const parsed = ClassProfileSchema.safeParse(inspectedHeroKit);
+    return parsed.success ? parsed.data : null;
+  }, [inspectedHeroKit]);
 
-  function kitGear(raw: Record<string, unknown>): Array<Record<string, unknown>> {
-    const g = raw.starting_gear;
-    if (!Array.isArray(g)) return [];
-    return g
-      .filter((x): x is Record<string, unknown> => Boolean(x) && typeof x === "object" && !Array.isArray(x))
-      .slice(0, 12);
-  }
+  const builderClassProfile = useMemo((): ClassProfile | null => {
+    if (!heroKit || typeof heroKit !== "object") return null;
+    const parsed = ClassProfileSchema.safeParse(heroKit);
+    return parsed.success ? parsed.data : null;
+  }, [heroKit]);
 
   useEffect(() => {
     if (status === "loading") return;
@@ -844,93 +842,9 @@ export default function ProfilePage() {
                   <p className="text-[10px] font-black uppercase tracking-[0.2em] text-[var(--outline)]">
                     Build: {inspectedHero.name}
                   </p>
-                  {inspectedHeroKit ? (
-                    <div className="mt-3 space-y-3">
-                      {typeof inspectedHeroKit.fantasy === "string" &&
-                      inspectedHeroKit.fantasy.trim() ? (
-                        <p className="text-sm text-[var(--color-silver-dim)] italic leading-relaxed">
-                          {inspectedHeroKit.fantasy.trim()}
-                        </p>
-                      ) : null}
-
-                      {kitAbilities(inspectedHeroKit).length ? (
-                        <div>
-                          <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[var(--outline)]">
-                            Abilities
-                          </p>
-                          <div className="mt-2 space-y-2">
-                            {kitAbilities(inspectedHeroKit).slice(0, 8).map((ability, idx) => {
-                              const name =
-                                typeof ability.name === "string" ? ability.name : `Ability ${idx + 1}`;
-                              const kind =
-                                typeof ability.effect_kind === "string" ? ability.effect_kind : null;
-                              const type = typeof ability.type === "string" ? ability.type : null;
-                              const cost =
-                                typeof ability.resource_cost === "number" ? ability.resource_cost : null;
-                              const cd = typeof ability.cooldown === "number" ? ability.cooldown : null;
-                              return (
-                                <div
-                                  key={`${name}-${idx}`}
-                                  className="rounded-[var(--radius-card)] border border-white/10 bg-black/15 px-3 py-2"
-                                >
-                                  <div className="flex items-start justify-between gap-3">
-                                    <p className="text-sm text-[var(--color-silver-muted)]">
-                                      {name}
-                                    </p>
-                                    <div className="flex items-center gap-1.5">
-                                      {typeof cost === "number" ? (
-                                        <span className="text-[9px] font-black uppercase tracking-[0.18em] text-[var(--outline)] border border-white/10 rounded-[var(--radius-chip)] px-2 py-1 bg-black/20">
-                                          {cost} MP
-                                        </span>
-                                      ) : null}
-                                      {typeof cd === "number" ? (
-                                        <span className="text-[9px] font-black uppercase tracking-[0.18em] text-[var(--outline)] border border-white/10 rounded-[var(--radius-chip)] px-2 py-1 bg-black/20">
-                                          CD {cd}
-                                        </span>
-                                      ) : null}
-                                    </div>
-                                  </div>
-                                  {(kind || type) ? (
-                                    <p className="text-[10px] uppercase tracking-[0.18em] text-[var(--outline)]">
-                                      {[type, kind].filter(Boolean).join(" · ")}
-                                    </p>
-                                  ) : null}
-                                </div>
-                              );
-                            })}
-                          </div>
-                        </div>
-                      ) : null}
-
-                      {kitGear(inspectedHeroKit).length ? (
-                        <div>
-                          <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[var(--outline)]">
-                            Starting gear
-                          </p>
-                          <div className="mt-2 grid grid-cols-2 gap-2">
-                            {kitGear(inspectedHeroKit).slice(0, 10).map((gear, idx) => {
-                              const name =
-                                typeof gear.name === "string" ? gear.name : `Gear ${idx + 1}`;
-                              const type = typeof gear.type === "string" ? gear.type : null;
-                              return (
-                                <div
-                                  key={`${name}-${idx}`}
-                                  className="rounded-[var(--radius-card)] border border-white/10 bg-black/15 px-3 py-2"
-                                >
-                                  <p className="text-xs text-[var(--color-silver-muted)]">
-                                    {name}
-                                  </p>
-                                  {type ? (
-                                    <p className="text-[10px] uppercase tracking-[0.18em] text-[var(--outline)]">
-                                      {type}
-                                    </p>
-                                  ) : null}
-                                </div>
-                              );
-                            })}
-                          </div>
-                        </div>
-                      ) : null}
+                  {inspectedHeroClassProfile ? (
+                    <div className="mt-3">
+                      <HeroKitPreview profile={inspectedHeroClassProfile} />
                     </div>
                   ) : (
                     <p className="mt-2 text-sm text-[var(--color-silver-dim)]">
@@ -999,7 +913,7 @@ export default function ProfilePage() {
                   </div>
                 </div>
 
-                {heroKit && typeof heroKit === "object" ? (
+                {builderClassProfile ? (
                   <div className="col-span-2 rounded-[var(--radius-card)] border border-[rgba(77,70,53,0.2)] bg-[var(--color-midnight)] p-4">
                     <p className="text-[10px] font-black uppercase tracking-[0.2em] text-[var(--outline)]">
                       Generated kit preview
@@ -1007,109 +921,8 @@ export default function ProfilePage() {
                     <p className="mt-2 text-sm text-[var(--color-silver-dim)]">
                       This is what will be saved into your hero’s build.
                     </p>
-                    <div className="mt-3 space-y-3">
-                      {typeof (heroKit as Record<string, unknown>).fantasy === "string" &&
-                      String((heroKit as Record<string, unknown>).fantasy).trim() ? (
-                        <p className="text-sm text-[var(--color-silver-dim)] italic leading-relaxed">
-                          {String((heroKit as Record<string, unknown>).fantasy).trim()}
-                        </p>
-                      ) : null}
-
-                      {kitAbilities(heroKit as Record<string, unknown>).length ? (
-                        <div>
-                          <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[var(--outline)]">
-                            Abilities
-                          </p>
-                          <div className="mt-2 space-y-2">
-                            {kitAbilities(heroKit as Record<string, unknown>)
-                              .slice(0, 8)
-                              .map((ability, idx) => {
-                                const name =
-                                  typeof ability.name === "string"
-                                    ? ability.name
-                                    : `Ability ${idx + 1}`;
-                                const kind =
-                                  typeof ability.effect_kind === "string"
-                                    ? ability.effect_kind
-                                    : null;
-                                const type =
-                                  typeof ability.type === "string" ? ability.type : null;
-                                const cost =
-                                  typeof ability.resource_cost === "number"
-                                    ? ability.resource_cost
-                                    : null;
-                                const cd =
-                                  typeof ability.cooldown === "number"
-                                    ? ability.cooldown
-                                    : null;
-                                return (
-                                  <div
-                                    key={`${name}-${idx}`}
-                                    className="rounded-[var(--radius-card)] border border-white/10 bg-black/15 px-3 py-2"
-                                  >
-                                    <div className="flex items-start justify-between gap-3">
-                                      <p className="text-sm text-[var(--color-silver-muted)]">
-                                        {name}
-                                      </p>
-                                      <div className="flex items-center gap-1.5">
-                                        {typeof cost === "number" ? (
-                                          <span className="text-[9px] font-black uppercase tracking-[0.18em] text-[var(--outline)] border border-white/10 rounded-[var(--radius-chip)] px-2 py-1 bg-black/20">
-                                            {cost} MP
-                                          </span>
-                                        ) : null}
-                                        {typeof cd === "number" ? (
-                                          <span className="text-[9px] font-black uppercase tracking-[0.18em] text-[var(--outline)] border border-white/10 rounded-[var(--radius-chip)] px-2 py-1 bg-black/20">
-                                            CD {cd}
-                                          </span>
-                                        ) : null}
-                                      </div>
-                                    </div>
-                                    {(kind || type) ? (
-                                      <p className="text-[10px] uppercase tracking-[0.18em] text-[var(--outline)]">
-                                        {[type, kind].filter(Boolean).join(" · ")}
-                                      </p>
-                                    ) : null}
-                                  </div>
-                                );
-                              })}
-                          </div>
-                        </div>
-                      ) : null}
-
-                      {kitGear(heroKit as Record<string, unknown>).length ? (
-                        <div>
-                          <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[var(--outline)]">
-                            Starting gear
-                          </p>
-                          <div className="mt-2 grid grid-cols-2 gap-2">
-                            {kitGear(heroKit as Record<string, unknown>)
-                              .slice(0, 10)
-                              .map((gear, idx) => {
-                                const name =
-                                  typeof gear.name === "string"
-                                    ? gear.name
-                                    : `Gear ${idx + 1}`;
-                                const type =
-                                  typeof gear.type === "string" ? gear.type : null;
-                                return (
-                                  <div
-                                    key={`${name}-${idx}`}
-                                    className="rounded-[var(--radius-card)] border border-white/10 bg-black/15 px-3 py-2"
-                                  >
-                                    <p className="text-xs text-[var(--color-silver-muted)]">
-                                      {name}
-                                    </p>
-                                    {type ? (
-                                      <p className="text-[10px] uppercase tracking-[0.18em] text-[var(--outline)]">
-                                        {type}
-                                      </p>
-                                    ) : null}
-                                  </div>
-                                );
-                              })}
-                          </div>
-                        </div>
-                      ) : null}
+                    <div className="mt-3">
+                      <HeroKitPreview profile={builderClassProfile} />
                     </div>
                   </div>
                 ) : null}
