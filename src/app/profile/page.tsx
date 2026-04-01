@@ -608,7 +608,15 @@ export default function ProfilePage() {
                       >
                         {heroAiPortraitBusy ? "Generating…" : "Generate portrait"}
                       </GhostButton>
-                    ) : null}
+                    ) : (
+                      <GhostButton
+                        size="sm"
+                        disabled
+                        onClick={() => toast("Portrait reroll is paid (coming soon).", "info")}
+                      >
+                        Reroll (paid)
+                      </GhostButton>
+                    )}
                     <GhostButton
                       size="sm"
                       disabled={heroBusy}

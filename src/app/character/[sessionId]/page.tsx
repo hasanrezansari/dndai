@@ -345,6 +345,10 @@ export default function CharacterCreationPage() {
 
   async function handleGeneratePortrait() {
     if (portraitBusy) return;
+    if (portraitUrl) {
+      toast("Portrait reroll is paid (coming soon).", "info");
+      return;
+    }
     if (!name.trim()) {
       toast("Enter a name first", "error");
       return;
@@ -539,7 +543,7 @@ export default function CharacterCreationPage() {
               onClick={() => void handleGeneratePortrait()}
               className="w-full"
             >
-              {portraitBusy ? "Generating…" : portraitUrl ? "Re-generate (paid)" : "Generate portrait"}
+              {portraitBusy ? "Generating…" : portraitUrl ? "Reroll (paid)" : "Generate portrait"}
             </GhostButton>
             {portraitUrl ? (
               <GhostButton
