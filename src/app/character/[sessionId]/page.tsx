@@ -44,6 +44,7 @@ type SavedHero = {
   name: string;
   heroClass: string;
   race: string;
+  portraitUrl?: string;
 };
 
 export default function CharacterCreationPage() {
@@ -169,6 +170,11 @@ export default function CharacterCreationPage() {
       cancelled = true;
     };
   }, [authStatus]);
+
+  const selectedSavedHero = useMemo(() => {
+    if (!selectedHeroId) return null;
+    return savedHeroes.find((h) => h.id === selectedHeroId) ?? null;
+  }, [savedHeroes, selectedHeroId]);
 
   const equipment = useMemo(
     () =>
@@ -437,47 +443,102 @@ export default function CharacterCreationPage() {
           </p>
         ) : (
           <div className="mt-4 space-y-3">
-            {savedHeroes.map((h) => {
-              const active = selectedHeroId === h.id;
-              return (
-                <button
-                  key={h.id}
-                  type="button"
-                  onClick={() => {
-                    setSelectedHeroId(h.id);
-                    setName(h.name);
-                    // Deliberately do not force preset class/race UI here.
-                    // Saved heroes can be fully freeform; the session instantiation uses the saved template server-side.
-                  }}
-                  className={`w-full text-left rounded-[var(--radius-card)] border px-4 py-4 transition-colors ${
-                    active
-                      ? "border-[rgba(212,175,55,0.45)] bg-[var(--surface-high)]/35"
-                      : "border-white/10 bg-black/15 hover:bg-white/5"
-                  }`}
-                >
-                  <p className="text-fantasy text-lg text-[var(--color-silver-muted)]">
-                    {h.name}
-                  </p>
-                  <p className="mt-1 text-xs capitalize text-[var(--color-silver-dim)]">
-                    {h.heroClass} · {h.race}
-                  </p>
-                  {active ? (
-                    <p className="mt-2 text-[10px] font-black uppercase tracking-[0.18em] text-[var(--color-gold-rare)]">
-                      Selected
+            <div className="grid grid-cols-2 gap-3">
+              {savedHeroes.map((h) => {
+                const active = selectedHeroId === h.id;
+                return (
+                  <button
+                    key={h.id}
+                    type="button"
+                    onClick={() => {
+                      setSelectedHeroId(h.id);
+                      setName(h.name);
+                      // Deliberately do not force preset class/race UI here.
+                      // Saved heroes can be fully freeform; session instantiation uses the saved template server-side.
+                    }}
+                    className={`relative overflow-hidden rounded-[var(--radius-card)] border text-left transition-colors ${
+                      active
+                        ? "border-[rgba(212,175,55,0.45)] bg-[var(--surface-high)]/35"
+                        : "border-white/10 bg-black/15 hover:bg-white/5"
+                    }`}
+                    aria-pressed={active}
+                  >
+                    <div className="absolute inset-0 opacity-70">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={
+                          h.portraitUrl?.trim() ||
+                          "https://api.dicebear.com/7.x/adventurer/svg?seed=Hero"
+                        }
+                        alt=""
+                        className="h-full w-full object-cover"
+                      />
+                    </div>
+                    <div className="absolute inset-0 bg-gradient-to-t from-[var(--color-obsidian)] via-[var(--color-obsidian)]/70 to-transparent" />
+                    <div className="relative p-4 min-h-[8.75rem] flex flex-col gap-1.5">
+                      <p className="text-fantasy text-base text-[var(--color-silver-muted)] truncate">
+                        {h.name}
+                      </p>
+                      <p className="text-[10px] uppercase tracking-[0.18em] text-[var(--outline)]">
+                        {h.heroClass} · {h.race}
+                      </p>
+                      <div className="mt-auto">
+                        {active ? (
+                          <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[var(--color-gold-rare)]">
+                            Selected
+                          </p>
+                        ) : (
+                          <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[var(--outline)]">
+                            Tap to use
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+
+            {selectedSavedHero ? (
+              <div className="rounded-[var(--radius-card)] border border-[rgba(77,70,53,0.2)] bg-[var(--color-midnight)] p-4">
+                <p className="text-[10px] font-black uppercase tracking-[0.2em] text-[var(--outline)]">
+                  Saved hero preview
+                </p>
+                <div className="mt-3 flex items-center gap-3">
+                  <div className="h-14 w-14 overflow-hidden rounded-[var(--radius-avatar)] border border-white/10 bg-black/20 shrink-0">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={
+                        selectedSavedHero.portraitUrl?.trim() ||
+                        "https://api.dicebear.com/7.x/adventurer/svg?seed=Hero"
+                      }
+                      alt=""
+                      className="h-full w-full object-cover"
+                    />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-fantasy text-lg text-[var(--color-silver-muted)] truncate">
+                      {selectedSavedHero.name}
                     </p>
-                  ) : null}
-                </button>
-              );
-            })}
-            {selectedHeroId ? (
-              <GhostButton
-                type="button"
-                size="sm"
-                onClick={() => setSelectedHeroId(null)}
-                className="w-full"
-              >
-                Use a different hero
-              </GhostButton>
+                    <p className="text-xs capitalize text-[var(--color-silver-dim)]">
+                      {selectedSavedHero.heroClass} · {selectedSavedHero.race}
+                    </p>
+                    <p className="mt-1 text-[10px] uppercase tracking-[0.18em] text-[var(--outline)]">
+                      Uses the stats you rolled below
+                    </p>
+                  </div>
+                </div>
+                <div className="mt-3">
+                  <GhostButton
+                    type="button"
+                    size="sm"
+                    onClick={() => setSelectedHeroId(null)}
+                    className="w-full"
+                  >
+                    Use a different hero
+                  </GhostButton>
+                </div>
+              </div>
             ) : null}
           </div>
         )}

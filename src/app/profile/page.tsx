@@ -41,6 +41,7 @@ export default function ProfilePage() {
   const [image, setImage] = useState<string | null>(null);
   const [heroesLoading, setHeroesLoading] = useState(true);
   const [heroes, setHeroes] = useState<ProfileHero[]>([]);
+  const [heroFreeSlots, setHeroFreeSlots] = useState(1);
   const [publicProfileEnabled, setPublicProfileEnabledState] = useState(false);
   const [heroName, setHeroName] = useState("");
   const [heroClass, setHeroClass] = useState("warrior");
@@ -126,10 +127,14 @@ export default function ProfilePage() {
         const d = data as {
           heroes?: ProfileHero[];
           publicProfileEnabled?: boolean;
+          freeSlots?: number;
         };
         if (cancelled) return;
         setHeroes(Array.isArray(d.heroes) ? d.heroes : []);
         setPublicProfileEnabledState(Boolean(d.publicProfileEnabled));
+        setHeroFreeSlots(
+          typeof d.freeSlots === "number" && d.freeSlots > 0 ? d.freeSlots : 1,
+        );
       } finally {
         if (!cancelled) setHeroesLoading(false);
       }
@@ -240,9 +245,16 @@ export default function ProfilePage() {
     const res = await fetch("/api/profile/heroes");
     const data: unknown = await res.json().catch(() => ({}));
     if (!res.ok) return;
-    const d = data as { heroes?: ProfileHero[]; publicProfileEnabled?: boolean };
+    const d = data as {
+      heroes?: ProfileHero[];
+      publicProfileEnabled?: boolean;
+      freeSlots?: number;
+    };
     setHeroes(Array.isArray(d.heroes) ? d.heroes : []);
     setPublicProfileEnabledState(Boolean(d.publicProfileEnabled));
+    setHeroFreeSlots(
+      typeof d.freeSlots === "number" && d.freeSlots > 0 ? d.freeSlots : 1,
+    );
   }
 
   async function handleCreateHero() {
@@ -630,15 +642,15 @@ export default function ProfilePage() {
 
           {heroesLoading ? (
             <p className="mt-4 text-sm text-[var(--color-silver-dim)]">Loading…</p>
-          ) : heroes.length > 0 ? (
-            <div className="mt-4 space-y-3">
-              {heroes.map((h) => (
-                <div
-                  key={h.id}
-                  className="rounded-[var(--radius-card)] border border-white/10 bg-[var(--surface-container)]/25 p-4"
-                >
-                  <div className="flex items-center gap-3">
-                    <div className="h-12 w-12 overflow-hidden rounded-[var(--radius-avatar)] border border-white/10 bg-black/20 shrink-0">
+          ) : (
+            <div className="mt-4 space-y-4">
+              <div className="grid grid-cols-2 gap-3">
+                {heroes.map((h) => (
+                  <div
+                    key={h.id}
+                    className="relative overflow-hidden rounded-[var(--radius-card)] border border-white/10 bg-[var(--surface-container)]/25"
+                  >
+                    <div className="absolute inset-0 opacity-70">
                       {/* eslint-disable-next-line @next/next/no-img-element */}
                       <img
                         src={h.portraitUrl?.trim() || dicebearHeroPortrait(h.name)}
@@ -646,54 +658,95 @@ export default function ProfilePage() {
                         className="h-full w-full object-cover"
                       />
                     </div>
-                    <div className="min-w-0 flex-1">
-                      <p className="text-fantasy text-lg text-[var(--color-silver-muted)]">
-                        {h.name}
-                      </p>
-                      <p className="text-xs text-[var(--color-silver-dim)] capitalize">
-                        {h.heroClass} · {h.race}
-                      </p>
+                    <div className="absolute inset-0 bg-gradient-to-t from-[var(--color-obsidian)] via-[var(--color-obsidian)]/70 to-transparent" />
+
+                    <div className="relative p-4 flex flex-col gap-3 min-h-[10.5rem]">
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <p className="text-fantasy text-lg text-[var(--color-silver-muted)] truncate">
+                            {h.name}
+                          </p>
+                          <p className="text-[10px] uppercase tracking-[0.18em] text-[var(--outline)]">
+                            {h.heroClass} · {h.race}
+                          </p>
+                        </div>
+                        <div
+                          className={`shrink-0 min-h-[28px] px-2 rounded-[var(--radius-chip)] border text-[9px] font-black uppercase tracking-[0.18em] ${
+                            h.isPublic
+                              ? "border-[rgba(212,175,55,0.35)] text-[var(--color-gold-rare)] bg-[var(--surface-high)]/35"
+                              : "border-white/10 text-[var(--outline)] bg-black/20"
+                          }`}
+                          title={h.isPublic ? "Public" : "Private"}
+                        >
+                          {h.isPublic ? "Public" : "Private"}
+                        </div>
+                      </div>
+
+                      <div className="mt-auto grid grid-cols-2 gap-2">
+                        {!h.portraitUrl ? (
+                          <GhostButton
+                            size="sm"
+                            disabled={heroBusy || heroAiPortraitBusy}
+                            onClick={() => void handleGenerateHeroPortraitAI(h.id)}
+                            className="col-span-2"
+                          >
+                            {heroAiPortraitBusy ? "Generating…" : "Generate portrait"}
+                          </GhostButton>
+                        ) : (
+                          <GhostButton
+                            size="sm"
+                            disabled
+                            onClick={() =>
+                              toast("Portrait reroll is paid (coming soon).", "info")
+                            }
+                            className="col-span-2"
+                          >
+                            Reroll (paid)
+                          </GhostButton>
+                        )}
+
+                        <GhostButton
+                          size="sm"
+                          disabled={heroBusy}
+                          onClick={() => void handleToggleHeroPublic(h.id, !h.isPublic)}
+                        >
+                          {h.isPublic ? "Private" : "Public"}
+                        </GhostButton>
+                        <GhostButton
+                          size="sm"
+                          disabled={heroBusy}
+                          onClick={() => void handleDeleteHero(h.id)}
+                          className="text-[var(--color-failure)]"
+                        >
+                          Delete
+                        </GhostButton>
+                      </div>
                     </div>
                   </div>
-                  <div className="mt-3 flex gap-2">
-                    {!h.portraitUrl ? (
-                      <GhostButton
-                        size="sm"
-                        disabled={heroBusy || heroAiPortraitBusy}
-                        onClick={() => void handleGenerateHeroPortraitAI(h.id)}
-                      >
-                        {heroAiPortraitBusy ? "Generating…" : "Generate portrait"}
-                      </GhostButton>
-                    ) : (
-                      <GhostButton
-                        size="sm"
-                        disabled
-                        onClick={() => toast("Portrait reroll is paid (coming soon).", "info")}
-                      >
-                        Reroll (paid)
-                      </GhostButton>
-                    )}
-                    <GhostButton
-                      size="sm"
-                      disabled={heroBusy}
-                      onClick={() => void handleToggleHeroPublic(h.id, !h.isPublic)}
-                    >
-                      {h.isPublic ? "Make private" : "Make public"}
-                    </GhostButton>
-                    <GhostButton
-                      size="sm"
-                      disabled={heroBusy}
-                      onClick={() => void handleDeleteHero(h.id)}
-                      className="text-[var(--color-failure)]"
-                    >
-                      Delete
-                    </GhostButton>
+                ))}
+
+                {Array.from({
+                  length: Math.max(0, heroFreeSlots - heroes.length),
+                }).map((_, idx) => (
+                  <div
+                    key={`hero-slot-${idx}`}
+                    className="rounded-[var(--radius-card)] border border-dashed border-white/10 bg-black/10 p-4 flex flex-col items-center justify-center gap-2 min-h-[10.5rem]"
+                  >
+                    <span className="material-symbols-outlined text-[var(--outline)]">
+                      lock
+                    </span>
+                    <p className="text-[10px] font-black uppercase tracking-[0.2em] text-[var(--outline)] text-center">
+                      Empty slot
+                    </p>
+                    <p className="text-xs text-[var(--color-silver-dim)] text-center max-w-[22ch]">
+                      Create a hero to fill this slot.
+                    </p>
                   </div>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <div className="mt-4 space-y-3">
+                ))}
+              </div>
+
+              {heroes.length === 0 ? (
+                <div className="space-y-3">
               <div className="grid grid-cols-2 gap-3">
                 <div className="col-span-2">
                   <p className="text-[10px] uppercase tracking-[0.18em] text-[var(--outline)]">
@@ -857,6 +910,8 @@ export default function ProfilePage() {
               >
                 {heroBusy ? "Saving…" : "Save hero"}
               </GoldButton>
+                </div>
+              ) : null}
             </div>
           )}
         </GlassCard>
