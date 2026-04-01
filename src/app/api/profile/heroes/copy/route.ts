@@ -33,7 +33,10 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ hero }, { status: 201 });
     } catch (err) {
       if (err instanceof ProfileHeroSlotLimitError) {
-        return apiError("Hero slot limit reached", 409);
+        return apiError(
+          "Hero slot limit reached. Extra slots require payment.",
+          402,
+        );
       }
       if (err instanceof PublicProfileDisabledError) {
         return apiError("This player's public profile is disabled", 403);
