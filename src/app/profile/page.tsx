@@ -155,6 +155,8 @@ export default function ProfilePage() {
     [builderClassProfile],
   );
 
+  const slotsFull = heroes.length >= heroFreeSlots;
+
   useEffect(() => {
     if (status === "loading") return;
     if (status !== "authenticated") {
@@ -380,6 +382,10 @@ export default function ProfilePage() {
 
   async function handleCreateHero() {
     if (heroBusy) return;
+    if (slotsFull) {
+      toast("Hero slot is full. Unlock a new slot to create another hero.", "error");
+      return;
+    }
     if (!heroName.trim()) {
       toast("Enter a hero name", "error");
       return;
@@ -869,24 +875,48 @@ export default function ProfilePage() {
                   </div>
                 ))}
 
-                {Array.from({
-                  length: Math.max(0, heroFreeSlots - heroes.length),
-                }).map((_, idx) => (
-                  <div
-                    key={`hero-slot-${idx}`}
-                    className="rounded-[var(--radius-card)] border border-dashed border-white/10 bg-black/10 p-4 flex flex-col items-center justify-center gap-2 min-h-[10.5rem]"
-                  >
-                    <span className="material-symbols-outlined text-[var(--outline)]">
+                {Array.from({ length: Math.max(0, heroFreeSlots - heroes.length) }).map(
+                  (_, idx) => (
+                    <button
+                      key={`hero-slot-${idx}`}
+                      type="button"
+                      onClick={() => setHeroBuilderOpen(true)}
+                      className="rounded-[var(--radius-card)] border border-dashed border-white/10 bg-black/10 p-4 flex flex-col items-center justify-center gap-2 min-h-[10.5rem] hover:border-[rgba(212,175,55,0.25)] hover:bg-[var(--surface-container)]/20 transition-colors"
+                    >
+                      <span className="material-symbols-outlined text-[var(--outline)]">
+                        add
+                      </span>
+                      <p className="text-[10px] font-black uppercase tracking-[0.2em] text-[var(--outline)] text-center">
+                        Create hero
+                      </p>
+                      <p className="text-xs text-[var(--color-silver-dim)] text-center max-w-[22ch]">
+                        Fill this slot with a new build.
+                      </p>
+                    </button>
+                  ),
+                )}
+
+                {slotsFull ? (
+                  <div className="rounded-[var(--radius-card)] border border-white/10 bg-black/10 p-4 flex flex-col items-center justify-center gap-2 min-h-[10.5rem] relative overflow-hidden">
+                    <div className="pointer-events-none absolute inset-0 opacity-70">
+                      <div className="absolute -top-10 -left-16 h-40 w-40 rounded-full bg-[rgba(212,175,55,0.08)] blur-2xl" />
+                      <div className="absolute -bottom-12 -right-16 h-44 w-44 rounded-full bg-[rgba(120,74,32,0.16)] blur-2xl" />
+                    </div>
+                    <span className="relative material-symbols-outlined text-[var(--outline)]">
                       lock
                     </span>
-                    <p className="text-[10px] font-black uppercase tracking-[0.2em] text-[var(--outline)] text-center">
-                      Empty slot
+                    <p className="relative text-[10px] font-black uppercase tracking-[0.2em] text-[var(--outline)] text-center">
+                      + New slot (locked)
                     </p>
-                    <p className="text-xs text-[var(--color-silver-dim)] text-center max-w-[22ch]">
-                      Create a hero to fill this slot.
+                    <p className="relative text-xs text-[var(--color-silver-dim)] text-center max-w-[24ch]">
+                      Unlock with <span className="text-[var(--color-gold-rare)] font-bold">10 Sparks</span>{" "}
+                      (coming soon).
+                    </p>
+                    <p className="relative text-[10px] uppercase tracking-[0.18em] text-[var(--outline)] text-center">
+                      Or delete your hero to replace it.
                     </p>
                   </div>
-                ))}
+                ) : null}
               </div>
 
               {inspectedHero && inspectedHeroId ? (
@@ -915,20 +945,31 @@ export default function ProfilePage() {
                     </p>
                     <p className="mt-1 text-sm text-[var(--color-silver-dim)]">
                       Generate a kit (class, abilities, gear) and an AI portrait, then save.
-                      {heroes.length > 0 ? " This replaces your hero after you delete the old one." : ""}
+                      {slotsFull
+                        ? " Your free slot is full — unlock another slot (10 Sparks) or delete your hero to replace."
+                        : ""}
                     </p>
                   </div>
                   <GhostButton
                     size="sm"
                     disabled={heroBusy}
-                    onClick={() => setHeroBuilderOpen((v) => !v)}
+                    onClick={() => {
+                      if (slotsFull) {
+                        toast(
+                          "Hero slot is full. Unlock a new slot (10 Sparks) or delete your hero to replace it.",
+                          "error",
+                        );
+                        return;
+                      }
+                      setHeroBuilderOpen((v) => !v);
+                    }}
                   >
                     {heroBuilderOpen ? "Hide" : heroes.length > 0 ? "Build new" : "Create"}
                   </GhostButton>
                 </div>
               </div>
 
-              {heroBuilderOpen ? (
+              {heroBuilderOpen && !slotsFull ? (
                 <div className="space-y-3">
               <div className="grid grid-cols-2 gap-3">
                 <div className="col-span-2">
