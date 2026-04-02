@@ -18,9 +18,13 @@ const SESSION_DISPLAY_PATH =
 /** NextAuth recovery (upgrade, bridge) — must render even when session drops mid-OAuth */
 const AUTH_FLOW_PATH = /^\/auth\//;
 
+const SKIP_GUEST_UNTIL_KEY = "ashveil.skip_guest_until";
+
 const AUTH_ERROR_HINT: Record<string, string> = {
   OAuthCallbackError:
     "Google sign-in didn’t finish. You can try again or keep playing as a guest.",
+  OAuthAccountNotLinked:
+    "Google sign-in conflicted with your guest session. Try Sign in with Google again — if it keeps failing, refresh the page first.",
   AccessDenied: "That Google account wasn’t used to sign in.",
   Callback: "Sign-in was interrupted. Try again when you’re ready.",
   Configuration:
@@ -39,6 +43,7 @@ function AuthGateInner({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
   const searchParams = useSearchParams();
+  const authErrorParam = searchParams.get("error")?.trim() ?? "";
   const displayToken = searchParams.get("t")?.trim() ?? "";
   const displayBypass =
     SESSION_DISPLAY_PATH.test(pathname) &&
@@ -55,6 +60,24 @@ function AuthGateInner({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (session?.user?.id) hadSessionRef.current = true;
   }, [session?.user?.id]);
+
+  useEffect(() => {
+    if (!session?.user?.id) return;
+    try {
+      sessionStorage.removeItem(SKIP_GUEST_UNTIL_KEY);
+    } catch {
+      /* ignore */
+    }
+  }, [session?.user?.id]);
+
+  useEffect(() => {
+    if (!authErrorParam) return;
+    try {
+      sessionStorage.removeItem(SKIP_GUEST_UNTIL_KEY);
+    } catch {
+      /* ignore */
+    }
+  }, [authErrorParam]);
 
   useEffect(() => {
     if (displayBypass) return;
@@ -107,7 +130,6 @@ function AuthGateInner({ children }: { children: React.ReactNode }) {
   const loading = displayBypass ? false : status === "loading" || !guestId;
   const isHome = pathname === "/" || pathname === "";
   const authFlowPath = AUTH_FLOW_PATH.test(pathname);
-  const authErrorParam = searchParams.get("error")?.trim() ?? "";
   const oauthHint =
     AUTH_ERROR_HINT[authErrorParam] ?? AUTH_ERROR_HINT.Default;
 
@@ -129,6 +151,16 @@ function AuthGateInner({ children }: { children: React.ReactNode }) {
       !displayName.trim()
     ) {
       return;
+    }
+    try {
+      const raw = sessionStorage.getItem(SKIP_GUEST_UNTIL_KEY);
+      const until = raw ? Number(raw) : 0;
+      if (Number.isFinite(until) && Date.now() < until) {
+        return;
+      }
+      if (raw) sessionStorage.removeItem(SKIP_GUEST_UNTIL_KEY);
+    } catch {
+      /* ignore */
     }
     setAutoAttempted(true);
     void handleGuest();

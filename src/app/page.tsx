@@ -1,6 +1,6 @@
 "use client";
 
-import { signIn, useSession } from "next-auth/react";
+import { signIn, signOut, useSession } from "next-auth/react";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -86,6 +86,15 @@ export default function Home() {
     } catch {
       // Ignore; upgrade page will show error if missing context.
     }
+    // Guest JWT + existing Google account => Auth.js throws OAuthAccountNotLinked at
+    // callback ("already associated with another user"). Clear session before OAuth.
+    try {
+      const until = Date.now() + 3 * 60 * 1000;
+      window.sessionStorage.setItem("ashveil.skip_guest_until", String(until));
+    } catch {
+      /* ignore */
+    }
+    await signOut({ redirect: false });
     await signIn("google", { callbackUrl: "/auth/upgrade" });
   }
 
