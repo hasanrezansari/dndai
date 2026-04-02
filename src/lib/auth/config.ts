@@ -1,5 +1,5 @@
 import { DrizzleAdapter } from "@auth/drizzle-adapter";
-import { eq } from "drizzle-orm";
+import { and, eq, gt, isNull } from "drizzle-orm";
 import NextAuth from "next-auth";
 import type { NextAuthResult } from "next-auth";
 import Credentials from "next-auth/providers/credentials";
@@ -10,9 +10,11 @@ import { getDb } from "@/lib/db";
 import {
   authAccounts,
   authSessions,
+  authBridgeTokens,
   authUsers,
   authVerificationTokens,
 } from "@/lib/db/schema";
+import { hashBridgeToken } from "@/lib/auth/bridge-tokens";
 
 let _nextAuth: NextAuthResult | null = null;
 
@@ -34,6 +36,7 @@ function getNextAuth(): NextAuthResult {
       },
       providers: [
         Credentials({
+          id: "guest",
           name: "Guest",
           credentials: {
             displayName: { label: "Display Name", type: "text" },
@@ -79,6 +82,51 @@ function getNextAuth(): NextAuthResult {
               image: null,
             });
             return { id: guestId, name: displayName, email };
+          },
+        }),
+        Credentials({
+          id: "bridge",
+          name: "Bridge",
+          credentials: {
+            token: { label: "Bridge Token", type: "text" },
+          },
+          async authorize(credentials) {
+            const realDb = getDb();
+            const token =
+              typeof credentials?.token === "string"
+                ? credentials.token.trim()
+                : "";
+            if (!token) return null;
+            const tokenHash = hashBridgeToken(token);
+
+            const now = new Date();
+            const [row] = await realDb
+              .update(authBridgeTokens)
+              .set({ used_at: now })
+              .where(
+                and(
+                  eq(authBridgeTokens.token_hash, tokenHash),
+                  isNull(authBridgeTokens.used_at),
+                  gt(authBridgeTokens.expires_at, now),
+                ),
+              )
+              .returning({
+                userId: authBridgeTokens.user_id,
+              });
+
+            if (!row) return null;
+
+            const [user] = await realDb
+              .select()
+              .from(authUsers)
+              .where(eq(authUsers.id, row.userId))
+              .limit(1);
+            if (!user) return null;
+            return {
+              id: user.id,
+              name: user.name ?? "Adventurer",
+              email: user.email ?? null,
+            };
           },
         }),
         Google({

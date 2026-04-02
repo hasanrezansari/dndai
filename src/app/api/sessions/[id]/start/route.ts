@@ -14,6 +14,8 @@ import { CampaignSeedOutputSchema, type CampaignSeedOutput } from "@/lib/schemas
 import { runOrchestrationStep } from "@/lib/orchestrator/step-runner";
 import { COPY } from "@/lib/copy/ashveil";
 import { db } from "@/lib/db";
+import { ROMA_SEEDS } from "@/lib/rome/seeder";
+import type { RomaModuleKey } from "@/lib/rome/modules";
 import {
   characters,
   narrativeEvents,
@@ -64,6 +66,25 @@ Output JSON with ALL these fields:
 - "visual_bible_seed": { "palette": "color description", "motifs": "recurring visual elements", "architecture": "building style" }
 
 Make it dark fantasy. Keep the opening scene atmospheric and evocative, not action-packed.`;
+
+function isRomaModuleKey(key: string): key is RomaModuleKey {
+  return Object.prototype.hasOwnProperty.call(ROMA_SEEDS, key);
+}
+
+function buildSeederSystemPrompt(params: {
+  campaignMode: string;
+  moduleKey: string | null;
+}): string {
+  if (
+    params.campaignMode === "module" &&
+    params.moduleKey &&
+    isRomaModuleKey(params.moduleKey)
+  ) {
+    const seed = ROMA_SEEDS[params.moduleKey];
+    return `You are the Campaign Seeder for PlayRomana, a curated Roman adventure experience.\n\n${CAMPAIGN_SEEDER_SYSTEM}\n\nAdditional constraints for this module:\n- Setting: Ancient Rome\n- Style policy: ${seed.stylePolicyAddon}\n- Visual bible: palette=${seed.visualBibleSeed.palette}; motifs=${seed.visualBibleSeed.motifs}; architecture=${seed.visualBibleSeed.architecture}\n\nDo NOT mention modern times. Do NOT use modern slang.\nIf you include any supernatural elements, keep them rare, grounded, and framed as cult ritual or superstition unless explicitly required.`;
+  }
+  return CAMPAIGN_SEEDER_SYSTEM;
+}
 
 const FallbackOpeningSchema = z.object({
   scene_text: z.string(),
@@ -175,18 +196,26 @@ export async function POST(
     const adventurePrompt =
       activeSession?.adventure_prompt?.trim() ||
       "a mysterious dark fantasy adventure";
+    const moduleKey = activeSession?.module_key?.trim() || null;
+    const effectiveAdventurePrompt =
+      activeSession?.campaign_mode === "module" &&
+      moduleKey &&
+      isRomaModuleKey(moduleKey)
+        ? ROMA_SEEDS[moduleKey].theme
+        : adventurePrompt;
 
-    let seededObjective = `Complete the mission: ${adventurePrompt}`;
+    let seededObjective = `Complete the mission: ${effectiveAdventurePrompt}`;
     let seededSubObjectives: string[] | undefined;
 
     try {
       const provider = getAIProvider();
       const seedUserPrompt = JSON.stringify({
-        adventure_theme: adventurePrompt,
+        adventure_theme: effectiveAdventurePrompt,
         characters: charNames,
         player_count: allPlayers.length,
         mode: activeSession?.mode,
         campaign_mode: activeSession?.campaign_mode ?? "user_prompt",
+        module_key: moduleKey,
       });
 
       const seedResult = await runOrchestrationStep<CampaignSeedOutput>({
@@ -195,7 +224,10 @@ export async function POST(
         turnId: null,
         provider,
         model: "heavy",
-        systemPrompt: CAMPAIGN_SEEDER_SYSTEM,
+        systemPrompt: buildSeederSystemPrompt({
+          campaignMode: activeSession?.campaign_mode ?? "user_prompt",
+          moduleKey,
+        }),
         userPrompt: seedUserPrompt,
         schema: CampaignSeedOutputSchema,
         maxTokens: 1200,
@@ -325,7 +357,9 @@ export async function POST(
       characterNamesForImage.length > 0
         ? characterNamesForImage
         : allPlayers.map((p) => p.user_id.slice(0, 8));
-    const imgSceneCtx = [campaignTitle, adventurePrompt].filter(Boolean).join(" ");
+    const imgSceneCtx = [campaignTitle, effectiveAdventurePrompt]
+      .filter(Boolean)
+      .join(" ");
     after(async () => {
       try {
         console.log("[image-after] starting image generation for opening scene");

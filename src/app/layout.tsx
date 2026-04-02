@@ -4,6 +4,7 @@ import { Noto_Serif, Manrope, Inter } from "next/font/google";
 import { AuthGate } from "@/components/auth/auth-gate";
 import { AuthProvider } from "@/components/auth/session-provider";
 import { ToastContainer } from "@/components/ui/toast";
+import { getBrandName, getBrandTagline, getBuildTimeBrand } from "@/lib/brand";
 
 import "./globals.css";
 
@@ -27,17 +28,21 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  title: "Falvos — A Living World Awaits",
+  title: `${getBrandName(getBuildTimeBrand())} — ${getBrandTagline(getBuildTimeBrand())}`,
   description:
-    "Mobile-first multiplayer AI-powered tabletop RPG. Play with friends online — AI or Human DM.",
+    getBuildTimeBrand() === "playromana"
+      ? "Curated Roman adventures. Start instantly, invite friends, and let the world respond."
+      : "Mobile-first multiplayer AI-powered tabletop RPG. Play with friends online — AI or Human DM.",
   metadataBase: new URL(
     process.env.NEXTAUTH_URL ?? "https://playdndai.com",
   ),
   openGraph: {
-    title: "Falvos — A Living World Awaits",
+    title: `${getBrandName(getBuildTimeBrand())} — ${getBrandTagline(getBuildTimeBrand())}`,
     description:
-      "Mobile-first multiplayer AI-powered tabletop RPG. Play with friends online.",
-    siteName: "Falvos",
+      getBuildTimeBrand() === "playromana"
+        ? "Curated Roman adventures. Start instantly, invite friends, and let the world respond."
+        : "Mobile-first multiplayer AI-powered tabletop RPG. Play with friends online.",
+    siteName: getBrandName(getBuildTimeBrand()),
     type: "website",
   },
 };

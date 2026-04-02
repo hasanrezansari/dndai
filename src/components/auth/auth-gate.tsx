@@ -56,7 +56,7 @@ function AuthGateInner({ children }: { children: React.ReactNode }) {
     if (!guestId || busy) return;
     setBusy(true);
     setError(null);
-    const res = await signIn("credentials", {
+    const res = await signIn("guest", {
       guestId,
       displayName: displayName.trim() || "Adventurer",
       redirect: false,

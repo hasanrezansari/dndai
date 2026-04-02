@@ -65,6 +65,23 @@ export const authVerificationTokens = pgTable(
   }),
 );
 
+export const authBridgeTokens = pgTable(
+  "auth_bridge_tokens",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    token_hash: text("token_hash").notNull().unique(),
+    user_id: text("user_id")
+      .notNull()
+      .references(() => authUsers.id, { onDelete: "cascade" }),
+    expires_at: timestamp("expires_at", { withTimezone: true }).notNull(),
+    used_at: timestamp("used_at", { withTimezone: true }),
+    created_at: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [index("auth_bridge_tokens_user_id_idx").on(t.user_id)],
+);
+
 export const sessions = pgTable(
   "sessions",
   {
