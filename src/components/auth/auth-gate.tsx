@@ -9,6 +9,10 @@ import { GoogleSignInButton } from "@/components/auth/google-sign-in-button";
 import { GlassCard } from "@/components/ui/glass-card";
 import { GoldButton } from "@/components/ui/gold-button";
 import { RouteLoadingUI } from "@/components/ui/route-loading";
+import {
+  clearOauthLinkPending,
+  isOauthLinkPending,
+} from "@/lib/auth/oauth-link-pending";
 import { getBrandName, getBuildTimeBrand } from "@/lib/brand";
 
 const GUEST_STORAGE_KEY = "ashveil.guest_id";
@@ -66,6 +70,10 @@ function AuthGateInner({ children }: { children: React.ReactNode }) {
       /* ignore */
     }
   }, [displayBypass]);
+
+  useEffect(() => {
+    if (authErrorParam) clearOauthLinkPending();
+  }, [authErrorParam]);
 
   async function handleGuest() {
     if (entryBusy) return;
@@ -134,6 +142,10 @@ function AuthGateInner({ children }: { children: React.ReactNode }) {
     !authFlowPath &&
     status === "unauthenticated" &&
     !hasSessionUser;
+
+  /** After signOut, before Google redirect — avoid flashing the entry card. */
+  const oauthLinkHandoff =
+    needsEntryChoice && isOauthLinkPending();
 
   function clearOAuthParamsFromUrl() {
     const next = new URLSearchParams(searchParams.toString());
@@ -262,6 +274,26 @@ function AuthGateInner({ children }: { children: React.ReactNode }) {
             <RouteLoadingUI />
           </motion.div>
         )
+      ) : oauthLinkHandoff ? (
+        <motion.div
+          key="oauth-link-handoff"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          transition={{ duration: 0.2 }}
+          className="min-h-dvh flex flex-col items-center justify-center px-6 bg-[var(--color-obsidian)] gap-5"
+          role="status"
+          aria-live="polite"
+          aria-label="Opening Google sign-in"
+        >
+          <div
+            className="h-11 w-11 rounded-full border-2 border-[rgba(242,202,80,0.25)] border-t-[var(--color-gold-rare)] animate-spin"
+            aria-hidden
+          />
+          <p className="text-xs text-center text-[var(--color-silver-dim)] uppercase tracking-[0.14em] max-w-xs leading-relaxed">
+            Continuing to Google…
+          </p>
+        </motion.div>
       ) : needsEntryChoice ? (
         entryCard
       ) : isHome ? (

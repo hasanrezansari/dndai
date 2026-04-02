@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
 
+import { clearOauthLinkPending } from "@/lib/auth/oauth-link-pending";
 import { GlassCard } from "@/components/ui/glass-card";
 import { GoldButton } from "@/components/ui/gold-button";
 
@@ -26,6 +27,10 @@ export default function AuthUpgradePage() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const waitingForGoogle = status === "unauthenticated";
+
+  useEffect(() => {
+    clearOauthLinkPending();
+  }, []);
 
   useEffect(() => {
     if (status !== "authenticated" || !session?.user) return;

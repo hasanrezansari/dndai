@@ -6,6 +6,10 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 
 import { GoogleSignInButton } from "@/components/auth/google-sign-in-button";
+import {
+  clearOauthLinkPending,
+  setOauthLinkPending,
+} from "@/lib/auth/oauth-link-pending";
 import { getBrandName, getBrandTagline, getBuildTimeBrand } from "@/lib/brand";
 import { ROMA_MODULES } from "@/lib/rome/modules";
 import { GoldButton } from "@/components/ui/gold-button";
@@ -85,6 +89,7 @@ export default function Home() {
       return;
     }
     try {
+      setOauthLinkPending();
       await signOut({ redirect: false });
       // Never use GET /api/auth/signin/google: with pages.signIn set to "/", Auth.js
       // rejects that route (Unsupported action) and the app redirects with ?error=Configuration.
@@ -93,6 +98,7 @@ export default function Home() {
       const callbackUrl = `${window.location.origin}/auth/upgrade`;
       await signIn("google", { callbackUrl, redirect: true });
     } catch {
+      clearOauthLinkPending();
       setUpgradeError(
         "Could not open Google sign-in after sign-out. Refresh the page — you may need to play as guest again, then tap Link with Google once more.",
       );
