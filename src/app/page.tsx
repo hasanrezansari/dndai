@@ -37,6 +37,8 @@ export default function Home() {
   const [createLoading, setCreateLoading] = useState(false);
   const [joinLoading, setJoinLoading] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
+  const [upgradeError, setUpgradeError] = useState<string | null>(null);
+  const [upgradeBusy, setUpgradeBusy] = useState(false);
 
   const isGuest =
     typeof authSession?.user?.email === "string" &&
@@ -81,21 +83,47 @@ export default function Home() {
   }, []);
 
   async function handleUpgradeToGoogle() {
+    setUpgradeError(null);
+    setUpgradeBusy(true);
+    let prepareRes: Response;
     try {
-      await fetch("/api/auth/upgrade/prepare", { method: "POST" });
+      prepareRes = await fetch("/api/auth/upgrade/prepare", {
+        method: "POST",
+        credentials: "include",
+      });
     } catch {
-      // Ignore; upgrade page will show error if missing context.
+      setUpgradeError(
+        "Could not start Google sign-in. Check your connection and try again.",
+      );
+      setUpgradeBusy(false);
+      return;
     }
-    // Guest JWT + existing Google account => Auth.js throws OAuthAccountNotLinked at
-    // callback ("already associated with another user"). Clear session before OAuth.
+    if (!prepareRes.ok) {
+      const data: unknown = await prepareRes.json().catch(() => ({}));
+      const msg =
+        typeof data === "object" &&
+        data !== null &&
+        "error" in data &&
+        typeof (data as { error: unknown }).error === "string"
+          ? (data as { error: string }).error
+          : "Could not prepare account upgrade. Refresh the page and try again.";
+      setUpgradeError(msg);
+      setUpgradeBusy(false);
+      return;
+    }
+    // Guest JWT + existing Google account can confuse OAuth linking; clear session before OAuth.
     try {
       const until = Date.now() + 3 * 60 * 1000;
       window.sessionStorage.setItem("ashveil.skip_guest_until", String(until));
     } catch {
       /* ignore */
     }
-    await signOut({ redirect: false });
-    await signIn("google", { callbackUrl: "/auth/upgrade" });
+    try {
+      await signOut({ redirect: false });
+      await signIn("google", { callbackUrl: "/auth/upgrade" });
+    } finally {
+      setUpgradeBusy(false);
+    }
   }
 
   async function handleCreate() {
@@ -240,17 +268,25 @@ export default function Home() {
                   Edit profile
                 </Link>
                 {isGuest ? (
-                  <GhostButton
-                    type="button"
-                    size="sm"
-                    className="min-h-[36px]"
-                    onClick={() => void handleUpgradeToGoogle()}
-                  >
-                    <span className="flex items-center justify-center gap-2">
-                      {GoogleIcon}
-                      Sign in with Google
-                    </span>
-                  </GhostButton>
+                  <>
+                    <GhostButton
+                      type="button"
+                      size="sm"
+                      className="min-h-[36px]"
+                      disabled={upgradeBusy}
+                      onClick={() => void handleUpgradeToGoogle()}
+                    >
+                      <span className="flex items-center justify-center gap-2">
+                        {GoogleIcon}
+                        {upgradeBusy ? "Connecting…" : "Sign in with Google"}
+                      </span>
+                    </GhostButton>
+                    {upgradeError ? (
+                      <p className="mt-2 text-xs text-[var(--color-failure)] text-center px-2 leading-relaxed">
+                        {upgradeError}
+                      </p>
+                    ) : null}
+                  </>
                 ) : null}
               </div>
             ) : null}
@@ -506,17 +542,25 @@ export default function Home() {
                   {isGuest ? " (Guest)" : ""}
                 </p>
                 {isGuest ? (
-                  <GhostButton
-                    type="button"
-                    size="sm"
-                    className="min-h-[36px]"
-                    onClick={() => void handleUpgradeToGoogle()}
-                  >
-                    <span className="flex items-center justify-center gap-2">
-                      {GoogleIcon}
-                      Sign in with Google
-                    </span>
-                  </GhostButton>
+                  <>
+                    <GhostButton
+                      type="button"
+                      size="sm"
+                      className="min-h-[36px]"
+                      disabled={upgradeBusy}
+                      onClick={() => void handleUpgradeToGoogle()}
+                    >
+                      <span className="flex items-center justify-center gap-2">
+                        {GoogleIcon}
+                        {upgradeBusy ? "Connecting…" : "Sign in with Google"}
+                      </span>
+                    </GhostButton>
+                    {upgradeError ? (
+                      <p className="mt-2 text-xs text-[var(--color-failure)] text-center px-2 leading-relaxed">
+                        {upgradeError}
+                      </p>
+                    ) : null}
+                  </>
                 ) : null}
               </div>
             ) : null}

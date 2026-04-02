@@ -3,10 +3,12 @@ import { and, eq, inArray } from "drizzle-orm";
 
 import { apiError, handleApiError } from "@/lib/api/errors";
 import { requireUser, unauthorizedResponse } from "@/lib/auth/guards";
+import {
+  UPGRADE_COOKIE_NAME,
+  upgradeCookieDeleteOptions,
+} from "@/lib/auth/upgrade-cookie";
 import { db } from "@/lib/db";
 import { authUsers, players, sessions } from "@/lib/db/schema";
-
-const UPGRADE_COOKIE = "falvos.upgrade_guest_id";
 
 function isGuestEmail(email: string | null | undefined): boolean {
   return typeof email === "string" && email.endsWith("@ashveil.guest");
@@ -18,7 +20,7 @@ export async function POST(request: NextRequest) {
     const user = await requireUser();
     if (!user) return unauthorizedResponse();
 
-    const guestId = request.cookies.get(UPGRADE_COOKIE)?.value ?? "";
+    const guestId = request.cookies.get(UPGRADE_COOKIE_NAME)?.value ?? "";
     if (!guestId) {
       return apiError("Missing upgrade context", 400);
     }
@@ -76,13 +78,7 @@ export async function POST(request: NextRequest) {
     });
 
     const res = NextResponse.json({ ok: true });
-    res.cookies.set(UPGRADE_COOKIE, "", {
-      httpOnly: true,
-      sameSite: "lax",
-      secure: process.env.NODE_ENV === "production",
-      path: "/",
-      maxAge: 0,
-    });
+    res.cookies.set(UPGRADE_COOKIE_NAME, "", upgradeCookieDeleteOptions());
     return res;
   } catch (e) {
     return handleApiError(e);

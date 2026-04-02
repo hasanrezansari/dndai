@@ -2,8 +2,10 @@ import { NextRequest, NextResponse } from "next/server";
 
 import { apiError, handleApiError } from "@/lib/api/errors";
 import { requireUser, unauthorizedResponse } from "@/lib/auth/guards";
-
-const UPGRADE_COOKIE = "falvos.upgrade_guest_id";
+import {
+  UPGRADE_COOKIE_NAME,
+  upgradeCookieAssignOptions,
+} from "@/lib/auth/upgrade-cookie";
 
 function isGuestEmail(email: string | null | undefined): boolean {
   return typeof email === "string" && email.endsWith("@ashveil.guest");
@@ -23,13 +25,7 @@ export async function POST(request: NextRequest) {
     }
 
     const res = NextResponse.json({ ok: true });
-    res.cookies.set(UPGRADE_COOKIE, user.id, {
-      httpOnly: true,
-      sameSite: "lax",
-      secure: process.env.NODE_ENV === "production",
-      path: "/",
-      maxAge: 60 * 15, // 15 minutes
-    });
+    res.cookies.set(UPGRADE_COOKIE_NAME, user.id, upgradeCookieAssignOptions());
     return res;
   } catch (e) {
     return handleApiError(e);

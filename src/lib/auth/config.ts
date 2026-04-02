@@ -138,7 +138,9 @@ function getNextAuth(): NextAuthResult {
         Google({
           clientId: process.env.GOOGLE_CLIENT_ID ?? "",
           clientSecret: process.env.GOOGLE_CLIENT_SECRET ?? "",
-          allowDangerousEmailAccountLinking: false,
+          // Guest→Google upgrade signs out first; without this, returning Google users
+          // often hit OAuthAccountNotLinked and bounce to home with an error banner.
+          allowDangerousEmailAccountLinking: true,
         }),
       ],
       callbacks: {
