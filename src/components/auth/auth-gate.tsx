@@ -20,17 +20,15 @@ const SESSION_DISPLAY_PATH =
 /** NextAuth recovery (upgrade, bridge) — must render even when session drops mid-OAuth */
 const AUTH_FLOW_PATH = /^\/auth\//;
 
-const SKIP_GUEST_UNTIL_KEY = "ashveil.skip_guest_until";
-
 const AUTH_ERROR_HINT: Record<string, string> = {
   OAuthCallbackError:
     "Google sign-in didn’t finish. You can try again or play as a guest.",
   OAuthAccountNotLinked:
-    "That Google account couldn’t be linked this time. Try again or play as a guest first.",
+    "Google sign-in clashed with an existing session. Refresh, then try Create account with Google or Link with Google again.",
   AccessDenied: "That Google account wasn’t used to sign in.",
   Callback: "Sign-in was interrupted. Try again when you’re ready.",
   Configuration:
-    "Sign-in isn’t configured correctly on the server. Check Google OAuth env vars.",
+    "Sign-in hit a server error (Auth.js often shows this for any internal failure — check Vercel logs, not only OAuth env vars). Try again in a moment.",
   Verification: "The sign-in link expired or was already used.",
   Default: "Sign-in didn’t complete. Try again or continue as a guest.",
 };
@@ -53,62 +51,48 @@ function AuthGateInner({ children }: { children: React.ReactNode }) {
 
   const { data: session, status } = useSession();
   const brand = getBuildTimeBrand();
-  const [guestId, setGuestId] = useState<string | null>(null);
   const [displayName, setDisplayName] = useState("Adventurer");
-  const [busy, setBusy] = useState(false);
+  const [guestNameOpen, setGuestNameOpen] = useState(false);
+  const [entryBusy, setEntryBusy] = useState<null | "guest" | "google">(null);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    if (!session?.user?.id) return;
-    const email = session.user?.email;
-    if (
-      typeof email === "string" &&
-      email.endsWith("@ashveil.guest")
-    ) {
-      return;
-    }
-    try {
-      sessionStorage.removeItem(SKIP_GUEST_UNTIL_KEY);
-    } catch {
-      /* ignore */
-    }
-  }, [session?.user?.id, session?.user?.email]);
-
-  useEffect(() => {
-    if (!authErrorParam) return;
-    try {
-      sessionStorage.removeItem(SKIP_GUEST_UNTIL_KEY);
-    } catch {
-      /* ignore */
-    }
-  }, [authErrorParam]);
-
+  // Guest UUID is created only when the user taps "Play as guest" (or reused from storage).
   useEffect(() => {
     if (displayBypass) return;
+    try {
+      const savedName = localStorage.getItem(DISPLAY_NAME_STORAGE_KEY)?.trim();
+      if (savedName) setDisplayName(savedName);
+    } catch {
+      /* ignore */
+    }
+  }, [displayBypass]);
+
+  async function handleGuest() {
+    if (entryBusy) return;
+    setEntryBusy("guest");
+    setError(null);
+    let guestId: string;
     try {
       let id = localStorage.getItem(GUEST_STORAGE_KEY);
       if (!id || !/^[0-9a-f-]{36}$/i.test(id)) {
         id = crypto.randomUUID();
         localStorage.setItem(GUEST_STORAGE_KEY, id);
       }
-      const savedName = localStorage.getItem(DISPLAY_NAME_STORAGE_KEY)?.trim();
-      if (savedName) setDisplayName(savedName);
-      setGuestId(id);
+      guestId = id;
     } catch {
-      setGuestId(crypto.randomUUID());
+      guestId = crypto.randomUUID();
+      try {
+        localStorage.setItem(GUEST_STORAGE_KEY, guestId);
+      } catch {
+        /* non-persistent guest for this tab only */
+      }
     }
-  }, [displayBypass]);
-
-  async function handleGuest() {
-    if (!guestId || busy) return;
-    setBusy(true);
-    setError(null);
     const res = await signIn("guest", {
       guestId,
       displayName: displayName.trim() || "Adventurer",
       redirect: false,
     });
-    setBusy(false);
+    setEntryBusy(null);
     if (res?.error) {
       setError("Could not start guest session.");
       return;
@@ -124,16 +108,19 @@ function AuthGateInner({ children }: { children: React.ReactNode }) {
   }
 
   async function handleGoogleOnly() {
-    setBusy(true);
+    if (entryBusy) return;
+    setEntryBusy("google");
     setError(null);
     try {
-      await signIn("google", { callbackUrl: "/" });
+      await signIn("google", { callbackUrl: "/", redirect: true });
+    } catch {
+      setError("Could not reach Google sign-in. Check your connection and try again.");
     } finally {
-      setBusy(false);
+      setEntryBusy(null);
     }
   }
 
-  const loading = displayBypass ? false : status === "loading" || !guestId;
+  const loading = displayBypass ? false : status === "loading";
   const isHome = pathname === "/" || pathname === "";
   const authFlowPath = AUTH_FLOW_PATH.test(pathname);
   const oauthHint =
@@ -184,49 +171,63 @@ function AuthGateInner({ children }: { children: React.ReactNode }) {
       className="min-h-dvh flex flex-col items-center justify-center px-6 bg-[var(--color-obsidian)] gap-[var(--void-gap)] py-10"
     >
       {oauthBanner}
-      <GlassCard className="p-6 w-full max-w-sm border-[rgba(212,175,55,0.12)]">
+      <GlassCard className="p-6 w-full max-w-md border-[rgba(212,175,55,0.12)]">
         <p className="text-fantasy text-center text-xl font-bold text-[var(--color-gold-rare)] tracking-tight uppercase mb-1">
           {getBrandName(brand)}
         </p>
-        <p className="text-xs text-center text-[var(--color-silver-dim)] mb-6 leading-relaxed">
-          Play as a guest instantly, or sign in with Google. If you play as a
-          guest first, use{" "}
-          <span className="text-[var(--color-silver-muted)]">
-            Link with Google
-          </span>{" "}
-          on the home screen later — your progress moves to your Google account.
+        <p className="text-xs text-center text-[var(--color-silver-dim)] mb-5 leading-relaxed">
+          Play as a guest right away, or sign in with Google. On the home screen,
+          guests can link progress to Google anytime.
         </p>
-        <label
-          htmlFor="gate-guest-name"
-          className="text-xs uppercase tracking-wider text-[var(--color-silver-dim)] mb-2 block"
-        >
-          Display name (guest)
-        </label>
-        <input
-          id="gate-guest-name"
-          type="text"
-          value={displayName}
-          onChange={(e) => setDisplayName(e.target.value)}
-          maxLength={48}
-          className="w-full min-h-[44px] rounded-[var(--radius-card)] bg-[var(--color-deep-void)] border border-[rgba(255,255,255,0.08)] px-4 text-[var(--color-silver-muted)] text-base mb-4 focus:outline-none focus:border-[rgba(212,175,55,0.25)]"
-        />
-        <GoldButton
+
+        <div className="grid grid-cols-2 gap-3 items-stretch mb-4">
+          <GoldButton
+            type="button"
+            size="lg"
+            className="min-h-[52px] h-full w-full px-2 py-3 text-[10px] sm:text-xs leading-tight whitespace-normal text-center"
+            disabled={entryBusy !== null}
+            aria-label="Play as guest without signing in"
+            onClick={() => void handleGuest()}
+          >
+            {entryBusy === "guest" ? "Entering…" : "Play as guest"}
+          </GoldButton>
+          <GoogleSignInButton
+            disabled={entryBusy !== null}
+            onClick={() => void handleGoogleOnly()}
+            label="Create account"
+            stacked
+            className="h-full min-h-[52px] min-w-0"
+          />
+        </div>
+
+        <button
           type="button"
-          size="lg"
-          className="w-full min-h-[48px] mb-3"
-          disabled={busy || !displayName.trim()}
-          onClick={() => void handleGuest()}
+          className="w-full text-center text-[10px] uppercase tracking-[0.14em] text-[var(--outline)] hover:text-[var(--color-gold-rare)] transition-colors py-1"
+          onClick={() => setGuestNameOpen((o) => !o)}
+          aria-expanded={guestNameOpen}
         >
-          {busy ? "Entering…" : "Play as guest"}
-        </GoldButton>
-        <p className="text-center text-[10px] uppercase tracking-[0.2em] text-[var(--outline)] mb-3">
-          or
-        </p>
-        <GoogleSignInButton
-          disabled={busy}
-          onClick={() => void handleGoogleOnly()}
-          label="Continue with Google"
-        />
+          {guestNameOpen ? "Hide guest name" : "Guest display name (optional)"}
+        </button>
+        {guestNameOpen ? (
+          <div className="mt-2">
+            <label
+              htmlFor="gate-guest-name"
+              className="sr-only"
+            >
+              Guest display name
+            </label>
+            <input
+              id="gate-guest-name"
+              type="text"
+              value={displayName}
+              onChange={(e) => setDisplayName(e.target.value)}
+              maxLength={48}
+              placeholder="Adventurer"
+              className="w-full min-h-[44px] rounded-[var(--radius-card)] bg-[var(--color-deep-void)] border border-[rgba(255,255,255,0.08)] px-4 text-[var(--color-silver-muted)] text-sm focus:outline-none focus:border-[rgba(212,175,55,0.25)]"
+            />
+          </div>
+        ) : null}
+
         {error ? (
           <p className="mt-4 text-sm text-[var(--color-failure)] text-center leading-relaxed">
             {error}

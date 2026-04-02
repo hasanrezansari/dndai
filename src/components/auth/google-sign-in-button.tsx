@@ -5,6 +5,8 @@ type Props = {
   onClick: () => void;
   label?: string;
   className?: string;
+  /** Icon above label — fits narrow columns (e.g. entry screen beside Play as guest). */
+  stacked?: boolean;
 };
 
 export function GoogleSignInButton({
@@ -12,13 +14,17 @@ export function GoogleSignInButton({
   onClick,
   label = "Continue with Google",
   className = "",
+  stacked = false,
 }: Props) {
   return (
     <button
       type="button"
       disabled={disabled}
       onClick={onClick}
-      className={`flex w-full min-h-[48px] items-center justify-center gap-3 rounded-[var(--radius-card)] border border-[rgba(255,255,255,0.14)] bg-[var(--color-deep-void)] px-4 text-sm font-semibold text-[var(--color-silver-muted)] shadow-[inset_0_1px_0_rgba(255,255,255,0.06)] transition-colors hover:border-[rgba(242,202,80,0.35)] hover:text-[var(--color-silver-bright)] disabled:opacity-50 disabled:pointer-events-none ${className}`}
+      aria-label={label}
+      className={`flex w-full min-h-[48px] items-center justify-center gap-3 rounded-[var(--radius-card)] border border-[rgba(255,255,255,0.14)] bg-[var(--color-deep-void)] px-4 text-sm font-semibold text-[var(--color-silver-muted)] shadow-[inset_0_1px_0_rgba(255,255,255,0.06)] transition-colors hover:border-[rgba(242,202,80,0.35)] hover:text-[var(--color-silver-bright)] disabled:opacity-50 disabled:pointer-events-none ${
+        stacked ? "flex-col gap-2 py-3 px-3 [&_span]:text-center [&_span]:text-[11px] [&_span]:leading-snug sm:[&_span]:text-xs" : ""
+      } ${className}`}
     >
       <GoogleMark />
       <span>{label}</span>

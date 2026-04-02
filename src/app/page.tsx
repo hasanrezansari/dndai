@@ -1,6 +1,6 @@
 "use client";
 
-import { signOut, useSession } from "next-auth/react";
+import { signIn, signOut, useSession } from "next-auth/react";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -84,22 +84,17 @@ export default function Home() {
       setUpgradeBusy(false);
       return;
     }
-    // Guest JWT + existing Google account can confuse OAuth linking; clear session before OAuth.
-    try {
-      const until = Date.now() + 3 * 60 * 1000;
-      window.sessionStorage.setItem("ashveil.skip_guest_until", String(until));
-    } catch {
-      /* ignore */
-    }
     try {
       await signOut({ redirect: false });
-      // Client signIn() can start OAuth before the browser applies Set-Cookie from
-      // signOut. The OAuth callback then still carries the guest JWT, and Auth.js
-      // throws OAuthAccountNotLinked (Google account belongs to another user id).
-      // Full navigation forces a new request after the session cookie is cleared.
+      // Never use GET /api/auth/signin/google: with pages.signIn set to "/", Auth.js
+      // rejects that route (Unsupported action) and the app redirects with ?error=Configuration.
+      // POST via signIn() runs after signOut clears the guest JWT so Google is not treated as
+      // "link to guest" against an existing Google user row (OAuthAccountNotLinked).
       const callbackUrl = `${window.location.origin}/auth/upgrade`;
-      window.location.assign(
-        `/api/auth/signin/google?callbackUrl=${encodeURIComponent(callbackUrl)}`,
+      await signIn("google", { callbackUrl, redirect: true });
+    } catch {
+      setUpgradeError(
+        "Could not open Google sign-in after sign-out. Refresh the page — you may need to play as guest again, then tap Link with Google once more.",
       );
     } finally {
       setUpgradeBusy(false);
