@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { useSession } from "next-auth/react";
+import { signOut, useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 
 import { GlassCard } from "@/components/ui/glass-card";
@@ -707,8 +707,8 @@ export default function ProfilePage() {
   return (
     <main className="min-h-dvh flex flex-col items-center px-6 pb-10 bg-[var(--color-obsidian)]">
       <div className="w-full max-w-md pt-10 flex flex-col gap-[var(--void-gap-lg)]">
-        <header className="flex items-center justify-between">
-          <div>
+        <header className="flex items-center justify-between gap-3">
+          <div className="min-w-0">
             <p className="text-[10px] uppercase tracking-[0.2em] text-[var(--outline)]">
               Account
             </p>
@@ -716,9 +716,18 @@ export default function ProfilePage() {
               Profile
             </h1>
           </div>
-          <GhostButton size="sm" onClick={() => router.back()}>
-            Back
-          </GhostButton>
+          <div className="flex flex-wrap items-center justify-end gap-2 shrink-0">
+            <GhostButton
+              size="sm"
+              type="button"
+              onClick={() => void signOut({ callbackUrl: "/" })}
+            >
+              Sign out
+            </GhostButton>
+            <GhostButton size="sm" type="button" onClick={() => router.back()}>
+              Back
+            </GhostButton>
+          </div>
         </header>
 
         <GlassCard className="p-6">
