@@ -3,6 +3,7 @@
 import { AnimatePresence, motion } from "framer-motion";
 import { getSession, signIn, signOut, useSession } from "next-auth/react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import type { Dispatch, SetStateAction } from "react";
 import { Suspense, useEffect, useRef, useState } from "react";
 
 import { GoogleSignInButton } from "@/components/auth/google-sign-in-button";
@@ -29,7 +30,7 @@ const AUTH_ERROR_HINT: Record<string, string> = {
   OAuthCallbackError:
     "Google sign-in didn’t finish. You can try again or play as a guest.",
   OAuthAccountNotLinked:
-    "That Google account is already tied to another profile here, or an old session was still active. Try: hard refresh, then Create account with Google again — or use Link with Google only while logged in as the guest you want to save.",
+    "That Google account is already in use here, or this browser still had another session. Fix: one tab only, Sign out on Profile if needed, then Log in with Google again. To move a guest’s saves into Google, stay signed in as that guest and tap Save progress with Google — don’t use Log in with Google first.",
   AccessDenied: "That Google account wasn’t used to sign in.",
   Callback: "Sign-in was interrupted. Try again when you’re ready.",
   Configuration:
@@ -75,6 +76,100 @@ async function performGuestSignIn(displayName: string): Promise<boolean> {
     /* ignore */
   }
   return true;
+}
+
+function EntryChoiceActions(props: {
+  displayName: string;
+  setDisplayName: (v: string) => void;
+  guestNameOpen: boolean;
+  setGuestNameOpen: Dispatch<SetStateAction<boolean>>;
+  entryBusy: null | "guest" | "google";
+  onGuest: () => void;
+  onGoogle: () => void;
+  error: string | null;
+  googleButtonLabel: string;
+  compact?: boolean;
+}) {
+  const {
+    displayName,
+    setDisplayName,
+    guestNameOpen,
+    setGuestNameOpen,
+    entryBusy,
+    onGuest,
+    onGoogle,
+    error,
+    googleButtonLabel,
+    compact,
+  } = props;
+  return (
+    <>
+      <div
+        className={
+          compact ? "grid grid-cols-2 gap-2 items-stretch" : "grid grid-cols-2 gap-3 items-stretch mb-4"
+        }
+      >
+        <GoldButton
+          type="button"
+          size="lg"
+          className={
+            compact
+              ? "min-h-[48px] h-full w-full px-2 py-2.5 text-[10px] sm:text-xs leading-tight whitespace-normal text-center"
+              : "min-h-[52px] h-full w-full px-2 py-3 text-[10px] sm:text-xs leading-tight whitespace-normal text-center"
+          }
+          disabled={entryBusy !== null}
+          aria-label="Play as guest without signing in"
+          onClick={() => void onGuest()}
+        >
+          {entryBusy === "guest" ? "Entering…" : "Play as guest"}
+        </GoldButton>
+        <GoogleSignInButton
+          disabled={entryBusy !== null}
+          onClick={() => void onGoogle()}
+          label={googleButtonLabel}
+          stacked
+          className={compact ? "h-full min-h-[48px] min-w-0" : "h-full min-h-[52px] min-w-0"}
+        />
+      </div>
+
+      <button
+        type="button"
+        className="w-full text-center text-[10px] uppercase tracking-[0.14em] text-[var(--outline)] hover:text-[var(--color-gold-rare)] transition-colors py-1"
+        onClick={() => setGuestNameOpen((o) => !o)}
+        aria-expanded={guestNameOpen}
+      >
+        {guestNameOpen ? "Hide guest name" : "Guest display name (optional)"}
+      </button>
+      {guestNameOpen ? (
+        <div className="mt-2">
+          <label htmlFor="gate-guest-name" className="sr-only">
+            Guest display name
+          </label>
+          <input
+            id="gate-guest-name"
+            type="text"
+            value={displayName}
+            onChange={(e) => setDisplayName(e.target.value)}
+            maxLength={48}
+            placeholder="Adventurer"
+            className="w-full min-h-[44px] rounded-[var(--radius-card)] bg-[var(--color-deep-void)] border border-[rgba(255,255,255,0.08)] px-4 text-[var(--color-silver-muted)] text-sm focus:outline-none focus:border-[rgba(212,175,55,0.25)]"
+          />
+        </div>
+      ) : null}
+
+      {error ? (
+        <p
+          className={
+            compact
+              ? "mt-3 text-xs text-[var(--color-failure)] text-center leading-relaxed"
+              : "mt-4 text-sm text-[var(--color-failure)] text-center leading-relaxed"
+          }
+        >
+          {error}
+        </p>
+      ) : null}
+    </>
+  );
 }
 
 function AuthGateInner({ children }: { children: React.ReactNode }) {
@@ -203,6 +298,7 @@ function AuthGateInner({ children }: { children: React.ReactNode }) {
   }
 
   const isHome = pathname === "/" || pathname === "";
+  const falvosHomeEntryInline = brand === "falvos" && isHome;
   const oauthHint =
     AUTH_ERROR_HINT[authErrorParam] ?? AUTH_ERROR_HINT.Default;
 
@@ -275,65 +371,45 @@ function AuthGateInner({ children }: { children: React.ReactNode }) {
           {getBrandName(brand)}
         </p>
         <p className="text-xs text-center text-[var(--color-silver-dim)] mb-5 leading-relaxed">
-          Play as a guest right away, or sign in with Google. On the home screen,
-          guests can link progress to Google anytime.
+          Play as a guest, or log in with Google. Logging in briefly clears this
+          browser&apos;s session so Google can attach cleanly — you don&apos;t need
+          to tap Sign out yourself. If you already played as a guest, use Save
+          progress with Google on the home or profile screen to keep that data.
         </p>
 
-        <div className="grid grid-cols-2 gap-3 items-stretch mb-4">
-          <GoldButton
-            type="button"
-            size="lg"
-            className="min-h-[52px] h-full w-full px-2 py-3 text-[10px] sm:text-xs leading-tight whitespace-normal text-center"
-            disabled={entryBusy !== null}
-            aria-label="Play as guest without signing in"
-            onClick={() => void handleGuest()}
-          >
-            {entryBusy === "guest" ? "Entering…" : "Play as guest"}
-          </GoldButton>
-          <GoogleSignInButton
-            disabled={entryBusy !== null}
-            onClick={() => void handleGoogleOnly()}
-            label="Create account"
-            stacked
-            className="h-full min-h-[52px] min-w-0"
-          />
-        </div>
-
-        <button
-          type="button"
-          className="w-full text-center text-[10px] uppercase tracking-[0.14em] text-[var(--outline)] hover:text-[var(--color-gold-rare)] transition-colors py-1"
-          onClick={() => setGuestNameOpen((o) => !o)}
-          aria-expanded={guestNameOpen}
-        >
-          {guestNameOpen ? "Hide guest name" : "Guest display name (optional)"}
-        </button>
-        {guestNameOpen ? (
-          <div className="mt-2">
-            <label
-              htmlFor="gate-guest-name"
-              className="sr-only"
-            >
-              Guest display name
-            </label>
-            <input
-              id="gate-guest-name"
-              type="text"
-              value={displayName}
-              onChange={(e) => setDisplayName(e.target.value)}
-              maxLength={48}
-              placeholder="Adventurer"
-              className="w-full min-h-[44px] rounded-[var(--radius-card)] bg-[var(--color-deep-void)] border border-[rgba(255,255,255,0.08)] px-4 text-[var(--color-silver-muted)] text-sm focus:outline-none focus:border-[rgba(212,175,55,0.25)]"
-            />
-          </div>
-        ) : null}
-
-        {error ? (
-          <p className="mt-4 text-sm text-[var(--color-failure)] text-center leading-relaxed">
-            {error}
-          </p>
-        ) : null}
+        <EntryChoiceActions
+          displayName={displayName}
+          setDisplayName={setDisplayName}
+          guestNameOpen={guestNameOpen}
+          setGuestNameOpen={setGuestNameOpen}
+          entryBusy={entryBusy}
+          onGuest={handleGuest}
+          onGoogle={handleGoogleOnly}
+          error={error}
+          googleButtonLabel="Log in with Google"
+        />
       </GlassCard>
     </motion.div>
+  );
+
+  const falvosHomeEntryStrip = (
+    <GlassCard className="p-4 w-full max-w-md mx-auto mb-4 border-[rgba(212,175,55,0.12)]">
+      <p className="text-[10px] text-center text-[var(--color-silver-dim)] uppercase tracking-[0.14em] mb-3 leading-relaxed">
+        Log in with Google to use the same account everywhere, or play as a guest on this browser.
+      </p>
+      <EntryChoiceActions
+        displayName={displayName}
+        setDisplayName={setDisplayName}
+        guestNameOpen={guestNameOpen}
+        setGuestNameOpen={setGuestNameOpen}
+        entryBusy={entryBusy}
+        onGuest={handleGuest}
+        onGoogle={handleGoogleOnly}
+        error={error}
+        googleButtonLabel="Log in with Google"
+        compact
+      />
+    </GlassCard>
   );
 
   return (
@@ -378,8 +454,21 @@ function AuthGateInner({ children }: { children: React.ReactNode }) {
             aria-hidden
           />
           <p className="text-xs text-center text-[var(--color-silver-dim)] uppercase tracking-[0.14em] max-w-xs leading-relaxed">
-            Continuing to Google…
+            Opening Google sign-in…
           </p>
+        </motion.div>
+      ) : needsEntryChoice && falvosHomeEntryInline ? (
+        <motion.div
+          key="home-entry-inline"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          transition={{ duration: 0.25 }}
+          className="flex flex-col items-center w-full min-h-dvh px-5 pt-6"
+        >
+          {authErrorParam ? oauthBanner : null}
+          {falvosHomeEntryStrip}
+          {children}
         </motion.div>
       ) : needsEntryChoice ? (
         entryCard

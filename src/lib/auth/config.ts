@@ -1,7 +1,9 @@
 import { DrizzleAdapter } from "@auth/drizzle-adapter";
 import { and, eq, gt, isNull } from "drizzle-orm";
+import { decodeJwt } from "jose";
 import NextAuth from "next-auth";
 import type { NextAuthResult } from "next-auth";
+import type { JWT } from "next-auth/jwt";
 import Credentials from "next-auth/providers/credentials";
 import Google from "next-auth/providers/google";
 import { z } from "zod";
@@ -18,6 +20,68 @@ import { hashBridgeToken } from "@/lib/auth/bridge-tokens";
 import { authServerLog, isAuthLogVerbose } from "@/lib/auth/auth-server-log";
 
 let _nextAuth: NextAuthResult | null = null;
+
+function isGuestSyntheticEmail(email: string | null | undefined): boolean {
+  return typeof email === "string" && email.endsWith("@ashveil.guest");
+}
+
+/**
+ * Keep JWT email/name aligned with `users` on every request (fixes stale cookies),
+ * and self-heal rows where Google is linked but `users.email` was never moved off
+ * `@ashveil.guest` (some users then saw “guest” + Link Google after OAuth).
+ */
+async function syncJwtUserFieldsFromDb(sub: string, token: JWT): Promise<void> {
+  const realDb = getDb();
+  const [row] = await realDb
+    .select({ email: authUsers.email, name: authUsers.name })
+    .from(authUsers)
+    .where(eq(authUsers.id, sub))
+    .limit(1);
+  if (!row) return;
+
+  let email = row.email ?? null;
+  const name = row.name ?? null;
+
+  if (isGuestSyntheticEmail(email)) {
+    const [acct] = await realDb
+      .select({ id_token: authAccounts.id_token })
+      .from(authAccounts)
+      .where(
+        and(eq(authAccounts.userId, sub), eq(authAccounts.provider, "google")),
+      )
+      .limit(1);
+    if (acct?.id_token) {
+      try {
+        const payload = decodeJwt(acct.id_token);
+        const googleEmailRaw = payload.email;
+        const googleEmail =
+          typeof googleEmailRaw === "string" ? googleEmailRaw.trim() : "";
+        if (googleEmail && !isGuestSyntheticEmail(googleEmail)) {
+          try {
+            await realDb
+              .update(authUsers)
+              .set({ email: googleEmail })
+              .where(eq(authUsers.id, sub));
+            email = googleEmail;
+          } catch (e) {
+            authServerLog("jwt_email_repair_conflict", {
+              userIdPrefix: `${sub.slice(0, 8)}…`,
+              message: e instanceof Error ? e.message : String(e),
+            });
+          }
+        }
+      } catch (e) {
+        authServerLog("jwt_email_repair_jwt_decode", {
+          userIdPrefix: `${sub.slice(0, 8)}…`,
+          message: e instanceof Error ? e.message : String(e),
+        });
+      }
+    }
+  }
+
+  token.email = email;
+  if (name) token.name = name;
+}
 
 function getNextAuth(): NextAuthResult {
   if (!_nextAuth) {
@@ -215,16 +279,8 @@ function getNextAuth(): NextAuthResult {
             return token;
           }
           const sub = typeof token.sub === "string" ? token.sub : "";
-          if (sub && !token.email) {
-            const [row] = await getDb()
-              .select({ email: authUsers.email, name: authUsers.name })
-              .from(authUsers)
-              .where(eq(authUsers.id, sub))
-              .limit(1);
-            if (row) {
-              token.email = row.email ?? null;
-              if (row.name) token.name = row.name;
-            }
+          if (sub) {
+            await syncJwtUserFieldsFromDb(sub, token);
           }
           return token;
         },

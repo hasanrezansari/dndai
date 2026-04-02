@@ -12,7 +12,7 @@ type Props = {
 export function GoogleSignInButton({
   disabled,
   onClick,
-  label = "Continue with Google",
+  label = "Log in with Google",
   className = "",
   stacked = false,
 }: Props) {

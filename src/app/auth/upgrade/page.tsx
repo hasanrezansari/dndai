@@ -13,10 +13,10 @@ function friendlyUpgradeError(raw: string): string {
     raw.includes("Already signed in as guest") ||
     raw.includes("did not switch this browser from guest")
   ) {
-    return "Google didn’t finish replacing the guest session. Go home and tap Sign in with Google once more.";
+    return "Google didn’t finish replacing the guest session. Go home and tap Log in with Google once more.";
   }
   if (raw.includes("Missing upgrade context")) {
-    return "This sign-in step expired or was interrupted. Go home and tap Sign in with Google again.";
+    return "This sign-in step expired or was interrupted. Go home and tap Log in with Google again.";
   }
   return raw;
 }
@@ -40,7 +40,7 @@ export default function AuthUpgradePage() {
       email.endsWith("@ashveil.guest")
     ) {
       setError(
-        "You’re still signed in as a guest after Google. Go home and tap Sign in with Google again — the next try usually completes the link.",
+        "You’re still signed in as a guest after Google. Go home and tap Log in with Google again — the next try usually completes the link.",
       );
       return;
     }

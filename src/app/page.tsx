@@ -1,15 +1,12 @@
 "use client";
 
-import { signIn, signOut, useSession } from "next-auth/react";
+import { useSession } from "next-auth/react";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 
 import { GoogleSignInButton } from "@/components/auth/google-sign-in-button";
-import {
-  clearOauthLinkPending,
-  setOauthLinkPending,
-} from "@/lib/auth/oauth-link-pending";
+import { runGuestGoogleUpgradeFlow } from "@/lib/auth/guest-google-upgrade-client";
 import { getBrandName, getBrandTagline, getBuildTimeBrand } from "@/lib/brand";
 import { ROMA_MODULES } from "@/lib/rome/modules";
 import { GoldButton } from "@/components/ui/gold-button";
@@ -62,46 +59,11 @@ export default function Home() {
   async function handleUpgradeToGoogle() {
     setUpgradeError(null);
     setUpgradeBusy(true);
-    let prepareRes: Response;
     try {
-      prepareRes = await fetch("/api/auth/upgrade/prepare", {
-        method: "POST",
-        credentials: "include",
-      });
-    } catch {
-      setUpgradeError(
-        "Could not start Google sign-in. Check your connection and try again.",
-      );
-      setUpgradeBusy(false);
-      return;
-    }
-    if (!prepareRes.ok) {
-      const data: unknown = await prepareRes.json().catch(() => ({}));
-      const msg =
-        typeof data === "object" &&
-        data !== null &&
-        "error" in data &&
-        typeof (data as { error: unknown }).error === "string"
-          ? (data as { error: string }).error
-          : "Could not prepare account upgrade. Refresh the page and try again.";
-      setUpgradeError(msg);
-      setUpgradeBusy(false);
-      return;
-    }
-    try {
-      setOauthLinkPending();
-      await signOut({ redirect: false });
-      // Never use GET /api/auth/signin/google: with pages.signIn set to "/", Auth.js
-      // rejects that route (Unsupported action) and the app redirects with ?error=Configuration.
-      // POST via signIn() runs after signOut clears the guest JWT so Google is not treated as
-      // "link to guest" against an existing Google user row (OAuthAccountNotLinked).
-      const callbackUrl = `${window.location.origin}/auth/upgrade`;
-      await signIn("google", { callbackUrl, redirect: true });
-    } catch {
-      clearOauthLinkPending();
-      setUpgradeError(
-        "Could not open Google sign-in after sign-out. Refresh the page — you may need to play as guest again, then tap Link with Google once more.",
-      );
+      const result = await runGuestGoogleUpgradeFlow();
+      if (!result.ok) {
+        setUpgradeError(result.error);
+      }
     } finally {
       setUpgradeBusy(false);
     }
@@ -254,7 +216,7 @@ export default function Home() {
                       disabled={upgradeBusy}
                       onClick={() => void handleUpgradeToGoogle()}
                       label={
-                        upgradeBusy ? "Linking…" : "Link progress with Google"
+                        upgradeBusy ? "Saving…" : "Save progress with Google"
                       }
                     />
                     <p className="text-[9px] text-[var(--outline)] text-center leading-relaxed">
@@ -516,9 +478,29 @@ export default function Home() {
 
             {authSession?.user?.name ? (
               <div className="mt-2 flex flex-col items-center gap-2">
-                <p className="text-[10px] text-[var(--outline)] uppercase tracking-[0.18em]">
-                  Welcome, {authSession.user.name}
-                  {isGuest ? " (Guest)" : ""}
+                <p className="text-[10px] text-[var(--outline)] uppercase tracking-[0.18em] text-center">
+                  {isGuest ? (
+                    <>
+                      Playing as{" "}
+                      <span className="text-[var(--color-silver-muted)] normal-case tracking-normal">
+                        {authSession.user.name}
+                      </span>
+                      <span className="block mt-1 normal-case tracking-normal text-[var(--color-silver-dim)]">
+                        Guest session · progress stays on this browser until you link
+                        Google
+                      </span>
+                    </>
+                  ) : (
+                    <>
+                      Signed in with Google
+                      {typeof authSession.user.email === "string" &&
+                      !authSession.user.email.endsWith("@ashveil.guest") ? (
+                        <span className="block mt-1 normal-case tracking-normal text-[var(--color-silver-dim)]">
+                          {authSession.user.email}
+                        </span>
+                      ) : null}
+                    </>
+                  )}
                 </p>
                 {isGuest ? (
                   <div className="w-full max-w-[240px] mx-auto flex flex-col gap-2">
@@ -526,11 +508,13 @@ export default function Home() {
                       disabled={upgradeBusy}
                       onClick={() => void handleUpgradeToGoogle()}
                       label={
-                        upgradeBusy ? "Linking…" : "Link progress with Google"
+                        upgradeBusy ? "Saving…" : "Save progress with Google"
                       }
                     />
                     <p className="text-[9px] text-[var(--outline)] text-center leading-relaxed">
-                      Moves this guest&apos;s games to your Google account.
+                      Opens Google once, then attaches this guest&apos;s games to
+                      that login. You don&apos;t need Sign out first — we clear the
+                      guest session as part of this.
                     </p>
                     {upgradeError ? (
                       <p className="text-xs text-[var(--color-failure)] text-center leading-relaxed">

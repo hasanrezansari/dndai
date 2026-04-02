@@ -4,12 +4,14 @@ import { useEffect, useMemo, useState } from "react";
 import { signOut, useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 
+import { GoogleSignInButton } from "@/components/auth/google-sign-in-button";
 import { GlassCard } from "@/components/ui/glass-card";
 import { GoldButton } from "@/components/ui/gold-button";
 import { GhostButton } from "@/components/ui/ghost-button";
 import { useToast } from "@/components/ui/toast";
 import { HeroKitPreview } from "@/components/character/hero-kit-preview";
 import { PillSelect } from "@/components/ui/pill-select";
+import { runGuestGoogleUpgradeFlow } from "@/lib/auth/guest-google-upgrade-client";
 import {
   ClassProfileSchema,
   type ClassProfile,
@@ -103,6 +105,13 @@ export default function ProfilePage() {
   const [outgoingRequests, setOutgoingRequests] = useState<
     Array<{ id: string; toUserId: string; toName: string; toImage: string | null }>
   >([]);
+  const [guestLinkBusy, setGuestLinkBusy] = useState(false);
+  const [guestLinkError, setGuestLinkError] = useState<string | null>(null);
+
+  const isGuestSession = useMemo(() => {
+    const email = session?.user?.email;
+    return typeof email === "string" && email.endsWith("@ashveil.guest");
+  }, [session?.user?.email]);
 
   const avatarPreview = useMemo(() => {
     if (image?.trim()) return image.trim();
@@ -683,6 +692,19 @@ export default function ProfilePage() {
     }
   }
 
+  async function handleGuestLinkGoogle() {
+    setGuestLinkError(null);
+    setGuestLinkBusy(true);
+    try {
+      const result = await runGuestGoogleUpgradeFlow();
+      if (!result.ok) {
+        setGuestLinkError(result.error);
+      }
+    } finally {
+      setGuestLinkBusy(false);
+    }
+  }
+
   async function handleTogglePublicProfile(enabled: boolean) {
     setPublicProfileEnabledState(enabled);
     try {
@@ -729,6 +751,48 @@ export default function ProfilePage() {
             </GhostButton>
           </div>
         </header>
+
+        <GlassCard className="p-4 border-[rgba(212,175,55,0.12)]">
+          {isGuestSession ? (
+            <div className="flex flex-col gap-2">
+              <p className="text-[10px] uppercase tracking-[0.16em] text-[var(--outline)]">
+                Account type
+              </p>
+              <p className="text-sm text-[var(--color-silver-dim)] leading-relaxed">
+                You&apos;re on a <span className="text-[var(--color-silver-muted)]">guest</span>{" "}
+                profile (this browser only). Use Save progress with Google to keep heroes and
+                friends when you switch devices. We sign the guest out automatically as part of
+                that — no need to tap Sign out first.
+              </p>
+              <GoogleSignInButton
+                disabled={guestLinkBusy}
+                onClick={() => void handleGuestLinkGoogle()}
+                label={guestLinkBusy ? "Saving…" : "Save progress with Google"}
+                className="mt-1"
+              />
+              {guestLinkError ? (
+                <p className="text-xs text-[var(--color-failure)] leading-relaxed">
+                  {guestLinkError}
+                </p>
+              ) : null}
+            </div>
+          ) : (
+            <div>
+              <p className="text-[10px] uppercase tracking-[0.16em] text-[var(--outline)]">
+                Account type
+              </p>
+              <p className="text-sm text-[var(--color-silver-dim)] mt-1 leading-relaxed">
+                Signed in with Google
+                {typeof session?.user?.email === "string" &&
+                !session.user.email.endsWith("@ashveil.guest") ? (
+                  <span className="block mt-1 text-[var(--color-silver-muted)] break-all">
+                    {session.user.email}
+                  </span>
+                ) : null}
+              </p>
+            </div>
+          )}
+        </GlassCard>
 
         <GlassCard className="p-6">
           <div className="flex items-center gap-4">
