@@ -1,6 +1,6 @@
 "use client";
 
-import { signIn, signOut, useSession } from "next-auth/react";
+import { signOut, useSession } from "next-auth/react";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -93,7 +93,14 @@ export default function Home() {
     }
     try {
       await signOut({ redirect: false });
-      await signIn("google", { callbackUrl: "/auth/upgrade" });
+      // Client signIn() can start OAuth before the browser applies Set-Cookie from
+      // signOut. The OAuth callback then still carries the guest JWT, and Auth.js
+      // throws OAuthAccountNotLinked (Google account belongs to another user id).
+      // Full navigation forces a new request after the session cookie is cleared.
+      const callbackUrl = `${window.location.origin}/auth/upgrade`;
+      window.location.assign(
+        `/api/auth/signin/google?callbackUrl=${encodeURIComponent(callbackUrl)}`,
+      );
     } finally {
       setUpgradeBusy(false);
     }
