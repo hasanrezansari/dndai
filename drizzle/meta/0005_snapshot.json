@@ -1,6 +1,6 @@
 {
-  "id": "fd3f6d8a-3a1b-42b6-8719-76451a6cf11e",
-  "prevId": "8b8205d9-9bf0-4e73-9cff-1d82945fdc45",
+  "id": "a94dab89-535a-4c4b-9e2a-e5c8f40a962b",
+  "prevId": "fd3f6d8a-3a1b-42b6-8719-76451a6cf11e",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -1969,6 +1969,13 @@
           "primaryKey": false,
           "notNull": true,
           "default": false
+        },
+        "free_portrait_uses": {
+          "name": "free_portrait_uses",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
         },
         "created_at": {
           "name": "created_at",

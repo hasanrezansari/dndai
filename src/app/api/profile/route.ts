@@ -9,7 +9,25 @@ import { authUsers } from "@/lib/db/schema";
 
 const UpdateProfileSchema = z.object({
   name: z.string().trim().min(1).max(48),
-  image: z.string().trim().url().nullable().optional(),
+  image: z
+    .string()
+    .trim()
+    .refine(
+      (v) => {
+        if (!v) return false;
+        if (v.startsWith("data:image/")) return true;
+        try {
+          // eslint-disable-next-line no-new
+          new URL(v);
+          return true;
+        } catch {
+          return false;
+        }
+      },
+      { message: "Invalid image" },
+    )
+    .nullable()
+    .optional(),
 });
 
 export async function GET() {

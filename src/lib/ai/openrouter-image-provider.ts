@@ -51,6 +51,8 @@ async function requestOpenRouterImage(params: {
   apiKey: string;
   model: string;
   userContent: string;
+  aspectRatio: "16:9" | "1:1";
+  systemPrompt: string;
 }): Promise<{ base64: string }> {
   const res = await fetch(BASE_URL, {
     method: "POST",
@@ -65,8 +67,7 @@ async function requestOpenRouterImage(params: {
       messages: [
         {
           role: "system",
-          content:
-            "You are a fantasy illustrator. Generate a single wide scene image in a consistent dark-fantasy oil-painting style with muted earth tones, amber torchlight, and deep shadows. Keep character designs and environment consistent across scenes. No text, no UI, no watermarks.",
+          content: params.systemPrompt,
         },
         {
           role: "user",
@@ -75,7 +76,7 @@ async function requestOpenRouterImage(params: {
       ],
       modalities: ["image", "text"],
       image_config: {
-        aspect_ratio: "16:9",
+        aspect_ratio: params.aspectRatio,
       },
     }),
   });
@@ -158,7 +159,14 @@ export async function generateSceneImageOpenRouter(params: {
   let lastErr: Error | null = null;
   for (const model of models) {
     try {
-      return await requestOpenRouterImage({ apiKey, model, userContent });
+      return await requestOpenRouterImage({
+        apiKey,
+        model,
+        userContent,
+        aspectRatio: "16:9",
+        systemPrompt:
+          "You are a fantasy illustrator. Generate a single wide scene image in a consistent dark-fantasy oil-painting style with muted earth tones, amber torchlight, and deep shadows. Keep character designs and environment consistent across scenes. No text, no UI, no watermarks.",
+      });
     } catch (e) {
       lastErr = e instanceof Error ? e : new Error(String(e));
       if (model !== models[models.length - 1]) {
@@ -170,4 +178,52 @@ export async function generateSceneImageOpenRouter(params: {
     }
   }
   throw lastErr ?? new Error("OpenRouter image generation failed");
+}
+
+export async function generatePortraitImageOpenRouter(params: {
+  prompt: string;
+  negativePrompt?: string;
+}): Promise<{ base64: string }> {
+  const apiKey = process.env.OPENROUTER_API_KEY;
+  if (!apiKey) {
+    console.error("[openrouter-image] OPENROUTER_API_KEY is not set");
+    throw new Error("OPENROUTER_API_KEY is not set");
+  }
+
+  const userContent = params.negativePrompt
+    ? `${params.prompt}\n\nAvoid: ${params.negativePrompt}`
+    : params.prompt;
+
+  const primary =
+    normalizeModelId(process.env.OPENROUTER_IMAGE_MODEL) || PRIMARY_IMAGE_MODEL;
+  const fallback =
+    normalizeModelId(process.env.OPENROUTER_IMAGE_FALLBACK_MODEL) ||
+    DEFAULT_FALLBACK_IMAGE_MODEL;
+
+  const models = [primary, fallback].filter(
+    (m, i, a) => m.length > 0 && a.indexOf(m) === i,
+  );
+
+  let lastErr: Error | null = null;
+  for (const model of models) {
+    try {
+      return await requestOpenRouterImage({
+        apiKey,
+        model,
+        userContent,
+        aspectRatio: "1:1",
+        systemPrompt:
+          "You are a fantasy character portrait illustrator. Generate a single square portrait of one character, framed from chest-up. Dark-fantasy painterly style, high detail. No text, no UI, no watermarks. Clean background with subtle atmosphere. Keep the character centered and readable on mobile.",
+      });
+    } catch (e) {
+      lastErr = e instanceof Error ? e : new Error(String(e));
+      if (model !== models[models.length - 1]) {
+        console.warn("[openrouter-image] retrying with fallback model", {
+          failed: model,
+          next: models[models.indexOf(model) + 1],
+        });
+      }
+    }
+  }
+  throw lastErr ?? new Error("OpenRouter portrait generation failed");
 }
