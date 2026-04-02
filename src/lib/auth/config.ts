@@ -146,11 +146,11 @@ function getNextAuth(): NextAuthResult {
       callbacks: {
         session({ session, token }) {
           if (token.sub) session.user.id = token.sub;
-          if (token.email !== undefined) {
-            session.user.email = token.email as string | null;
+          if (typeof token.email === "string") {
+            session.user.email = token.email;
           }
-          if (token.name !== undefined) {
-            session.user.name = token.name as string | null;
+          if (typeof token.name === "string") {
+            session.user.name = token.name;
           }
           return session;
         },
