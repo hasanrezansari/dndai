@@ -30,6 +30,12 @@ function getNextAuth(): NextAuthResult {
       }),
       trustHost: true,
       secret: process.env.NEXTAUTH_SECRET,
+      // OAuth cancel / deny sends users through /api/auth/signin. Send them to the app shell
+      // instead of Auth.js’s default HTML page (avoids “blank” / confusing recovery).
+      pages: {
+        signIn: "/",
+        error: "/",
+      },
       session: {
         strategy: "jwt",
         maxAge: 60 * 60 * 24 * 30,

@@ -2,8 +2,8 @@
 
 import { AnimatePresence, motion } from "framer-motion";
 import { signIn, useSession } from "next-auth/react";
-import { usePathname, useSearchParams } from "next/navigation";
-import { Suspense, useEffect, useState } from "react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { Suspense, useEffect, useRef, useState } from "react";
 
 import { GlassCard } from "@/components/ui/glass-card";
 import { GoldButton } from "@/components/ui/gold-button";
@@ -15,6 +15,20 @@ const DISPLAY_NAME_STORAGE_KEY = "ashveil.display_name";
 const SESSION_DISPLAY_PATH =
   /^\/session\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\/display$/i;
 
+/** NextAuth recovery (upgrade, bridge) — must render even when session drops mid-OAuth */
+const AUTH_FLOW_PATH = /^\/auth\//;
+
+const AUTH_ERROR_HINT: Record<string, string> = {
+  OAuthCallbackError:
+    "Google sign-in didn’t finish. You can try again or keep playing as a guest.",
+  AccessDenied: "That Google account wasn’t used to sign in.",
+  Callback: "Sign-in was interrupted. Try again when you’re ready.",
+  Configuration:
+    "Sign-in isn’t configured correctly on the server. Check Google OAuth env vars.",
+  Verification: "The sign-in link expired or was already used.",
+  Default: "Sign-in didn’t complete. Try again or continue as a guest.",
+};
+
 function looksLikeSignedDisplayToken(t: string): boolean {
   const parts = t.split(".");
   if (parts.length !== 3) return false;
@@ -23,6 +37,7 @@ function looksLikeSignedDisplayToken(t: string): boolean {
 
 function AuthGateInner({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
+  const router = useRouter();
   const searchParams = useSearchParams();
   const displayToken = searchParams.get("t")?.trim() ?? "";
   const displayBypass =
@@ -35,6 +50,19 @@ function AuthGateInner({ children }: { children: React.ReactNode }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [autoAttempted, setAutoAttempted] = useState(false);
+  const hadSessionRef = useRef(false);
+
+  useEffect(() => {
+    if (session?.user?.id) hadSessionRef.current = true;
+  }, [session?.user?.id]);
+
+  useEffect(() => {
+    if (displayBypass) return;
+    if (status === "unauthenticated" && hadSessionRef.current) {
+      hadSessionRef.current = false;
+      setAutoAttempted(false);
+    }
+  }, [displayBypass, status]);
 
   useEffect(() => {
     if (displayBypass) return;
@@ -78,6 +106,17 @@ function AuthGateInner({ children }: { children: React.ReactNode }) {
 
   const loading = displayBypass ? false : status === "loading" || !guestId;
   const isHome = pathname === "/" || pathname === "";
+  const authFlowPath = AUTH_FLOW_PATH.test(pathname);
+  const authErrorParam = searchParams.get("error")?.trim() ?? "";
+  const oauthHint =
+    AUTH_ERROR_HINT[authErrorParam] ?? AUTH_ERROR_HINT.Default;
+
+  function clearOAuthParamsFromUrl() {
+    const next = new URLSearchParams(searchParams.toString());
+    next.delete("error");
+    const qs = next.toString();
+    router.replace(qs ? `${pathname}?${qs}` : pathname);
+  }
 
   useEffect(() => {
     if (
@@ -104,6 +143,25 @@ function AuthGateInner({ children }: { children: React.ReactNode }) {
     displayName,
   ]);
 
+  const homeOauthBanner =
+    isHome && authErrorParam ? (
+      <div
+        role="status"
+        className="w-full max-w-md mx-auto mb-3 rounded-[var(--radius-card)] border border-[rgba(242,202,80,0.22)] bg-[var(--color-deep-void)]/90 px-4 py-3 text-center"
+      >
+        <p className="text-xs text-[var(--color-silver-dim)] leading-relaxed">
+          {oauthHint}
+        </p>
+        <button
+          type="button"
+          className="mt-2 text-[10px] font-bold uppercase tracking-[0.16em] text-[var(--color-gold-rare)] underline-offset-4 hover:underline"
+          onClick={() => clearOAuthParamsFromUrl()}
+        >
+          Dismiss
+        </button>
+      </div>
+    ) : null;
+
   return (
     <AnimatePresence mode="wait">
       {loading ? (
@@ -114,7 +172,9 @@ function AuthGateInner({ children }: { children: React.ReactNode }) {
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             transition={{ duration: 0.2 }}
+            className="flex flex-col items-center w-full min-h-dvh"
           >
+            {homeOauthBanner}
             {children}
           </motion.div>
         ) : (
@@ -134,10 +194,12 @@ function AuthGateInner({ children }: { children: React.ReactNode }) {
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ duration: 0.25 }}
+          className="flex flex-col items-center w-full min-h-dvh"
         >
+          {homeOauthBanner}
           {children}
         </motion.div>
-      ) : displayBypass || session?.user?.id ? (
+      ) : displayBypass || authFlowPath || session?.user?.id ? (
         <motion.div
           key="app"
           initial={{ opacity: 0 }}
