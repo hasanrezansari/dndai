@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { and, eq, inArray } from "drizzle-orm";
 
 import { apiError, handleApiError } from "@/lib/api/errors";
+import { authServerLog } from "@/lib/auth/auth-server-log";
 import { requireUser, unauthorizedResponse } from "@/lib/auth/guards";
 import {
   UPGRADE_COOKIE_NAME,
@@ -18,13 +19,21 @@ export async function POST(request: NextRequest) {
   void request;
   try {
     const user = await requireUser();
-    if (!user) return unauthorizedResponse();
+    if (!user) {
+      authServerLog("upgrade_complete", { result: "unauthorized" });
+      return unauthorizedResponse();
+    }
 
     const guestId = request.cookies.get(UPGRADE_COOKIE_NAME)?.value ?? "";
     if (!guestId) {
+      authServerLog("upgrade_complete", { result: "missing_cookie" });
       return apiError("Missing upgrade context", 400);
     }
     if (guestId === user.id) {
+      authServerLog("upgrade_complete", {
+        result: "guest_id_equals_session",
+        userIdPrefix: `${user.id.slice(0, 8)}…`,
+      });
       return apiError(
         "Google sign-in did not switch this browser from guest mode; try Sign in with Google again from home.",
         400,
@@ -38,6 +47,10 @@ export async function POST(request: NextRequest) {
       .where(eq(authUsers.id, guestId))
       .limit(1);
     if (!guestRow || !isGuestEmail(guestRow.email)) {
+      authServerLog("upgrade_complete", {
+        result: "invalid_guest_cookie",
+        guestIdPrefix: `${guestId.slice(0, 8)}…`,
+      });
       return apiError("Invalid upgrade context", 400);
     }
 
@@ -61,6 +74,7 @@ export async function POST(request: NextRequest) {
         )
         .limit(1);
       if (conflict) {
+        authServerLog("upgrade_complete", { result: "session_conflict", status: 409 });
         return apiError(
           "Upgrade conflict: account already in one of these sessions",
           409,
@@ -80,6 +94,11 @@ export async function POST(request: NextRequest) {
         .where(eq(sessions.host_user_id, guestId));
     });
 
+    authServerLog("upgrade_complete", {
+      result: "ok",
+      guestIdPrefix: `${guestId.slice(0, 8)}…`,
+      googleUserIdPrefix: `${user.id.slice(0, 8)}…`,
+    });
     const res = NextResponse.json({ ok: true });
     res.cookies.set(UPGRADE_COOKIE_NAME, "", upgradeCookieDeleteOptions());
     return res;

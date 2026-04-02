@@ -15,6 +15,7 @@ import {
   authVerificationTokens,
 } from "@/lib/db/schema";
 import { hashBridgeToken } from "@/lib/auth/bridge-tokens";
+import { authServerLog, isAuthLogVerbose } from "@/lib/auth/auth-server-log";
 
 let _nextAuth: NextAuthResult | null = null;
 
@@ -30,6 +31,58 @@ function getNextAuth(): NextAuthResult {
       }),
       trustHost: true,
       secret: process.env.NEXTAUTH_SECRET,
+      // When true, Auth.js emits adapter + flow debug lines (to our logger below).
+      debug: isAuthLogVerbose(),
+      logger: {
+        error(error) {
+          authServerLog("authjs_error", {
+            name: error.name,
+            message: error.message,
+            cause:
+              error.cause instanceof Error
+                ? `${error.cause.name}: ${error.cause.message}`
+                : undefined,
+          });
+          console.error("[ashveil-auth] Auth.js error:", error);
+        },
+        warn(code) {
+          authServerLog("authjs_warn", { code: String(code) });
+        },
+        debug(message, metadata) {
+          let meta: string | undefined;
+          if (metadata !== undefined) {
+            try {
+              meta =
+                typeof metadata === "string"
+                  ? metadata
+                  : JSON.stringify(metadata);
+            } catch {
+              meta = "(unserializable metadata)";
+            }
+            if (meta.length > 800) meta = `${meta.slice(0, 800)}…`;
+          }
+          authServerLog("authjs_debug", { message, metadata: meta });
+        },
+      },
+      events: {
+        async signIn({ user, account, isNewUser }) {
+          const email = user.email;
+          const guest =
+            typeof email === "string" && email.endsWith("@ashveil.guest");
+          authServerLog("event_signIn", {
+            provider: account?.provider ?? "credentials",
+            accountType: account?.type,
+            userIdPrefix: user.id ? `${user.id.slice(0, 8)}…` : "(none)",
+            isGuestEmail: guest,
+            isNewUser: isNewUser ?? undefined,
+          });
+        },
+        async signOut(message) {
+          authServerLog("event_signOut", {
+            mode: "token" in message ? "jwt" : "adapter_session",
+          });
+        },
+      },
       // OAuth cancel / deny sends users through /api/auth/signin. Send them to the app shell
       // instead of Auth.js’s default HTML page (avoids “blank” / confusing recovery).
       pages: {
