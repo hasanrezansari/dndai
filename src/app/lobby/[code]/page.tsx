@@ -129,12 +129,14 @@ export default function LobbyPage() {
     channel.bind("player-joined", bump);
     channel.bind("player-ready", bump);
     channel.bind("player-disconnected", bump);
+    channel.bind("session-cap-updated", bump);
     channel.bind("session-started", onSessionStarted);
 
     return () => {
       channel.unbind("player-joined");
       channel.unbind("player-ready");
       channel.unbind("player-disconnected");
+      channel.unbind("session-cap-updated");
       channel.unbind("session-started");
       pusher.unsubscribe(name);
     };
@@ -151,7 +153,7 @@ export default function LobbyPage() {
   const canStart = useMemo(() => {
     if (!session) return false;
     const { players } = session;
-    if (players.length < 2) return false;
+    if (players.length < 1) return false;
     return players.every((p) => p.is_ready && p.is_connected);
   }, [session]);
 
@@ -182,6 +184,36 @@ export default function LobbyPage() {
   }
 
   const [startLoading, setStartLoading] = useState(false);
+  const [capLoading, setCapLoading] = useState(false);
+
+  async function handleAddSeat() {
+    if (!sessionId || !session || capLoading) return;
+    if (session.max_players >= 6) return;
+    setCapLoading(true);
+    try {
+      const res = await fetch(`/api/sessions/${sessionId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ max_players: session.max_players + 1 }),
+      });
+      const data = (await res.json().catch(() => ({}))) as SessionWithPlayers & {
+        error?: string;
+      };
+      if (!res.ok) {
+        window.alert(
+          typeof data.error === "string" ? data.error : "Could not add seat",
+        );
+        return;
+      }
+      if ("id" in data && Array.isArray(data.players)) {
+        setSession(data);
+      } else {
+        void refetchSession(sessionId);
+      }
+    } finally {
+      setCapLoading(false);
+    }
+  }
 
   async function handleStart() {
     if (!sessionId || !currentPlayerId || startLoading) return;
@@ -418,6 +450,17 @@ export default function LobbyPage() {
               <PlayerSlot key={`empty-${seat}`} isEmpty />
             ),
           )}
+          {isHost && session.max_players < 6 ? (
+            <button
+              type="button"
+              disabled={capLoading}
+              onClick={() => void handleAddSeat()}
+              className="w-full flex items-center justify-center gap-2 min-h-[56px] px-4 text-[10px] font-bold uppercase tracking-[0.2em] text-[var(--color-gold-rare)] border-t border-[rgba(77,70,53,0.1)] bg-[var(--surface-high)]/40 hover:bg-[var(--surface-high)]/70 transition-colors disabled:opacity-50"
+            >
+              <span className="material-symbols-outlined text-lg">add</span>
+              {capLoading ? "Opening seat…" : "Add seat — share code to invite"}
+            </button>
+          ) : null}
         </section>
 
         {/* Actions */}

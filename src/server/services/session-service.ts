@@ -76,6 +76,16 @@ export class PlayerNotFoundError extends Error {
   }
 }
 
+export class IncreaseMaxPlayersError extends Error {
+  constructor(
+    message: string,
+    public readonly statusCode: 400 | 403 | 404 | 409,
+  ) {
+    super(message);
+    this.name = "IncreaseMaxPlayersError";
+  }
+}
+
 async function allocateUniqueJoinCode(): Promise<string> {
   for (let attempt = 0; attempt < 32; attempt++) {
     const code = generateJoinCode();
@@ -232,14 +242,64 @@ export async function canStartSession(sessionId: string): Promise<boolean> {
     .select()
     .from(players)
     .where(eq(players.session_id, sessionId));
-  if (playerRows.length < 2) {
+  if (playerRows.length < 1) {
     return false;
   }
-  const connected = playerRows.filter((p) => p.is_connected);
-  if (connected.length < 2) {
-    return false;
+  return playerRows.every((p) => p.is_connected && p.is_ready);
+}
+
+/** Host-only while in lobby; new cap must exceed current max_players and be ≤ 6. */
+export async function increaseSessionMaxPlayers(params: {
+  sessionId: string;
+  actingUserId: string;
+  newMaxPlayers: number;
+}): Promise<void> {
+  const [sessionRow] = await db
+    .select()
+    .from(sessions)
+    .where(eq(sessions.id, params.sessionId))
+    .limit(1);
+  if (!sessionRow) {
+    throw new SessionNotFoundError();
   }
-  return connected.every((p) => p.is_ready);
+  if (sessionRow.status !== "lobby") {
+    throw new IncreaseMaxPlayersError("Session not in lobby", 409);
+  }
+  if (sessionRow.host_user_id !== params.actingUserId) {
+    throw new IncreaseMaxPlayersError("Forbidden", 403);
+  }
+  const next = params.newMaxPlayers;
+  if (!Number.isInteger(next) || next <= sessionRow.max_players || next > 6) {
+    throw new IncreaseMaxPlayersError(
+      "Invalid max_players (must increase, max 6)",
+      400,
+    );
+  }
+  const countRows = await db
+    .select({ value: count() })
+    .from(players)
+    .where(eq(players.session_id, params.sessionId));
+  const playerCount = Number(countRows[0]?.value ?? 0);
+  if (next < playerCount) {
+    throw new IncreaseMaxPlayersError(
+      "max_players cannot be below current party size",
+      400,
+    );
+  }
+  const [updated] = await db
+    .update(sessions)
+    .set({
+      max_players: next,
+      state_version: sql`${sessions.state_version} + 1`,
+      updated_at: new Date(),
+    })
+    .where(
+      and(eq(sessions.id, params.sessionId), eq(sessions.status, "lobby")),
+    )
+    .returning({ id: sessions.id });
+  if (!updated) {
+    throw new IncreaseMaxPlayersError("Could not update session", 409);
+  }
 }
 
 export async function startSession(sessionId: string): Promise<boolean> {

@@ -21,7 +21,7 @@ const CAMPAIGN_OPTIONS: { value: CampaignMode; label: string }[] = [
   { value: "module", label: "Module Remix" },
 ];
 
-const PARTY_SIZES = [2, 3, 4, 5, 6] as const;
+const PARTY_SIZES = [1, 2, 3, 4, 5, 6] as const;
 
 export default function Home() {
   const brand = getBuildTimeBrand();
@@ -78,6 +78,7 @@ export default function Home() {
     forceMode?: SessionMode;
     forceCampaignMode?: CampaignMode;
     forceModuleKey?: string;
+    forceMaxPlayers?: number;
   }) {
     const effectiveMode = options.forceMode ?? mode;
     if (!effectiveMode || createLoading) return;
@@ -93,7 +94,7 @@ export default function Home() {
       } = {
         mode: effectiveMode,
         campaignMode: options.forceCampaignMode ?? campaignMode,
-        maxPlayers,
+        maxPlayers: options.forceMaxPlayers ?? maxPlayers,
       };
       if (
         (options.forceCampaignMode ?? campaignMode) === "user_prompt" &&
@@ -276,6 +277,7 @@ export default function Home() {
                           forceMode: "ai_dm",
                           forceCampaignMode: "module",
                           forceModuleKey: m.key,
+                          forceMaxPlayers: 1,
                         })
                       }
                     >

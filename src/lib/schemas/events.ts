@@ -22,6 +22,11 @@ export const PlayerDisconnectedEventSchema = z.object({
 });
 export type PlayerDisconnectedEvent = output<typeof PlayerDisconnectedEventSchema>;
 
+export const SessionCapUpdatedEventSchema = z.object({
+  max_players: z.number().int().min(1).max(6),
+});
+export type SessionCapUpdatedEvent = output<typeof SessionCapUpdatedEventSchema>;
+
 export const SessionStartedEventSchema = z.object({
   campaign_title: z.string(),
   opening_scene: z.string(),

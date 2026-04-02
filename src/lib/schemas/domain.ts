@@ -24,7 +24,7 @@ export const SessionSchema = z.object({
   mode: SessionModeSchema,
   campaign_mode: CampaignModeSchema,
   status: SessionStatusSchema,
-  max_players: z.number().int().min(2).max(6),
+  max_players: z.number().int().min(1).max(6),
   current_round: z.number().int().min(1).default(1),
   current_turn_index: z.number().int().min(0),
   current_player_id: z.string().uuid().nullable(),

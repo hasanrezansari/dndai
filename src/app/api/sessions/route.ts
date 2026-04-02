@@ -10,7 +10,7 @@ import { createSession, getSession } from "@/server/services/session-service";
 const CreateSessionBodySchema = z.object({
   mode: SessionModeSchema,
   campaignMode: CampaignModeSchema,
-  maxPlayers: z.number().int().min(2).max(6),
+  maxPlayers: z.number().int().min(1).max(6),
   adventurePrompt: z.string().optional(),
   moduleKey: z.string().optional(),
 });
