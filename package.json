@@ -11,6 +11,7 @@
     "test:watch": "vitest",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
+    "db:reset": "node scripts/supabase-db-reset.cjs",
     "db:push": "drizzle-kit push",
     "db:studio": "drizzle-kit studio"
   },
