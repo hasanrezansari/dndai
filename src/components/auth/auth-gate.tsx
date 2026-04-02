@@ -1,7 +1,7 @@
 "use client";
 
 import { AnimatePresence, motion } from "framer-motion";
-import { signIn, useSession } from "next-auth/react";
+import { getSession, signIn, signOut, useSession } from "next-auth/react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useRef, useState } from "react";
 
@@ -12,6 +12,7 @@ import { RouteLoadingUI } from "@/components/ui/route-loading";
 import {
   clearOauthLinkPending,
   isOauthLinkPending,
+  setOauthLinkPending,
 } from "@/lib/auth/oauth-link-pending";
 import { getBrandName, getBuildTimeBrand } from "@/lib/brand";
 
@@ -28,7 +29,7 @@ const AUTH_ERROR_HINT: Record<string, string> = {
   OAuthCallbackError:
     "Google sign-in didn’t finish. You can try again or play as a guest.",
   OAuthAccountNotLinked:
-    "Google sign-in clashed with an existing session. Refresh, then try Create account with Google or Link with Google again.",
+    "That Google account is already tied to another profile here, or an old session was still active. Try: hard refresh, then Create account with Google again — or use Link with Google only while logged in as the guest you want to save.",
   AccessDenied: "That Google account wasn’t used to sign in.",
   Callback: "Sign-in was interrupted. Try again when you’re ready.",
   Configuration:
@@ -117,6 +118,10 @@ function AuthGateInner({ children }: { children: React.ReactNode }) {
     Boolean(session && "user" in session && session.user?.id) === true;
 
   useEffect(() => {
+    if (hasSessionUser) clearOauthLinkPending();
+  }, [hasSessionUser]);
+
+  useEffect(() => {
     if (hasSessionUser && playromanaGuestFallback) {
       setPlayromanaGuestFallback(false);
     }
@@ -179,8 +184,18 @@ function AuthGateInner({ children }: { children: React.ReactNode }) {
     setEntryBusy("google");
     setError(null);
     try {
+      // Clear any stale JWT (e.g. guest) before OAuth. Otherwise Auth.js can throw
+      // OAuthAccountNotLinked: Google account belongs to user A but cookie was user B.
+      setOauthLinkPending();
+      await signOut({ redirect: false });
+      for (let i = 0; i < 30; i++) {
+        const s = await getSession();
+        if (!s) break;
+        await new Promise((r) => setTimeout(r, 100));
+      }
       await signIn("google", { callbackUrl: "/", redirect: true });
     } catch {
+      clearOauthLinkPending();
       setError("Could not reach Google sign-in. Check your connection and try again.");
     } finally {
       setEntryBusy(null);

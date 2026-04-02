@@ -1,7 +1,7 @@
 /**
- * While guest→Google runs we call signOut() before signIn("google").
- * Session becomes unauthenticated briefly; AuthGate uses this flag to avoid
- * flashing the Play as guest / Create account screen.
+ * While opening Google after signOut (guest→Google upgrade or Create account),
+ * the session cookie is cleared before OAuth. AuthGate uses this flag to avoid
+ * flashing Play as guest / PlayRomana auto-guest during that gap.
  */
 const KEY = "ashveil.oauth_link_pending";
 const MAX_MS = 5 * 60 * 1000;
