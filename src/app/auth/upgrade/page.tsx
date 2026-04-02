@@ -15,34 +15,40 @@ export default function AuthUpgradePage() {
   const waitingForGoogle = status === "unauthenticated";
 
   useEffect(() => {
-    if (status !== "authenticated" || busy) return;
-    let cancelled = false;
+    if (status !== "authenticated") return;
+    const ac = new AbortController();
+
     async function run() {
       setBusy(true);
       setError(null);
       try {
-        const res = await fetch("/api/auth/upgrade/complete", { method: "POST" });
+        const res = await fetch("/api/auth/upgrade/complete", {
+          method: "POST",
+          signal: ac.signal,
+        });
+        if (ac.signal.aborted) return;
         if (!res.ok) {
           const data: unknown = await res.json().catch(() => ({}));
           const msg =
             typeof data === "object" && data !== null && "error" in data
               ? String((data as { error: unknown }).error)
               : `Upgrade failed (${res.status})`;
-          if (!cancelled) setError(msg);
+          setError(msg);
           return;
         }
         router.replace("/");
-      } catch {
-        if (!cancelled) setError("Network error during upgrade.");
+      } catch (e) {
+        if (e instanceof Error && e.name === "AbortError") return;
+        setError("Network error during upgrade.");
       } finally {
-        if (!cancelled) setBusy(false);
+        // Always clear — if we skip this when `cancelled` (Strict Mode), the UI
+        // stays on “Working…” forever because `busy` blocks the effect from re-running.
+        setBusy(false);
       }
     }
     void run();
-    return () => {
-      cancelled = true;
-    };
-  }, [status, busy, router]);
+    return () => ac.abort();
+  }, [status, router]);
 
   return (
     <main className="min-h-dvh flex items-center justify-center px-6 bg-[var(--color-obsidian)]">
