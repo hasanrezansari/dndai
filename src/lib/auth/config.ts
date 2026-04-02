@@ -146,10 +146,33 @@ function getNextAuth(): NextAuthResult {
       callbacks: {
         session({ session, token }) {
           if (token.sub) session.user.id = token.sub;
+          if (token.email !== undefined) {
+            session.user.email = token.email as string | null;
+          }
+          if (token.name !== undefined) {
+            session.user.name = token.name as string | null;
+          }
           return session;
         },
-        jwt({ token, user }) {
-          if (user) token.sub = user.id;
+        jwt: async ({ token, user }) => {
+          if (user) {
+            token.sub = user.id;
+            token.email = user.email ?? null;
+            token.name = user.name ?? null;
+            return token;
+          }
+          const sub = typeof token.sub === "string" ? token.sub : "";
+          if (sub && !token.email) {
+            const [row] = await getDb()
+              .select({ email: authUsers.email, name: authUsers.name })
+              .from(authUsers)
+              .where(eq(authUsers.id, sub))
+              .limit(1);
+            if (row) {
+              token.email = row.email ?? null;
+              if (row.name) token.name = row.name;
+            }
+          }
           return token;
         },
       },

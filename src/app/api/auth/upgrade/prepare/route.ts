@@ -19,9 +19,8 @@ export async function POST(request: NextRequest) {
 
     // We only support “upgrade” from guest accounts.
     // Guest accounts in this codebase use `guest-<uuid>@ashveil.guest`.
-    const email = (user as unknown as { email?: string | null }).email ?? null;
-    if (!isGuestEmail(email)) {
-      return apiError("Upgrade is only available for guest accounts", 400);
+    if (!isGuestEmail(user.email)) {
+      return apiError("Sign in with Google is only for guest accounts", 400);
     }
 
     const res = NextResponse.json({ ok: true });
