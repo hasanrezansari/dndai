@@ -3,7 +3,7 @@
 import { AnimatePresence, motion } from "framer-motion";
 import { signIn, useSession } from "next-auth/react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { Suspense, useEffect, useState } from "react";
+import { Suspense, useEffect, useRef, useState } from "react";
 
 import { GoogleSignInButton } from "@/components/auth/google-sign-in-button";
 import { GlassCard } from "@/components/ui/glass-card";
@@ -43,6 +43,39 @@ function looksLikeSignedDisplayToken(t: string): boolean {
   return parts.every((p) => p.length > 0);
 }
 
+/** Guest session + persist display name; shared by entry button and PlayRomana auto-entry. */
+async function performGuestSignIn(displayName: string): Promise<boolean> {
+  const name = displayName.trim() || "Adventurer";
+  let guestId: string;
+  try {
+    let id = localStorage.getItem(GUEST_STORAGE_KEY);
+    if (!id || !/^[0-9a-f-]{36}$/i.test(id)) {
+      id = crypto.randomUUID();
+      localStorage.setItem(GUEST_STORAGE_KEY, id);
+    }
+    guestId = id;
+  } catch {
+    guestId = crypto.randomUUID();
+    try {
+      localStorage.setItem(GUEST_STORAGE_KEY, guestId);
+    } catch {
+      /* non-persistent guest for this tab only */
+    }
+  }
+  const res = await signIn("guest", {
+    guestId,
+    displayName: name,
+    redirect: false,
+  });
+  if (res?.error) return false;
+  try {
+    localStorage.setItem(DISPLAY_NAME_STORAGE_KEY, name);
+  } catch {
+    /* ignore */
+  }
+  return true;
+}
+
 function AuthGateInner({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
@@ -52,6 +85,7 @@ function AuthGateInner({ children }: { children: React.ReactNode }) {
   const displayBypass =
     SESSION_DISPLAY_PATH.test(pathname) &&
     looksLikeSignedDisplayToken(displayToken);
+  const authFlowPath = AUTH_FLOW_PATH.test(pathname);
 
   const { data: session, status } = useSession();
   const brand = getBuildTimeBrand();
@@ -59,8 +93,12 @@ function AuthGateInner({ children }: { children: React.ReactNode }) {
   const [guestNameOpen, setGuestNameOpen] = useState(false);
   const [entryBusy, setEntryBusy] = useState<null | "guest" | "google">(null);
   const [error, setError] = useState<string | null>(null);
+  /** PlayRomana: auto guest failed — show same entry card as Falvos for retry. */
+  const [playromanaGuestFallback, setPlayromanaGuestFallback] =
+    useState(false);
+  const playromanaAutoGuestMounted = useRef(false);
 
-  // Guest UUID is created only when the user taps "Play as guest" (or reused from storage).
+  // Sync optional guest display name from storage (Falvos: before tapping Play as guest; PlayRomana: auto-entry).
   useEffect(() => {
     if (displayBypass) return;
     try {
@@ -75,43 +113,64 @@ function AuthGateInner({ children }: { children: React.ReactNode }) {
     if (authErrorParam) clearOauthLinkPending();
   }, [authErrorParam]);
 
+  const hasSessionUser =
+    Boolean(session && "user" in session && session.user?.id) === true;
+
+  useEffect(() => {
+    if (hasSessionUser && playromanaGuestFallback) {
+      setPlayromanaGuestFallback(false);
+    }
+  }, [hasSessionUser, playromanaGuestFallback]);
+
+  useEffect(() => {
+    if (hasSessionUser) {
+      playromanaAutoGuestMounted.current = false;
+    }
+  }, [hasSessionUser]);
+
+  useEffect(() => {
+    if (brand !== "playromana") return;
+    if (displayBypass || authFlowPath) return;
+    if (status !== "unauthenticated") return;
+    if (playromanaGuestFallback) return;
+    if (isOauthLinkPending()) return;
+    if (playromanaAutoGuestMounted.current) return;
+    playromanaAutoGuestMounted.current = true;
+
+    let cancelled = false;
+    void (async () => {
+      let name = "Adventurer";
+      try {
+        const saved = localStorage.getItem(DISPLAY_NAME_STORAGE_KEY)?.trim();
+        if (saved) name = saved;
+      } catch {
+        /* ignore */
+      }
+      const ok = await performGuestSignIn(name);
+      if (cancelled) return;
+      if (!ok) setPlayromanaGuestFallback(true);
+    })();
+
+    return () => {
+      cancelled = true;
+      playromanaAutoGuestMounted.current = false;
+    };
+  }, [
+    brand,
+    displayBypass,
+    authFlowPath,
+    status,
+    playromanaGuestFallback,
+  ]);
+
   async function handleGuest() {
     if (entryBusy) return;
     setEntryBusy("guest");
     setError(null);
-    let guestId: string;
-    try {
-      let id = localStorage.getItem(GUEST_STORAGE_KEY);
-      if (!id || !/^[0-9a-f-]{36}$/i.test(id)) {
-        id = crypto.randomUUID();
-        localStorage.setItem(GUEST_STORAGE_KEY, id);
-      }
-      guestId = id;
-    } catch {
-      guestId = crypto.randomUUID();
-      try {
-        localStorage.setItem(GUEST_STORAGE_KEY, guestId);
-      } catch {
-        /* non-persistent guest for this tab only */
-      }
-    }
-    const res = await signIn("guest", {
-      guestId,
-      displayName: displayName.trim() || "Adventurer",
-      redirect: false,
-    });
+    const ok = await performGuestSignIn(displayName);
     setEntryBusy(null);
-    if (res?.error) {
+    if (!ok) {
       setError("Could not start guest session.");
-      return;
-    }
-    try {
-      localStorage.setItem(
-        DISPLAY_NAME_STORAGE_KEY,
-        displayName.trim() || "Adventurer",
-      );
-    } catch {
-      /* ignore */
     }
   }
 
@@ -128,24 +187,37 @@ function AuthGateInner({ children }: { children: React.ReactNode }) {
     }
   }
 
-  const loading = displayBypass ? false : status === "loading";
   const isHome = pathname === "/" || pathname === "";
-  const authFlowPath = AUTH_FLOW_PATH.test(pathname);
   const oauthHint =
     AUTH_ERROR_HINT[authErrorParam] ?? AUTH_ERROR_HINT.Default;
-
-  const hasSessionUser =
-    Boolean(session && "user" in session && session.user?.id) === true;
 
   const needsEntryChoice =
     !displayBypass &&
     !authFlowPath &&
     status === "unauthenticated" &&
-    !hasSessionUser;
+    !hasSessionUser &&
+    (brand !== "playromana" || playromanaGuestFallback);
 
-  /** After signOut, before Google redirect — avoid flashing the entry card. */
+  const playromanaBlockingLoader =
+    brand === "playromana" &&
+    !displayBypass &&
+    !authFlowPath &&
+    status === "unauthenticated" &&
+    !hasSessionUser &&
+    !playromanaGuestFallback &&
+    !isOauthLinkPending();
+
+  const loading =
+    displayBypass ? false : status === "loading" || playromanaBlockingLoader;
+
+  /** After signOut, before Google redirect — avoid flashing entry / auto-guest. */
   const oauthLinkHandoff =
-    needsEntryChoice && isOauthLinkPending();
+    isOauthLinkPending() &&
+    !displayBypass &&
+    !authFlowPath &&
+    status === "unauthenticated" &&
+    !hasSessionUser &&
+    (brand !== "playromana" ? needsEntryChoice : !playromanaGuestFallback);
 
   function clearOAuthParamsFromUrl() {
     const next = new URLSearchParams(searchParams.toString());
