@@ -3,11 +3,13 @@
 import { AnimatePresence, motion } from "framer-motion";
 import { signIn, useSession } from "next-auth/react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { Suspense, useEffect, useRef, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 
+import { GoogleSignInButton } from "@/components/auth/google-sign-in-button";
 import { GlassCard } from "@/components/ui/glass-card";
 import { GoldButton } from "@/components/ui/gold-button";
 import { RouteLoadingUI } from "@/components/ui/route-loading";
+import { getBrandName, getBuildTimeBrand } from "@/lib/brand";
 
 const GUEST_STORAGE_KEY = "ashveil.guest_id";
 const DISPLAY_NAME_STORAGE_KEY = "ashveil.display_name";
@@ -22,9 +24,9 @@ const SKIP_GUEST_UNTIL_KEY = "ashveil.skip_guest_until";
 
 const AUTH_ERROR_HINT: Record<string, string> = {
   OAuthCallbackError:
-    "Google sign-in didn’t finish. You can try again or keep playing as a guest.",
+    "Google sign-in didn’t finish. You can try again or play as a guest.",
   OAuthAccountNotLinked:
-    "Google sign-in conflicted with your guest session. Try Sign in with Google again — if it keeps failing, refresh the page first.",
+    "That Google account couldn’t be linked this time. Try again or play as a guest first.",
   AccessDenied: "That Google account wasn’t used to sign in.",
   Callback: "Sign-in was interrupted. Try again when you’re ready.",
   Configuration:
@@ -50,20 +52,12 @@ function AuthGateInner({ children }: { children: React.ReactNode }) {
     looksLikeSignedDisplayToken(displayToken);
 
   const { data: session, status } = useSession();
+  const brand = getBuildTimeBrand();
   const [guestId, setGuestId] = useState<string | null>(null);
   const [displayName, setDisplayName] = useState("Adventurer");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [autoAttempted, setAutoAttempted] = useState(false);
-  const hadSessionRef = useRef(false);
 
-  useEffect(() => {
-    if (session?.user?.id) hadSessionRef.current = true;
-  }, [session?.user?.id]);
-
-  // Only clear the OAuth guard once we’re a real (non-guest) user. Clearing it
-  // while still a guest lets AuthGate auto–sign-in as guest between signOut and
-  // the Google redirect, which breaks guest→Google linking.
   useEffect(() => {
     if (!session?.user?.id) return;
     const email = session.user?.email;
@@ -88,14 +82,6 @@ function AuthGateInner({ children }: { children: React.ReactNode }) {
       /* ignore */
     }
   }, [authErrorParam]);
-
-  useEffect(() => {
-    if (displayBypass) return;
-    if (status === "unauthenticated" && hadSessionRef.current) {
-      hadSessionRef.current = false;
-      setAutoAttempted(false);
-    }
-  }, [displayBypass, status]);
 
   useEffect(() => {
     if (displayBypass) return;
@@ -124,7 +110,7 @@ function AuthGateInner({ children }: { children: React.ReactNode }) {
     });
     setBusy(false);
     if (res?.error) {
-      setError("Could not sign in");
+      setError("Could not start guest session.");
       return;
     }
     try {
@@ -137,11 +123,30 @@ function AuthGateInner({ children }: { children: React.ReactNode }) {
     }
   }
 
+  async function handleGoogleOnly() {
+    setBusy(true);
+    setError(null);
+    try {
+      await signIn("google", { callbackUrl: "/" });
+    } finally {
+      setBusy(false);
+    }
+  }
+
   const loading = displayBypass ? false : status === "loading" || !guestId;
   const isHome = pathname === "/" || pathname === "";
   const authFlowPath = AUTH_FLOW_PATH.test(pathname);
   const oauthHint =
     AUTH_ERROR_HINT[authErrorParam] ?? AUTH_ERROR_HINT.Default;
+
+  const hasSessionUser =
+    Boolean(session && "user" in session && session.user?.id) === true;
+
+  const needsEntryChoice =
+    !displayBypass &&
+    !authFlowPath &&
+    status === "unauthenticated" &&
+    !hasSessionUser;
 
   function clearOAuthParamsFromUrl() {
     const next = new URLSearchParams(searchParams.toString());
@@ -150,46 +155,11 @@ function AuthGateInner({ children }: { children: React.ReactNode }) {
     router.replace(qs ? `${pathname}?${qs}` : pathname);
   }
 
-  useEffect(() => {
-    if (
-      displayBypass ||
-      loading ||
-      session?.user?.id ||
-      !guestId ||
-      busy ||
-      autoAttempted ||
-      !displayName.trim()
-    ) {
-      return;
-    }
-    try {
-      const raw = sessionStorage.getItem(SKIP_GUEST_UNTIL_KEY);
-      const until = raw ? Number(raw) : 0;
-      if (Number.isFinite(until) && Date.now() < until) {
-        return;
-      }
-      if (raw) sessionStorage.removeItem(SKIP_GUEST_UNTIL_KEY);
-    } catch {
-      /* ignore */
-    }
-    setAutoAttempted(true);
-    void handleGuest();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [
-    displayBypass,
-    loading,
-    session?.user?.id,
-    guestId,
-    busy,
-    autoAttempted,
-    displayName,
-  ]);
-
-  const homeOauthBanner =
-    isHome && authErrorParam ? (
+  const oauthBanner =
+    authErrorParam ? (
       <div
         role="status"
-        className="w-full max-w-md mx-auto mb-3 rounded-[var(--radius-card)] border border-[rgba(242,202,80,0.22)] bg-[var(--color-deep-void)]/90 px-4 py-3 text-center"
+        className="w-full max-w-md mx-auto mb-4 rounded-[var(--radius-card)] border border-[rgba(242,202,80,0.22)] bg-[var(--color-deep-void)]/90 px-4 py-3 text-center"
       >
         <p className="text-xs text-[var(--color-silver-dim)] leading-relaxed">
           {oauthHint}
@@ -204,22 +174,72 @@ function AuthGateInner({ children }: { children: React.ReactNode }) {
       </div>
     ) : null;
 
+  const entryCard = (
+    <motion.div
+      key="entry"
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      transition={{ duration: 0.25 }}
+      className="min-h-dvh flex flex-col items-center justify-center px-6 bg-[var(--color-obsidian)] gap-[var(--void-gap)] py-10"
+    >
+      {oauthBanner}
+      <GlassCard className="p-6 w-full max-w-sm border-[rgba(212,175,55,0.12)]">
+        <p className="text-fantasy text-center text-xl font-bold text-[var(--color-gold-rare)] tracking-tight uppercase mb-1">
+          {getBrandName(brand)}
+        </p>
+        <p className="text-xs text-center text-[var(--color-silver-dim)] mb-6 leading-relaxed">
+          Play as a guest instantly, or sign in with Google. If you play as a
+          guest first, use{" "}
+          <span className="text-[var(--color-silver-muted)]">
+            Link with Google
+          </span>{" "}
+          on the home screen later — your progress moves to your Google account.
+        </p>
+        <label
+          htmlFor="gate-guest-name"
+          className="text-xs uppercase tracking-wider text-[var(--color-silver-dim)] mb-2 block"
+        >
+          Display name (guest)
+        </label>
+        <input
+          id="gate-guest-name"
+          type="text"
+          value={displayName}
+          onChange={(e) => setDisplayName(e.target.value)}
+          maxLength={48}
+          className="w-full min-h-[44px] rounded-[var(--radius-card)] bg-[var(--color-deep-void)] border border-[rgba(255,255,255,0.08)] px-4 text-[var(--color-silver-muted)] text-base mb-4 focus:outline-none focus:border-[rgba(212,175,55,0.25)]"
+        />
+        <GoldButton
+          type="button"
+          size="lg"
+          className="w-full min-h-[48px] mb-3"
+          disabled={busy || !displayName.trim()}
+          onClick={() => void handleGuest()}
+        >
+          {busy ? "Entering…" : "Play as guest"}
+        </GoldButton>
+        <p className="text-center text-[10px] uppercase tracking-[0.2em] text-[var(--outline)] mb-3">
+          or
+        </p>
+        <GoogleSignInButton
+          disabled={busy}
+          onClick={() => void handleGoogleOnly()}
+          label="Continue with Google"
+        />
+        {error ? (
+          <p className="mt-4 text-sm text-[var(--color-failure)] text-center leading-relaxed">
+            {error}
+          </p>
+        ) : null}
+      </GlassCard>
+    </motion.div>
+  );
+
   return (
     <AnimatePresence mode="wait">
       {loading ? (
-        isHome && guestId ? (
-          <motion.div
-            key="loading-home"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.2 }}
-            className="flex flex-col items-center w-full min-h-dvh"
-          >
-            {homeOauthBanner}
-            {children}
-          </motion.div>
-        ) : authFlowPath ? (
+        authFlowPath ? (
           <motion.div
             key="loading-auth-flow"
             initial={{ opacity: 0 }}
@@ -241,6 +261,8 @@ function AuthGateInner({ children }: { children: React.ReactNode }) {
             <RouteLoadingUI />
           </motion.div>
         )
+      ) : needsEntryChoice ? (
+        entryCard
       ) : isHome ? (
         <motion.div
           key="home"
@@ -249,10 +271,10 @@ function AuthGateInner({ children }: { children: React.ReactNode }) {
           transition={{ duration: 0.25 }}
           className="flex flex-col items-center w-full min-h-dvh"
         >
-          {homeOauthBanner}
+          {authErrorParam ? oauthBanner : null}
           {children}
         </motion.div>
-      ) : displayBypass || authFlowPath || session?.user?.id ? (
+      ) : (
         <motion.div
           key="app"
           initial={{ opacity: 0 }}
@@ -260,49 +282,6 @@ function AuthGateInner({ children }: { children: React.ReactNode }) {
           transition={{ duration: 0.3 }}
         >
           {children}
-        </motion.div>
-      ) : (
-        <motion.div
-          key="gate"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          transition={{ duration: 0.25 }}
-          className="min-h-dvh flex flex-col items-center justify-center px-6 bg-[var(--color-obsidian)] gap-[var(--void-gap)]"
-        >
-          <GlassCard className="p-6 w-full max-w-sm border-[rgba(212,175,55,0.12)]">
-            <p className="text-sm text-[var(--color-silver-dim)] mb-3">
-              Choose how your name appears in party seats and the shared journal.
-            </p>
-            <label
-              htmlFor="guest-name"
-              className="text-xs uppercase tracking-wider text-[var(--color-silver-dim)] mb-2 block"
-            >
-              Display name
-            </label>
-            <input
-              id="guest-name"
-              type="text"
-              value={displayName}
-              onChange={(e) => setDisplayName(e.target.value)}
-              maxLength={48}
-              className="w-full min-h-[44px] rounded-[var(--radius-card)] bg-[var(--color-deep-void)] border border-[rgba(255,255,255,0.08)] px-4 text-[var(--color-silver-muted)] text-base mb-4 focus:outline-none focus:border-[rgba(212,175,55,0.25)]"
-            />
-            <GoldButton
-              type="button"
-              size="lg"
-              className="w-full min-h-[44px]"
-              disabled={busy}
-              onClick={() => void handleGuest()}
-            >
-              {busy ? "Entering…" : "Continue"}
-            </GoldButton>
-            {error ? (
-              <p className="mt-3 text-sm text-[var(--color-failure)] text-center">
-                {error}
-              </p>
-            ) : null}
-          </GlassCard>
         </motion.div>
       )}
     </AnimatePresence>

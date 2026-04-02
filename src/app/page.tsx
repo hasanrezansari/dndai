@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 
+import { GoogleSignInButton } from "@/components/auth/google-sign-in-button";
 import { getBrandName, getBrandTagline, getBuildTimeBrand } from "@/lib/brand";
 import { ROMA_MODULES } from "@/lib/rome/modules";
 import { GoldButton } from "@/components/ui/gold-button";
@@ -43,34 +44,6 @@ export default function Home() {
   const isGuest =
     typeof authSession?.user?.email === "string" &&
     authSession.user.email.endsWith("@ashveil.guest");
-
-  const GoogleIcon = (
-    <svg
-      width="16"
-      height="16"
-      viewBox="0 0 48 48"
-      aria-hidden
-      className="shrink-0"
-    >
-      <path
-        fill="#EA4335"
-        d="M24 9.5c3.54 0 6.72 1.22 9.23 3.6l6.9-6.9C35.95 2.38 30.37 0 24 0 14.62 0 6.51 5.38 2.56 13.22l8.03 6.24C12.45 13.06 17.77 9.5 24 9.5z"
-      />
-      <path
-        fill="#4285F4"
-        d="M46.1 24.5c0-1.64-.15-3.21-.43-4.73H24v9.0h12.4c-.54 2.9-2.18 5.36-4.65 7.02l7.18 5.57C43.22 37.38 46.1 31.55 46.1 24.5z"
-      />
-      <path
-        fill="#FBBC05"
-        d="M10.59 28.46c-.5-1.5-.78-3.1-.78-4.76s.28-3.26.78-4.76l-8.03-6.24C.92 16.0 0 19.86 0 23.7s.92 7.7 2.56 11.0l8.03-6.24z"
-      />
-      <path
-        fill="#34A853"
-        d="M24 47.4c6.37 0 11.74-2.1 15.65-5.72l-7.18-5.57c-1.99 1.34-4.54 2.13-8.47 2.13-6.23 0-11.55-3.56-13.41-8.72l-8.03 6.24C6.51 42.02 14.62 47.4 24 47.4z"
-      />
-      <path fill="none" d="M0 0h48v48H0z" />
-    </svg>
-  );
 
   useEffect(() => {
     try {
@@ -268,25 +241,23 @@ export default function Home() {
                   Edit profile
                 </Link>
                 {isGuest ? (
-                  <>
-                    <GhostButton
-                      type="button"
-                      size="sm"
-                      className="min-h-[36px]"
+                  <div className="w-full max-w-[240px] mx-auto flex flex-col gap-2">
+                    <GoogleSignInButton
                       disabled={upgradeBusy}
                       onClick={() => void handleUpgradeToGoogle()}
-                    >
-                      <span className="flex items-center justify-center gap-2">
-                        {GoogleIcon}
-                        {upgradeBusy ? "Connecting…" : "Sign in with Google"}
-                      </span>
-                    </GhostButton>
+                      label={
+                        upgradeBusy ? "Linking…" : "Link progress with Google"
+                      }
+                    />
+                    <p className="text-[9px] text-[var(--outline)] text-center leading-relaxed">
+                      Moves this guest&apos;s games to your Google account.
+                    </p>
                     {upgradeError ? (
-                      <p className="mt-2 text-xs text-[var(--color-failure)] text-center px-2 leading-relaxed">
+                      <p className="text-xs text-[var(--color-failure)] text-center leading-relaxed">
                         {upgradeError}
                       </p>
                     ) : null}
-                  </>
+                  </div>
                 ) : null}
               </div>
             ) : null}
@@ -542,25 +513,23 @@ export default function Home() {
                   {isGuest ? " (Guest)" : ""}
                 </p>
                 {isGuest ? (
-                  <>
-                    <GhostButton
-                      type="button"
-                      size="sm"
-                      className="min-h-[36px]"
+                  <div className="w-full max-w-[240px] mx-auto flex flex-col gap-2">
+                    <GoogleSignInButton
                       disabled={upgradeBusy}
                       onClick={() => void handleUpgradeToGoogle()}
-                    >
-                      <span className="flex items-center justify-center gap-2">
-                        {GoogleIcon}
-                        {upgradeBusy ? "Connecting…" : "Sign in with Google"}
-                      </span>
-                    </GhostButton>
+                      label={
+                        upgradeBusy ? "Linking…" : "Link progress with Google"
+                      }
+                    />
+                    <p className="text-[9px] text-[var(--outline)] text-center leading-relaxed">
+                      Moves this guest&apos;s games to your Google account.
+                    </p>
                     {upgradeError ? (
-                      <p className="mt-2 text-xs text-[var(--color-failure)] text-center px-2 leading-relaxed">
+                      <p className="text-xs text-[var(--color-failure)] text-center leading-relaxed">
                         {upgradeError}
                       </p>
                     ) : null}
-                  </>
+                  </div>
                 ) : null}
               </div>
             ) : null}
