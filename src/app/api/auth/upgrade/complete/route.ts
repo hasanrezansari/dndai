@@ -25,7 +25,10 @@ export async function POST(request: NextRequest) {
       return apiError("Missing upgrade context", 400);
     }
     if (guestId === user.id) {
-      return apiError("Already signed in as guest", 400);
+      return apiError(
+        "Google sign-in did not switch this browser from guest mode; try Sign in with Google again from home.",
+        400,
+      );
     }
 
     // Validate that the cookie points to an actual guest user.

@@ -7,15 +7,39 @@ import { useSession } from "next-auth/react";
 import { GlassCard } from "@/components/ui/glass-card";
 import { GoldButton } from "@/components/ui/gold-button";
 
+function friendlyUpgradeError(raw: string): string {
+  if (
+    raw.includes("Already signed in as guest") ||
+    raw.includes("did not switch this browser from guest")
+  ) {
+    return "Google didn’t finish replacing the guest session. Go home and tap Sign in with Google once more.";
+  }
+  if (raw.includes("Missing upgrade context")) {
+    return "This sign-in step expired or was interrupted. Go home and tap Sign in with Google again.";
+  }
+  return raw;
+}
+
 export default function AuthUpgradePage() {
   const router = useRouter();
-  const { status } = useSession();
+  const { data: session, status } = useSession();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const waitingForGoogle = status === "unauthenticated";
 
   useEffect(() => {
-    if (status !== "authenticated") return;
+    if (status !== "authenticated" || !session?.user) return;
+    const email = session.user.email;
+    if (
+      typeof email === "string" &&
+      email.endsWith("@ashveil.guest")
+    ) {
+      setError(
+        "You’re still signed in as a guest after Google. Go home and tap Sign in with Google again — the next try usually completes the link.",
+      );
+      return;
+    }
+
     const ac = new AbortController();
 
     async function run() {
@@ -24,16 +48,17 @@ export default function AuthUpgradePage() {
       try {
         const res = await fetch("/api/auth/upgrade/complete", {
           method: "POST",
+          credentials: "include",
           signal: ac.signal,
         });
         if (ac.signal.aborted) return;
         if (!res.ok) {
           const data: unknown = await res.json().catch(() => ({}));
-          const msg =
+          const raw =
             typeof data === "object" && data !== null && "error" in data
               ? String((data as { error: unknown }).error)
               : `Upgrade failed (${res.status})`;
-          setError(msg);
+          setError(friendlyUpgradeError(raw));
           return;
         }
         router.replace("/");
@@ -48,7 +73,7 @@ export default function AuthUpgradePage() {
     }
     void run();
     return () => ac.abort();
-  }, [status, router]);
+  }, [status, session?.user, session?.user?.email, router]);
 
   return (
     <main className="min-h-dvh flex items-center justify-center px-6 bg-[var(--color-obsidian)]">

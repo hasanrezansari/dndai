@@ -61,14 +61,24 @@ function AuthGateInner({ children }: { children: React.ReactNode }) {
     if (session?.user?.id) hadSessionRef.current = true;
   }, [session?.user?.id]);
 
+  // Only clear the OAuth guard once we’re a real (non-guest) user. Clearing it
+  // while still a guest lets AuthGate auto–sign-in as guest between signOut and
+  // the Google redirect, which breaks guest→Google linking.
   useEffect(() => {
     if (!session?.user?.id) return;
+    const email = session.user?.email;
+    if (
+      typeof email === "string" &&
+      email.endsWith("@ashveil.guest")
+    ) {
+      return;
+    }
     try {
       sessionStorage.removeItem(SKIP_GUEST_UNTIL_KEY);
     } catch {
       /* ignore */
     }
-  }, [session?.user?.id]);
+  }, [session?.user?.id, session?.user?.email]);
 
   useEffect(() => {
     if (!authErrorParam) return;
@@ -207,6 +217,17 @@ function AuthGateInner({ children }: { children: React.ReactNode }) {
             className="flex flex-col items-center w-full min-h-dvh"
           >
             {homeOauthBanner}
+            {children}
+          </motion.div>
+        ) : authFlowPath ? (
+          <motion.div
+            key="loading-auth-flow"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.2 }}
+            className="min-h-dvh"
+          >
             {children}
           </motion.div>
         ) : (
