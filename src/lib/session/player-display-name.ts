@@ -1,3 +1,33 @@
+/** Optional JWT-backed identity for the HTTP viewer (fixes stale/null `users.email` on the player row). */
+export type ViewerIdentityHint = {
+  userId: string;
+  email: string | null | undefined;
+  name: string | null | undefined;
+};
+
+/**
+ * When the DB join left `users.email` / `users.name` empty but the signed-in viewer
+ * is this player, use session/JWT fields so `resolvePlayerDisplayName` can derive a label.
+ */
+export function mergeViewerUserFieldsForPlayer(params: {
+  playerUserId: string;
+  dbUserName: string | null | undefined;
+  dbUserEmail: string | null | undefined;
+  viewer: ViewerIdentityHint | null | undefined;
+}): { userName: string | null | undefined; userEmail: string | null | undefined } {
+  const isViewer = Boolean(
+    params.viewer && params.viewer.userId === params.playerUserId,
+  );
+  const dbEmail = params.dbUserEmail?.trim() ?? "";
+  const dbName = params.dbUserName?.trim() ?? "";
+  const vEmail = isViewer ? (params.viewer!.email?.trim() ?? "") : "";
+  const vName = isViewer ? (params.viewer!.name?.trim() ?? "") : "";
+  return {
+    userName: dbName || vName || undefined,
+    userEmail: dbEmail || vEmail || undefined,
+  };
+}
+
 /**
  * Lobby + session payloads: prefer hero name, then a non-generic account name,
  * then email local-part (fixes rows where `users.name` is still default "Adventurer").

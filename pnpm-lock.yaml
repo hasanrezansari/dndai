@@ -91,6 +91,9 @@ devDependencies:
   tailwindcss:
     specifier: ^4
     version: 4.2.2
+  tsx:
+    specifier: ^4.21.0
+    version: 4.21.0
   typescript:
     specifier: ^5
     version: 5.9.3
@@ -2239,7 +2242,7 @@ packages:
       '@vitest/spy': 4.1.1
       estree-walker: 3.0.3
       magic-string: 0.30.21
-      vite: 8.0.2(@types/node@20.19.37)
+      vite: 8.0.2(@types/node@20.19.37)(tsx@4.21.0)
     dev: true
 
   /@vitest/pretty-format@4.1.1:
@@ -5254,7 +5257,7 @@ packages:
       punycode: 2.3.1
     dev: true
 
-  /vite@8.0.2(@types/node@20.19.37):
+  /vite@8.0.2(@types/node@20.19.37)(tsx@4.21.0):
     resolution: {integrity: sha512-1gFhNi+bHhRE/qKZOJXACm6tX4bA3Isy9KuKF15AgSRuRazNBOJfdDemPBU16/mpMxApDPrWvZ08DcLPEoRnuA==}
     engines: {node: ^20.19.0 || >=22.12.0}
     hasBin: true
@@ -5303,6 +5306,7 @@ packages:
       postcss: 8.5.8
       rolldown: 1.0.0-rc.11
       tinyglobby: 0.2.15
+      tsx: 4.21.0
     optionalDependencies:
       fsevents: 2.3.3
     dev: true
@@ -5361,7 +5365,7 @@ packages:
       tinyexec: 1.0.4
       tinyglobby: 0.2.15
       tinyrainbow: 3.1.0
-      vite: 8.0.2(@types/node@20.19.37)
+      vite: 8.0.2(@types/node@20.19.37)(tsx@4.21.0)
       why-is-node-running: 2.3.0
     transitivePeerDependencies:
       - msw

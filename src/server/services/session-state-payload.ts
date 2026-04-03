@@ -31,7 +31,11 @@ import type {
   StatEffect,
 } from "@/lib/state/game-store";
 import { buildPartySessionNarrativeText } from "@/lib/party/party-opening-narrative";
-import { resolvePlayerDisplayName } from "@/lib/session/player-display-name";
+import {
+  mergeViewerUserFieldsForPlayer,
+  resolvePlayerDisplayName,
+  type ViewerIdentityHint,
+} from "@/lib/session/player-display-name";
 import { getQuestState } from "@/server/services/quest-service";
 
 const DEFAULT_STATS = {
@@ -205,6 +209,7 @@ function statEffectsToFeedText(effects: StatEffect[]): string {
  */
 export async function loadSessionStatePayload(
   sessionId: string,
+  viewer?: ViewerIdentityHint | null,
 ): Promise<SessionStatePayload | null> {
   const [sessionRow] = await db
     .select()
@@ -228,17 +233,23 @@ export async function loadSessionStatePayload(
     .where(eq(players.session_id, sessionId));
 
   const mappedPlayers = playerRows
-    .map((r) =>
-      mapPlayerRow(
+    .map((r) => {
+      const { userName, userEmail } = mergeViewerUserFieldsForPlayer({
+        playerUserId: r.player.user_id,
+        dbUserName: r.userName,
+        dbUserEmail: r.userEmail,
+        viewer,
+      });
+      return mapPlayerRow(
         r.player,
         r.character,
         resolvePlayerDisplayName({
           characterName: r.character?.name,
-          userName: r.userName,
-          userEmail: r.userEmail,
+          userName,
+          userEmail,
         }),
-      ),
-    )
+      );
+    })
     .sort((a, b) => a.seatIndex - b.seatIndex);
 
   const narrativeRows = await db

@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 
-import { resolvePlayerDisplayName } from "@/lib/session/player-display-name";
+import {
+  mergeViewerUserFieldsForPlayer,
+  resolvePlayerDisplayName,
+} from "@/lib/session/player-display-name";
 
 describe("resolvePlayerDisplayName", () => {
   it("prefers character name", () => {
@@ -41,5 +44,38 @@ describe("resolvePlayerDisplayName", () => {
         userEmail: null,
       }),
     ).toBe("Adventurer");
+  });
+});
+
+describe("mergeViewerUserFieldsForPlayer", () => {
+  const viewer = {
+    userId: "u1",
+    email: "hasan@example.com",
+    name: "Adventurer",
+  };
+
+  it("fills missing DB email from viewer for that player only", () => {
+    expect(
+      mergeViewerUserFieldsForPlayer({
+        playerUserId: "u1",
+        dbUserName: "Adventurer",
+        dbUserEmail: null,
+        viewer,
+      }),
+    ).toEqual({
+      userName: "Adventurer",
+      userEmail: "hasan@example.com",
+    });
+  });
+
+  it("does not inject viewer email for other players", () => {
+    expect(
+      mergeViewerUserFieldsForPlayer({
+        playerUserId: "u2",
+        dbUserName: "Adventurer",
+        dbUserEmail: null,
+        viewer,
+      }),
+    ).toEqual({ userName: "Adventurer", userEmail: undefined });
   });
 });

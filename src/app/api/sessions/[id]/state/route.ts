@@ -34,7 +34,11 @@ export async function GET(
         and(eq(players.session_id, sessionId), eq(players.user_id, user.id)),
       );
 
-    const payload = await loadSessionStatePayload(sessionId);
+    const payload = await loadSessionStatePayload(sessionId, {
+      userId: user.id,
+      email: user.email,
+      name: user.name,
+    });
     if (!payload) {
       return apiError("Not found", 404);
     }

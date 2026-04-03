@@ -36,6 +36,7 @@ import { db } from "@/lib/db";
 |-------|--------|-------------|
 | `sessions` | `sessions` | id (uuid PK), mode, campaign_mode, status, max_players, current_round, current_turn_index, current_player_id, phase, join_code (unique), host_user_id, state_version, adventure_prompt, module_key, campaign_title, world_summary, style_policy, tone, visual_bible_seed (jsonb), created_at, updated_at |
 | `players` | `players` | id (uuid PK), session_id (FK->sessions), user_id, character_id, seat_index, is_ready, is_connected, is_host, is_dm, joined_at |
+| `user_hidden_sessions` | `userHiddenSessions` | user_id (FK->users, cascade), session_id (FK->sessions, cascade), hidden_at; compound PK (user_id, session_id); filters My Adventures only |
 | `characters` | `characters` | id (uuid PK), player_id (FK->players, unique), name, class, race, level, stats (jsonb), hp, max_hp, ac, mana, max_mana, inventory (jsonb []), abilities (jsonb []), conditions (jsonb string[]), visual_profile (jsonb {}), created_at |
 | `turns` | `turns` | id (uuid PK), session_id (FK), round_number, player_id (FK), phase, status, started_at, resolved_at |
 | `actions` | `actions` | id (uuid PK), turn_id (FK), raw_input, parsed_intent (jsonb), resolution_status, created_at |
@@ -50,6 +51,7 @@ import { db } from "@/lib/db";
 ## Existing Indexes (DO NOT duplicate)
 - `sessions_host_user_id_idx` on sessions(host_user_id)
 - `players_session_id_idx` on players(session_id)
+- `user_hidden_sessions_user_id_idx` on user_hidden_sessions(user_id)
 - `turns_session_round_started_idx` on turns(session_id, round_number, started_at)
 - `actions_turn_created_idx` on actions(turn_id, created_at)
 - `dice_rolls_action_id_idx` on dice_rolls(action_id)

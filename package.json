@@ -10,6 +10,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "db:generate": "drizzle-kit generate",
+    "db:seed:worlds": "tsx --tsconfig tsconfig.json scripts/seed-published-worlds-roma.ts",
     "db:migrate": "drizzle-kit migrate",
     "db:reset": "node scripts/supabase-db-reset.cjs",
     "db:push": "drizzle-kit push",
@@ -46,6 +47,7 @@
     "eslint": "^9",
     "eslint-config-next": "16.2.1",
     "tailwindcss": "^4",
+    "tsx": "^4.21.0",
     "typescript": "^5",
     "vitest": "^4.1.1"
   }

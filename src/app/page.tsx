@@ -8,6 +8,7 @@ import { useRouter } from "next/navigation";
 import { GoogleSignInButton } from "@/components/auth/google-sign-in-button";
 import { runGuestGoogleUpgradeFlow } from "@/lib/auth/guest-google-upgrade-client";
 import { getBrandName, getBrandTagline, getBuildTimeBrand } from "@/lib/brand";
+import { getMainAppPublicOrigin } from "@/lib/main-app-public";
 import { ROMA_MODULES } from "@/lib/rome/modules";
 import { GoldButton } from "@/components/ui/gold-button";
 import { GhostButton } from "@/components/ui/ghost-button";
@@ -557,11 +558,34 @@ export default function Home() {
               </p>
             </div>
 
+            <Link
+              href={`${getMainAppPublicOrigin()}/worlds`}
+              onClick={() => {
+                void fetch("/api/analytics/romana-bridge", {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({
+                    destination: "main_app_worlds_index",
+                  }),
+                }).catch(() => {});
+              }}
+              className="w-full min-h-[48px] flex items-center justify-center rounded-[var(--radius-button)] border border-[rgba(77,70,53,0.3)] text-[var(--color-silver-muted)] font-bold uppercase tracking-[0.1em] text-sm hover:border-[var(--color-gold-rare)] hover:text-[var(--color-gold-rare)] transition-colors"
+            >
+              More worlds (playdndai)
+            </Link>
+
             <GhostButton
               type="button"
               size="lg"
               className="w-full min-h-[48px]"
               onClick={async () => {
+                void fetch("/api/analytics/romana-bridge", {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({
+                    destination: "bridge_token_adventures",
+                  }),
+                }).catch(() => {});
                 try {
                   const res = await fetch("/api/auth/bridge-token", {
                     method: "POST",
@@ -583,10 +607,10 @@ export default function Home() {
                 } catch {
                   // best effort
                 }
-                window.location.href = "https://playdndai.com/adventures";
+                window.location.href = `${getMainAppPublicOrigin()}/adventures`;
               }}
             >
-              Explore other worlds
+              Open full app (saved games)
             </GhostButton>
 
             {joinOpen ? (
@@ -710,6 +734,15 @@ export default function Home() {
                 <span className="flex items-center justify-center gap-2">
                   <span className="material-symbols-outlined text-sm">person</span>
                   Profile
+                </span>
+              </Link>
+              <Link
+                href="/worlds"
+                className="min-h-[38px] px-3.5 rounded-[var(--radius-chip)] border border-[rgba(255,255,255,0.10)] bg-gradient-to-b from-[rgba(255,255,255,0.06)] to-[rgba(0,0,0,0.14)] text-[10px] font-black uppercase tracking-[0.16em] text-[var(--color-silver-dim)] hover:text-[var(--color-gold-rare)] hover:border-[rgba(242,202,80,0.28)] transition-colors shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]"
+              >
+                <span className="flex items-center justify-center gap-2">
+                  <span className="material-symbols-outlined text-sm">public</span>
+                  Worlds
                 </span>
               </Link>
               <Link

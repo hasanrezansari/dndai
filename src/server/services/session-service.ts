@@ -14,7 +14,11 @@ import {
   DEFAULT_PARTY_TOTAL_ROUNDS,
   getDefaultPartyTemplateKeyForBrand,
 } from "@/lib/party/party-templates";
-import { resolvePlayerDisplayName } from "@/lib/session/player-display-name";
+import {
+  mergeViewerUserFieldsForPlayer,
+  resolvePlayerDisplayName,
+  type ViewerIdentityHint,
+} from "@/lib/session/player-display-name";
 import {
   createInitialPartyConfig,
   PartyConfigV1Schema,
@@ -128,6 +132,15 @@ export async function createSession(params: {
   partyInstigatorEnabled?: boolean;
   /** Analytics only; stored on session row, never used by turn/quest/narration. */
   acquisitionSource?: string;
+  /**
+   * When set, session is linked to a catalog world fork (atomic insert).
+   * `snapshot` is copied immutably for provenance.
+   */
+  worldFork?: {
+    worldId: string;
+    revision: number;
+    snapshot: Record<string, unknown>;
+  };
 }): Promise<{ sessionId: string; joinCode: string }> {
   const joinCode = await allocateUniqueJoinCode();
   const gameKind: GameKind = params.gameKind ?? "campaign";
@@ -160,6 +173,9 @@ export async function createSession(params: {
       game_kind: gameKind,
       party_config: partyConfig,
       acquisition_source: params.acquisitionSource?.trim() || null,
+      world_id: params.worldFork?.worldId ?? null,
+      world_revision: params.worldFork?.revision ?? null,
+      world_snapshot: params.worldFork?.snapshot ?? null,
     })
     .returning();
   if (!session) {
@@ -234,6 +250,7 @@ export async function joinSession(params: {
 
 export async function getSession(
   sessionId: string,
+  viewer?: ViewerIdentityHint | null,
 ): Promise<Session & { players: Player[] }> {
   const [sessionRow] = await db
     .select()
@@ -256,16 +273,22 @@ export async function getSession(
     .where(eq(players.session_id, sessionId));
   return {
     ...mapSessionRow(sessionRow),
-    players: playerRows.map((r) =>
-      mapPlayerRow(
+    players: playerRows.map((r) => {
+      const { userName, userEmail } = mergeViewerUserFieldsForPlayer({
+        playerUserId: r.player.user_id,
+        dbUserName: r.userName,
+        dbUserEmail: r.userEmail,
+        viewer,
+      });
+      return mapPlayerRow(
         r.player,
         resolvePlayerDisplayName({
           characterName: r.characterName,
-          userName: r.userName,
-          userEmail: r.userEmail,
+          userName,
+          userEmail,
         }),
-      ),
-    ),
+      );
+    }),
   };
 }
 

@@ -8,6 +8,7 @@ import {
   primaryKey,
   text,
   timestamp,
+  uniqueIndex,
   uuid,
 } from "drizzle-orm/pg-core";
 
@@ -188,6 +189,66 @@ export const authBridgeTokens = pgTable(
   (t) => [index("auth_bridge_tokens_user_id_idx").on(t.user_id)],
 );
 
+/** Catalog row for `/worlds` gallery; optional provenance on `sessions` via `world_id`. */
+export const worlds = pgTable(
+  "worlds",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    slug: text("slug").notNull().unique(),
+    title: text("title").notNull(),
+    /** Short line under title (marketing / card hook). */
+    subtitle: text("subtitle"),
+    description: text("description"),
+    /** `draft` | `published` — list/detail/fork only expose published rows (later phases). */
+    status: text("status").notNull().default("draft"),
+    sort_order: integer("sort_order").notNull().default(0),
+    /** When `campaign_mode_default` is `module`, links to Roma / module seeder key. */
+    module_key: text("module_key"),
+    /** Default campaign mode for forks; aligns with `CampaignModeSchema` when set. */
+    campaign_mode_default: text("campaign_mode_default"),
+    default_max_players: integer("default_max_players"),
+    /**
+     * Authoritative template for fork: theme strings, tags, art direction seeds,
+     * optional world bible snippet, etc. Merged with `module_key` seed at fork time (later phases).
+     */
+    snapshot_definition: jsonb("snapshot_definition").$type<Record<string, unknown>>(),
+    /** Bump when editable catalog content changes; sessions pin revision at fork. */
+    published_revision: integer("published_revision").notNull().default(1),
+    /** Gallery hero; multiple true allowed — UI picks first by sort_order. */
+    is_featured: boolean("is_featured").notNull().default(false),
+    /** Successful world forks (gallery + API); analytics only. */
+    fork_count: integer("fork_count").notNull().default(0),
+    created_at: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updated_at: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [index("worlds_status_idx").on(t.status)],
+);
+
+/** Logged-in user like on a catalog world (public gallery signal only). */
+export const worldLikes = pgTable(
+  "world_likes",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    user_id: text("user_id")
+      .notNull()
+      .references(() => authUsers.id, { onDelete: "cascade" }),
+    world_id: uuid("world_id")
+      .notNull()
+      .references(() => worlds.id, { onDelete: "cascade" }),
+    created_at: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [
+    index("world_likes_world_id_idx").on(t.world_id),
+    uniqueIndex("world_likes_user_world_uidx").on(t.user_id, t.world_id),
+  ],
+);
+
 export const sessions = pgTable(
   "sessions",
   {
@@ -229,6 +290,12 @@ export const sessions = pgTable(
     party_secrets: jsonb("party_secrets").$type<Record<string, unknown>>(),
     /** Optional create funnel label for analytics (never drives gameplay). */
     acquisition_source: text("acquisition_source"),
+    /** Optional catalog provenance; null until client or fork path sets it (Phase 4+). */
+    world_id: uuid("world_id").references(() => worlds.id, { onDelete: "restrict" }),
+    /** Copy of `worlds.published_revision` at fork time. */
+    world_revision: integer("world_revision"),
+    /** Immutable JSON copied from world at fork; survives world row edits. */
+    world_snapshot: jsonb("world_snapshot").$type<Record<string, unknown>>(),
     created_at: timestamp("created_at", { withTimezone: true })
       .notNull()
       .defaultNow(),
@@ -260,6 +327,26 @@ export const players = pgTable(
       .defaultNow(),
   },
   (t) => [index("players_session_id_idx").on(t.session_id)],
+);
+
+/** Per-user preference: omit session from GET /api/adventures only; does not remove membership. */
+export const userHiddenSessions = pgTable(
+  "user_hidden_sessions",
+  {
+    user_id: text("user_id")
+      .notNull()
+      .references(() => authUsers.id, { onDelete: "cascade" }),
+    session_id: uuid("session_id")
+      .notNull()
+      .references(() => sessions.id, { onDelete: "cascade" }),
+    hidden_at: timestamp("hidden_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => ({
+    pk: primaryKey({ columns: [t.user_id, t.session_id] }),
+    userIdx: index("user_hidden_sessions_user_id_idx").on(t.user_id),
+  }),
 );
 
 export const characters = pgTable("characters", {

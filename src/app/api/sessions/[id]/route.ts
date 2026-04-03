@@ -51,7 +51,11 @@ export async function GET(
     if (!(await isSessionMember(id, user.id))) {
       return apiError("Forbidden", 403);
     }
-    const session = await getSession(id);
+    const session = await getSession(id, {
+      userId: user.id,
+      email: user.email,
+      name: user.name,
+    });
     return NextResponse.json(session);
   } catch (e) {
     if (e instanceof SessionNotFoundError) {
@@ -117,7 +121,11 @@ export async function PATCH(
         newMaxPlayers: data.max_players,
       });
       try {
-        const sessionAfterCap = await getSession(id);
+        const sessionAfterCap = await getSession(id, {
+          userId: user.id,
+          email: user.email,
+          name: user.name,
+        });
         await broadcastToSession(id, "session-cap-updated", {
           max_players: sessionAfterCap.max_players,
         });
@@ -126,7 +134,11 @@ export async function PATCH(
       }
     }
 
-    const session = await getSession(id);
+    const session = await getSession(id, {
+      userId: user.id,
+      email: user.email,
+      name: user.name,
+    });
     return NextResponse.json(session);
   } catch (e) {
     if (e instanceof SessionNotFoundError) {

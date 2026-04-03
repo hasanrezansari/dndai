@@ -1,7 +1,21 @@
-import { count, desc, eq, inArray, max } from "drizzle-orm";
+import {
+  and,
+  count,
+  desc,
+  eq,
+  exists,
+  inArray,
+  max,
+  notExists,
+} from "drizzle-orm";
 
 import { db } from "@/lib/db";
-import { narrativeEvents, players, sessions } from "@/lib/db/schema";
+import {
+  narrativeEvents,
+  players,
+  sessions,
+  userHiddenSessions,
+} from "@/lib/db/schema";
 
 export type AdventureListItem = {
   sessionId: string;
@@ -16,10 +30,42 @@ export type AdventureListItem = {
   isHost: boolean;
 };
 
-export async function listAdventuresForUser(
+const hiddenPredicate = (userId: string) =>
+  exists(
+    db
+      .select()
+      .from(userHiddenSessions)
+      .where(
+        and(
+          eq(userHiddenSessions.user_id, userId),
+          eq(userHiddenSessions.session_id, sessions.id),
+        ),
+      ),
+  );
+
+const notHiddenPredicate = (userId: string) =>
+  notExists(
+    db
+      .select()
+      .from(userHiddenSessions)
+      .where(
+        and(
+          eq(userHiddenSessions.user_id, userId),
+          eq(userHiddenSessions.session_id, sessions.id),
+        ),
+      ),
+  );
+
+async function adventureRowsForUser(
   userId: string,
-): Promise<AdventureListItem[]> {
-  const rows = await db
+  hidden: "visible" | "hidden",
+) {
+  const visibility =
+    hidden === "hidden"
+      ? hiddenPredicate(userId)
+      : notHiddenPredicate(userId);
+
+  return db
     .select({
       sessionId: sessions.id,
       joinCode: sessions.join_code,
@@ -35,7 +81,7 @@ export async function listAdventuresForUser(
     .from(players)
     .innerJoin(sessions, eq(players.session_id, sessions.id))
     .leftJoin(narrativeEvents, eq(narrativeEvents.session_id, sessions.id))
-    .where(eq(players.user_id, userId))
+    .where(and(eq(players.user_id, userId), visibility))
     .groupBy(
       sessions.id,
       sessions.join_code,
@@ -47,10 +93,11 @@ export async function listAdventuresForUser(
       players.is_host,
     )
     .orderBy(desc(max(narrativeEvents.created_at)), desc(sessions.updated_at));
+}
 
-  // The `count(players.id)` above will only count the current user's player row due
-  // to the `from(players) where players.user_id = ...`. So we do a second query
-  // to compute playerCount per session efficiently.
+async function mapRowsToAdventures(
+  rows: Awaited<ReturnType<typeof adventureRowsForUser>>,
+): Promise<AdventureListItem[]> {
   const sessionIds = rows.map((r) => r.sessionId);
   if (sessionIds.length === 0) return [];
 
@@ -81,3 +128,41 @@ export async function listAdventuresForUser(
   });
 }
 
+export async function listAdventuresForUser(
+  userId: string,
+): Promise<AdventureListItem[]> {
+  const rows = await adventureRowsForUser(userId, "visible");
+  return mapRowsToAdventures(rows);
+}
+
+/** Sessions the user hid from My Adventures (same item shape as the main list). */
+export async function listHiddenAdventuresForUser(
+  userId: string,
+): Promise<AdventureListItem[]> {
+  const rows = await adventureRowsForUser(userId, "hidden");
+  return mapRowsToAdventures(rows);
+}
+
+export async function hideAdventureForUser(
+  userId: string,
+  sessionId: string,
+): Promise<void> {
+  await db
+    .insert(userHiddenSessions)
+    .values({ user_id: userId, session_id: sessionId })
+    .onConflictDoNothing();
+}
+
+export async function unhideAdventureForUser(
+  userId: string,
+  sessionId: string,
+): Promise<void> {
+  await db
+    .delete(userHiddenSessions)
+    .where(
+      and(
+        eq(userHiddenSessions.user_id, userId),
+        eq(userHiddenSessions.session_id, sessionId),
+      ),
+    );
+}

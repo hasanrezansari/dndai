@@ -9,6 +9,15 @@ import { createCharacter } from "@/server/services/character-service";
 
 export const FREE_PROFILE_HERO_SLOTS = 1 as const;
 
+function toIsoTimestamp(v: unknown): string {
+  if (v instanceof Date) return v.toISOString();
+  if (typeof v === "string" && v.trim().length > 0) {
+    const d = new Date(v);
+    if (!Number.isNaN(d.getTime())) return d.toISOString();
+  }
+  return new Date(0).toISOString();
+}
+
 export type ProfileHero = {
   id: string;
   userId: string;
@@ -48,8 +57,8 @@ function mapRow(row: typeof profileHeroes.$inferSelect): ProfileHero {
     visualProfile,
     portraitUrl,
     isPublic: Boolean(row.is_public),
-    createdAt: row.created_at.toISOString(),
-    updatedAt: row.updated_at.toISOString(),
+    createdAt: toIsoTimestamp(row.created_at),
+    updatedAt: toIsoTimestamp(row.updated_at),
   };
 }
 
@@ -68,14 +77,34 @@ export async function getOrCreateProfileSettings(userId: string): Promise<{
       freePortraitUses: row.free_portrait_uses ?? 0,
     };
   }
-  const [created] = await db
-    .insert(userProfileSettings)
-    .values({ user_id: userId, public_profile_enabled: false, free_portrait_uses: 0 })
-    .returning();
-  return {
-    publicProfileEnabled: created?.public_profile_enabled ?? false,
-    freePortraitUses: created?.free_portrait_uses ?? 0,
-  };
+  try {
+    const [created] = await db
+      .insert(userProfileSettings)
+      .values({ user_id: userId, public_profile_enabled: false, free_portrait_uses: 0 })
+      .returning();
+    return {
+      publicProfileEnabled: created?.public_profile_enabled ?? false,
+      freePortraitUses: created?.free_portrait_uses ?? 0,
+    };
+  } catch (e: unknown) {
+    const code =
+      typeof e === "object" && e !== null && "code" in e
+        ? String((e as { code: unknown }).code)
+        : "";
+    if (code !== "23505") throw e;
+    const [again] = await db
+      .select()
+      .from(userProfileSettings)
+      .where(eq(userProfileSettings.user_id, userId))
+      .limit(1);
+    if (again) {
+      return {
+        publicProfileEnabled: again.public_profile_enabled,
+        freePortraitUses: again.free_portrait_uses ?? 0,
+      };
+    }
+    throw new Error("Failed to create profile settings");
+  }
 }
 
 export async function setPublicProfileEnabled(userId: string, enabled: boolean) {
