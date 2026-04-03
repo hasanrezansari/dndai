@@ -20,6 +20,7 @@ import {
   listTopVoteTargets,
   soleVpLeaderOrNull,
 } from "@/lib/party/party-vote-resolution";
+import { buildPartySubmitSceneText } from "@/lib/party/party-opening-narrative";
 import {
   DEFAULT_PARTY_TOTAL_ROUNDS,
   getDefaultPartyTemplateKeyForBrand,
@@ -323,12 +324,15 @@ export async function activatePartySessionFromLobby(
 
   await dealPartySecretsIfNeeded(sessionId);
 
-  const prem = row.adventure_prompt?.trim() ?? "";
   const milestone = getPartyRoundMilestone(next.template_key, 1);
-  const preRoundNarrative = [prem, milestone ? `Round focus: ${milestone}` : ""]
-    .filter(Boolean)
-    .join("\n\n")
-    .trim();
+  const preRoundNarrative = buildPartySubmitSceneText({
+    adventurePrompt: row.adventure_prompt,
+    adventureTags: row.adventure_tags,
+    worldBible: row.world_bible,
+    sharedRoleLabel: next.shared_role_label,
+    carryForward: next.carry_forward,
+    roundMilestone: milestone,
+  }).trim();
   if (preRoundNarrative) {
     const { schedulePartyRoundSceneImage } = await import(
       "@/lib/orchestrator/party-image-schedule"
@@ -862,15 +866,18 @@ export async function tryPartyRevealDeadlineAdvance(
   };
   const version = await persistPartyConfigOptimistic(sessionId, row, nextConfig);
   if (version != null) {
-    const prem = row.adventure_prompt?.trim() ?? "";
     const milestone = getPartyRoundMilestone(
       nextConfig.template_key,
       nextConfig.round_index,
     );
-    const preRoundNarrative = [prem, milestone ? `Round focus: ${milestone}` : ""]
-      .filter(Boolean)
-      .join("\n\n")
-      .trim();
+    const preRoundNarrative = buildPartySubmitSceneText({
+      adventurePrompt: row.adventure_prompt,
+      adventureTags: row.adventure_tags,
+      worldBible: row.world_bible,
+      sharedRoleLabel: nextConfig.shared_role_label,
+      carryForward: nextConfig.carry_forward,
+      roundMilestone: milestone,
+    }).trim();
     if (preRoundNarrative) {
       const { schedulePartyRoundSceneImage } = await import(
         "@/lib/orchestrator/party-image-schedule"

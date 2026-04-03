@@ -30,6 +30,7 @@ import type {
   SessionStatePayload,
   StatEffect,
 } from "@/lib/state/game-store";
+import { buildPartySubmitSceneText } from "@/lib/party/party-opening-narrative";
 import { getPartyRoundMilestone } from "@/lib/party/party-templates";
 import { getQuestState } from "@/server/services/quest-service";
 
@@ -458,22 +459,15 @@ export async function loadSessionStatePayload(
         pc.party_phase === "submit" ||
         pc.party_phase === "tiebreak_submit"
       ) {
-        const prem = sessionRow.adventure_prompt?.trim() ?? "";
         const ms = getPartyRoundMilestone(pc.template_key, pc.round_index);
-        const carry = pc.carry_forward?.trim() ?? "";
-        const lens = pc.shared_role_label?.trim() ?? "";
-        const chunks: string[] = [];
-        if (lens) {
-          chunks.push(
-            `You’re all steering the same moment — shared lens: ${lens}`,
-          );
-        }
-        if (prem) chunks.push(prem);
-        if (ms) chunks.push(`Round focus: ${ms}`);
-        if (carry) chunks.push(`Where we left off: ${carry}`);
-        if (chunks.length > 0) {
-          narrativeText = chunks.join("\n\n");
-        }
+        narrativeText = buildPartySubmitSceneText({
+          adventurePrompt: sessionRow.adventure_prompt,
+          adventureTags: sessionRow.adventure_tags,
+          worldBible: sessionRow.world_bible,
+          sharedRoleLabel: pc.shared_role_label,
+          carryForward: pc.carry_forward,
+          roundMilestone: ms,
+        });
       } else if (pc.party_phase === "ended") {
         narrativeText =
           pc.merged_beat?.trim() ||

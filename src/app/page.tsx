@@ -153,8 +153,18 @@ export default function Home() {
           body.partyInstigatorEnabled = true;
         }
         body.acquisitionSource = "falvos_party_home";
-        if (adventurePrompt.trim()) {
-          body.adventurePrompt = adventurePrompt.trim();
+        const seedTrim = adventurePrompt.trim();
+        if (seedTrim) {
+          body.adventurePrompt = seedTrim;
+        } else if (toneTags.length > 0) {
+          const labels = toneTags.map(
+            (id) =>
+              LOBBY_TONE_TAG_OPTIONS.find((t) => t.id === id)?.label ?? id,
+          );
+          body.adventurePrompt = `Party scene — ${labels.join(", ")} tone. Everyone shares the same moment; your lines shape what happens next.`;
+        } else {
+          body.adventurePrompt =
+            "Party game — same scene, many voices. Pitch what happens next; the table votes on which direction sticks.";
         }
         if (worldBible.trim()) {
           body.worldBible = worldBible.trim();
@@ -835,7 +845,7 @@ export default function Home() {
           >
             <div
               className={`relative h-44 rounded-[var(--radius-card)] p-6 flex flex-col justify-end overflow-hidden transition-all duration-300 ${
-                mode === "ai_dm"
+                mode === "ai_dm" && !partyRoom
                   ? "bg-[var(--surface-high)] selected-glow metallic-edge"
                   : "bg-[var(--color-midnight)] border border-[rgba(77,70,53,0.2)] opacity-70 hover:opacity-100 hover:bg-[var(--surface-container)]"
               }`}
@@ -857,7 +867,7 @@ export default function Home() {
                 <div className="absolute inset-0 bg-gradient-to-br from-[rgba(242,202,80,0.18)] via-transparent to-[rgba(123,45,142,0.16)]" />
                 <div className="absolute inset-0 bg-gradient-to-t from-[var(--color-obsidian)] via-[var(--color-obsidian)]/30 to-transparent" />
               </div>
-              {mode === "ai_dm" && (
+              {mode === "ai_dm" && !partyRoom ? (
                 <div className="relative flex items-center gap-2 mb-1">
                   <span
                     className="material-symbols-outlined text-[var(--color-gold-rare)] text-sm"
@@ -869,7 +879,7 @@ export default function Home() {
                     Active Selection
                   </span>
                 </div>
-              )}
+              ) : null}
               <div className="relative">
                 <h3 className="text-fantasy font-bold text-xl text-[var(--color-silver-muted)]">
                   {COPY.landing.aiCardTitle}
