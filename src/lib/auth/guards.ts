@@ -49,9 +49,20 @@ export async function isPlayerForUser(
   return Boolean(row);
 }
 
+/** Non-empty trimmed secrets allowed for internal Bearer routes (either may be set in prod). */
+export function getInternalBearerSecrets(): string[] {
+  const raw = [process.env.INTERNAL_API_SECRET, process.env.NEXTAUTH_SECRET];
+  const trimmed = raw
+    .map((s) => s?.trim())
+    .filter((s): s is string => Boolean(s && s.length > 0));
+  return [...new Set(trimmed)];
+}
+
 export function internalBearerAuthorized(request: Request): boolean {
-  const secret = process.env.INTERNAL_API_SECRET || process.env.NEXTAUTH_SECRET;
-  if (!secret) return false;
+  const secrets = getInternalBearerSecrets();
+  if (secrets.length === 0) return false;
   const h = request.headers.get("authorization");
-  return h === `Bearer ${secret}`;
+  if (!h?.startsWith("Bearer ")) return false;
+  const token = h.slice(7).trim();
+  return secrets.some((s) => token === s);
 }

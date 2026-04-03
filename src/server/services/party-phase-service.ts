@@ -490,35 +490,81 @@ async function hydratePartyRoundSceneBeat(sessionId: string): Promise<void> {
       ? trimmed
       : "The table leans in; the moment hangs open — add what happens next.";
 
-  const nextCfg: PartyConfigV1 = {
-    ...cfg,
-    round_scene_beat,
-  };
+  let persistedVersion: number | null = null;
+  /** True if we lost a race and another writer already stored a beat (avoid duplicate image jobs). */
+  let beatAlreadyPresent = false;
+  for (let attempt = 0; attempt < 12; attempt++) {
+    if (attempt > 0) {
+      await new Promise((r) => setTimeout(r, 60 * attempt));
+    }
+    const [fresh] = await db
+      .select()
+      .from(sessions)
+      .where(eq(sessions.id, sessionId))
+      .limit(1);
+    if (!fresh || fresh.game_kind !== "party" || fresh.status !== "active") {
+      return;
+    }
+    const p = PartyConfigV1Schema.safeParse(fresh.party_config);
+    if (!p.success || p.data.party_phase !== "submit") return;
+    if (p.data.round_scene_beat?.trim()) {
+      persistedVersion = fresh.state_version;
+      beatAlreadyPresent = true;
+      break;
+    }
+    const nextCfg: PartyConfigV1 = {
+      ...p.data,
+      round_scene_beat,
+    };
+    const v = await persistPartyConfigOptimistic(sessionId, fresh, nextCfg);
+    if (v != null) {
+      persistedVersion = v;
+      beatAlreadyPresent = false;
+      break;
+    }
+  }
 
-  const version = await persistPartyConfigOptimistic(sessionId, row, nextCfg);
-  if (version == null) return;
+  if (persistedVersion == null) {
+    console.error(
+      "[party] round_scene_beat could not be persisted after retries",
+      sessionId,
+    );
+    return;
+  }
 
   const { buildPartySceneImageNarrativeText } = await import(
     "@/lib/party/party-opening-narrative"
   );
+  const [rowForImage] = await db
+    .select()
+    .from(sessions)
+    .where(eq(sessions.id, sessionId))
+    .limit(1);
+  const cfgForImage = PartyConfigV1Schema.safeParse(rowForImage?.party_config);
+  const partyConfig = cfgForImage.success ? cfgForImage.data : null;
+  if (!partyConfig || partyConfig.party_phase !== "submit") return;
+
   const narrative = buildPartySceneImageNarrativeText({
     sessionRow: {
-      adventure_prompt: row.adventure_prompt,
-      adventure_tags: row.adventure_tags,
-      world_bible: row.world_bible,
-      art_direction: row.art_direction,
+      adventure_prompt: rowForImage?.adventure_prompt,
+      adventure_tags: rowForImage?.adventure_tags,
+      world_bible: rowForImage?.world_bible,
+      art_direction: rowForImage?.art_direction,
     },
-    partyConfig: nextCfg,
+    partyConfig,
   }).trim();
 
-  if (narrative) {
+  const skipDuplicateImage =
+    beatAlreadyPresent && Boolean(partyConfig.scene_image_url?.trim());
+
+  if (narrative && !skipDuplicateImage) {
     const { schedulePartyRoundSceneImage } = await import(
       "@/lib/orchestrator/party-image-schedule"
     );
     void schedulePartyRoundSceneImage({
       sessionId,
       mergedBeat: narrative,
-      roundIndex: cfg.round_index,
+      roundIndex: partyConfig.round_index,
     });
   }
 }
