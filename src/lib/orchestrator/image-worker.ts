@@ -324,7 +324,8 @@ function buildPrompt(params: {
 
 export async function runImagePipeline(params: {
   sessionId: string;
-  turnId: string;
+  /** Party / internal jobs have no RPG turn — use `null` so traces do not violate `turns` FK. */
+  turnId: string | null;
   narrativeText: string;
   sceneContext: string;
   characterNames: string[];

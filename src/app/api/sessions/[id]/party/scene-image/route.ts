@@ -1,5 +1,3 @@
-import { randomUUID } from "node:crypto";
-
 import { and, eq } from "drizzle-orm";
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
@@ -65,13 +63,12 @@ export async function POST(
       return NextResponse.json({ ok: true, skipped: true }, { status: 200 });
     }
 
-    const turnId = randomUUID();
     const sceneContext = `Party game round ${cfg0.round_index}; template: ${cfg0.template_key}`;
     let imageUrl: string | null = null;
     try {
       const result = await runImagePipeline({
         sessionId,
-        turnId,
+        turnId: null,
         narrativeText: parsed.data.narrative_text,
         sceneContext,
         characterNames: [],
