@@ -3,16 +3,20 @@
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
+import { PartySessionCard } from "@/components/game/party-session-card";
 import { GhostButton } from "@/components/ui/ghost-button";
 import { GoldButton } from "@/components/ui/gold-button";
-import type { GamePlayerView } from "@/lib/state/game-store";
+import { isPartyBlockShownInScene } from "@/lib/party/party-ui-dedupe";
 import type { PartyConfigClientView } from "@/lib/schemas/party";
+import type { GamePlayerView } from "@/lib/state/game-store";
 
 type Props = {
   sessionId: string;
   currentPlayerId: string | null;
   party: PartyConfigClientView;
   players: GamePlayerView[];
+  /** Main Scene narrative from session state — used to hide duplicate carry / merged / recap text. */
+  sceneNarrativeForDedupe?: string | null;
 };
 
 type PartyMeView = {
@@ -56,6 +60,7 @@ export function PartyPlayPanel({
   currentPlayerId,
   party,
   players,
+  sceneNarrativeForDedupe = null,
 }: Props) {
   const [line, setLine] = useState("");
   const [busy, setBusy] = useState(false);
@@ -399,58 +404,73 @@ export function PartyPlayPanel({
     );
   }
 
-  return (
-    <div className="flex flex-col gap-4 px-4 py-4">
-      <div className="flex flex-wrap items-baseline justify-between gap-2">
-        <h2 className="text-sm font-semibold text-[var(--color-silver-dim)]">
-          Party · Round {party.roundIndex} / {party.totalRounds}
-        </h2>
-        <span className="text-[10px] uppercase tracking-wide text-[var(--outline)]">
-          {phase}
-        </span>
-      </div>
+  const scene = sceneNarrativeForDedupe;
+  const showCarryForward =
+    party.carryForward?.trim() &&
+    !isPartyBlockShownInScene(scene, party.carryForward);
+  const showMergedInPanel =
+    party.mergedBeat?.trim() &&
+    !isPartyBlockShownInScene(scene, party.mergedBeat);
+  const revealMergedDuplicated =
+    phase === "reveal" &&
+    Boolean(party.mergedBeat?.trim()) &&
+    isPartyBlockShownInScene(scene, party.mergedBeat);
 
-      {(phase === "submit" ||
-        phase === "vote" ||
-        phase === "forgery_guess" ||
-        phase === "reveal" ||
-        phase === "tiebreak_submit" ||
-        phase === "tiebreak_vote" ||
-        phase === "finale_tie_vote") && (
-        <PartyPhaseDeadline iso={party.phaseDeadlineIso} />
-      )}
+  return (
+    <div className="flex flex-col gap-3 px-4 py-4">
+      <PartySessionCard title="Table" variant="muted" className="!py-2.5">
+        <div className="flex flex-wrap items-baseline justify-between gap-2">
+          <p className="text-sm font-semibold text-[var(--color-silver-dim)]">
+            Round {party.roundIndex} / {party.totalRounds}
+          </p>
+          <span className="text-[10px] uppercase tracking-wide text-[var(--outline)]">
+            {phase}
+          </span>
+        </div>
+        {(phase === "submit" ||
+          phase === "vote" ||
+          phase === "forgery_guess" ||
+          phase === "reveal" ||
+          phase === "tiebreak_submit" ||
+          phase === "tiebreak_vote" ||
+          phase === "finale_tie_vote") && (
+          <div className="mt-2">
+            <PartyPhaseDeadline iso={party.phaseDeadlineIso} />
+          </div>
+        )}
+      </PartySessionCard>
 
       {party.instigatorEnabled ? (
-        <p className="text-[10px] uppercase tracking-wide text-[var(--color-outline)]">
-          Instigator on — one anonymous line is fake; guess it before the crowd vote.
-        </p>
+        <PartySessionCard title="Mode" variant="muted" className="!py-2.5">
+          <p className="text-[10px] uppercase tracking-wide text-[var(--color-outline)]">
+            Instigator on — one anonymous line is fake; guess it before the crowd vote.
+          </p>
+        </PartySessionCard>
       ) : null}
 
       {party.sharedRoleLabel?.trim() ? (
-        <p className="rounded-[var(--radius-chip)] border border-[var(--color-gold-rare)]/20 bg-[var(--color-gold-rare)]/5 px-3 py-2 text-[10px] leading-relaxed text-[var(--color-silver-muted)]">
-          <span className="font-semibold text-[var(--color-gold-rare)]">
-            Shared lens:{" "}
-          </span>
-          {party.sharedRoleLabel}
-        </p>
+        <PartySessionCard title="Shared lens" variant="muted">
+          <p className="text-[10px] leading-relaxed text-[var(--color-silver-muted)]">
+            <span className="font-semibold text-[var(--color-gold-rare)]">
+              Everyone steers:{" "}
+            </span>
+            {party.sharedRoleLabel}
+          </p>
+        </PartySessionCard>
       ) : null}
 
-      {party.carryForward?.trim() ? (
-        <p className="rounded-[var(--radius-chip)] border border-white/10 bg-black/20 px-3 py-2 text-xs text-[var(--color-silver-muted)]">
-          <span className="font-medium text-[var(--color-silver-dim)]">
-            Carried forward:{" "}
-          </span>
-          {party.carryForward}
-        </p>
+      {showCarryForward ? (
+        <PartySessionCard title="Where we left off" variant="muted">
+          <p className="whitespace-pre-wrap text-xs text-[var(--color-silver-muted)]">
+            {party.carryForward}
+          </p>
+        </PartySessionCard>
       ) : null}
 
       {showSecretBriefing && partyMe ? (
-        <div className="rounded-[var(--radius-card)] border border-[rgba(77,70,53,0.35)] bg-[var(--surface-container)]/50 p-4">
-          <p className="text-[10px] font-semibold uppercase tracking-wide text-[var(--color-gold-rare)]">
-            Your secret briefing
-          </p>
+        <PartySessionCard title="Your secret briefing">
           {partyMe.secretRole ? (
-            <p className="mt-2 text-sm font-medium text-[var(--color-silver)]">
+            <p className="text-sm font-medium text-[var(--color-silver)]">
               {partyMe.secretRole}
             </p>
           ) : null}
@@ -471,55 +491,59 @@ export function PartyPlayPanel({
               Secret bonus points: {partyMe.secretBonusPoints}
             </p>
           ) : null}
-        </div>
+        </PartySessionCard>
       ) : null}
 
       {(phase === "vote" ||
         phase === "forgery_guess" ||
         phase === "tiebreak_vote" ||
         phase === "finale_tie_vote") &&
-      party.mergedBeat?.trim() ? (
-        <div className="rounded-[var(--radius-card)] border border-[rgba(77,70,53,0.2)] bg-[var(--surface-container)]/40 p-4">
-          <p className="text-xs font-medium uppercase tracking-wide text-[var(--color-silver-dim)]">
-            Merged beat
-          </p>
-          <p className="mt-2 text-sm leading-relaxed text-[var(--color-silver-muted)]">
+      showMergedInPanel ? (
+        <PartySessionCard title="Merged beat">
+          <p className="whitespace-pre-wrap text-sm leading-relaxed text-[var(--color-silver-muted)]">
             {party.mergedBeat}
           </p>
-        </div>
+        </PartySessionCard>
       ) : null}
 
       {phase === "reveal" && party.mergedBeat?.trim() ? (
-        <div className="rounded-[var(--radius-card)] border border-[rgba(77,70,53,0.2)] bg-[var(--surface-container)]/40 p-4">
-          <p className="text-xs font-medium uppercase tracking-wide text-[var(--color-silver-dim)]">
-            Round recap
-          </p>
-          <p className="mt-2 text-sm leading-relaxed text-[var(--color-silver-muted)]">
-            {party.mergedBeat}
-          </p>
+        <PartySessionCard
+          title={revealMergedDuplicated ? "Who wrote what" : "Round recap"}
+        >
+          {!revealMergedDuplicated ? (
+            <p className="mb-3 whitespace-pre-wrap text-sm leading-relaxed text-[var(--color-silver-muted)]">
+              {party.mergedBeat}
+            </p>
+          ) : (
+            <p className="mb-3 text-[10px] text-[var(--color-outline)]">
+              Story is above in Scene — here’s how lines map to players.
+            </p>
+          )}
           {party.slotAttribution && party.submissionSlots?.length ? (
-            <ul className="mt-3 space-y-2 border-t border-white/10 pt-3">
+            <ul className="space-y-2">
               {party.submissionSlots.map((s) => {
                 const kind = party.slotAttribution?.[s.slotId];
                 return (
                   <li
                     key={s.slotId}
-                    className="flex flex-col gap-1 rounded-[var(--radius-chip)] border border-white/10 bg-black/20 px-3 py-2 text-left text-sm text-[var(--color-silver-muted)]"
+                    className="flex flex-col gap-1 rounded-[var(--radius-chip)] border border-white/12 bg-black/30 px-3 py-2.5 text-left"
                   >
-                    <span className="text-[10px] uppercase tracking-wide text-[var(--color-outline)]">
+                    <span className="text-[10px] font-semibold uppercase tracking-wide text-[var(--color-gold-rare)]/90">
                       {kind === "forgery" ? "Instigator (fake)" : "Player line"}
                     </span>
-                    <span>{s.text}</span>
+                    <span className="text-sm text-[var(--color-silver-muted)]">
+                      {s.text}
+                    </span>
                   </li>
                 );
               })}
             </ul>
           ) : null}
-        </div>
+        </PartySessionCard>
       ) : null}
 
       {phase === "forgery_guess" && party.submissionSlots?.length ? (
-        <div className="flex flex-col gap-2">
+        <PartySessionCard title="Spot the fake" contentClassName="flex flex-col gap-2">
           <p className="text-xs text-[var(--color-silver-dim)]">
             Which line was the instigator (the fake)?
           </p>
@@ -545,7 +569,7 @@ export function PartyPlayPanel({
               ))}
             </ul>
           )}
-        </div>
+        </PartySessionCard>
       ) : null}
 
       {phase === "tiebreak_submit" && !canTiebreakSubmit ? (
@@ -556,12 +580,10 @@ export function PartyPlayPanel({
       ) : null}
 
       {phase === "submit" || canTiebreakSubmit ? (
-        <div className="flex flex-col gap-2">
-          <label className="text-xs text-[var(--color-silver-dim)]">
-            {canTiebreakSubmit
-              ? "Your tiebreak line"
-              : "Your take on this moment"}
-          </label>
+        <PartySessionCard
+          title={canTiebreakSubmit ? "Tiebreak line" : "Your line"}
+          contentClassName="flex flex-col gap-2"
+        >
           <p className="text-[10px] leading-relaxed text-[var(--color-outline)]">
             {canTiebreakSubmit
               ? "Votes tied — pitch a sharper take. Everyone else will vote anonymously again."
@@ -600,11 +622,11 @@ export function PartyPlayPanel({
               {busy ? "Sending…" : canTiebreakSubmit ? "Submit tiebreak" : "Submit line"}
             </GoldButton>
           )}
-        </div>
+        </PartySessionCard>
       ) : null}
 
       {phase === "vote" || phase === "tiebreak_vote" || phase === "finale_tie_vote" ? (
-        <div className="flex flex-col gap-3">
+        <PartySessionCard title="Vote" contentClassName="flex flex-col gap-3">
           {isFinaleContender ? (
             <p className="text-sm text-[var(--color-silver-muted)]">
               You&apos;re tied for the crown — the rest of the table is picking
@@ -681,7 +703,7 @@ export function PartyPlayPanel({
           )}
             </>
           ) : null}
-        </div>
+        </PartySessionCard>
       ) : null}
 
       {(phase === "merge_pending" || phase === "narrate") && (

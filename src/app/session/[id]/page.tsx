@@ -31,6 +31,7 @@ import { TutorialOverlay } from "@/components/game/tutorial-overlay";
 import { ChronicleFeed } from "@/components/feed/chronicle-feed";
 import { FeedList } from "@/components/feed/feed-list";
 import { BeatStrip } from "@/components/game/beat-strip";
+import { PartySessionCard } from "@/components/game/party-session-card";
 import { PartyPlayPanel } from "@/components/game/party-play-panel";
 import { SessionViewModeToggle } from "@/components/game/session-view-mode-toggle";
 import { useGuidedTurnUi } from "@/hooks/use-guided-turn-ui";
@@ -642,14 +643,11 @@ export default function SessionGameplayPage() {
         </div>
         {narrativeText?.trim() ? (
           <div className="relative z-[2] shrink-0 px-4 pb-2 pt-1">
-            <div className="rounded-[var(--radius-card)] border border-[rgba(77,70,53,0.2)] bg-[var(--surface-container)]/40 px-4 py-3">
-              <p className="mb-2 text-[9px] font-black uppercase tracking-[0.2em] text-[var(--outline)]">
-                Scene
-              </p>
+            <PartySessionCard title="Scene" contentClassName="">
               <p className="text-fantasy text-sm leading-relaxed text-[var(--color-silver-muted)] whitespace-pre-wrap">
                 {narrativeText}
               </p>
-            </div>
+            </PartySessionCard>
           </div>
         ) : null}
         <div className="relative z-[2] min-h-0 flex-1 overflow-y-auto">
@@ -658,6 +656,7 @@ export default function SessionGameplayPage() {
             currentPlayerId={currentPlayerId}
             party={party}
             players={players}
+            sceneNarrativeForDedupe={narrativeText}
           />
         </div>
         <div className="mt-auto border-t border-white/10 p-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
