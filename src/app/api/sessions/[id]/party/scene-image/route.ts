@@ -55,15 +55,11 @@ export async function POST(
       return apiError("Invalid party state", 500);
     }
     const cfg0 = cfgParse.data;
-    const phaseOk =
-      cfg0.party_phase === "vote" ||
-      cfg0.party_phase === "forgery_guess" ||
-      cfg0.party_phase === "submit";
-    if (cfg0.round_index !== parsed.data.round_index || !phaseOk) {
+    if (cfg0.party_phase === "lobby" || cfg0.party_phase === "ended") {
       return NextResponse.json({ ok: true, skipped: true }, { status: 200 });
     }
 
-    const sceneContext = `Party game round ${cfg0.round_index}; template: ${cfg0.template_key}`;
+    const sceneContext = `Party game round ${parsed.data.round_index}; template: ${cfg0.template_key}`;
     let imageUrl: string | null = null;
     try {
       const result = await runImagePipeline({
@@ -82,6 +78,9 @@ export async function POST(
       return NextResponse.json({ ok: true, image: false }, { status: 200 });
     }
 
+    const urlTrim = imageUrl.trim();
+    const roundKey = String(parsed.data.round_index);
+
     const [row2] = await db
       .select()
       .from(sessions)
@@ -94,15 +93,14 @@ export async function POST(
       return apiError("Invalid party state", 500);
     }
     const cfg = cfgParse2.data;
-    const phaseOk2 =
-      cfg.party_phase === "vote" ||
-      cfg.party_phase === "forgery_guess" ||
-      cfg.party_phase === "submit";
-    if (cfg.round_index !== parsed.data.round_index || !phaseOk2) {
-      return NextResponse.json({ ok: true, skipped: true }, { status: 200 });
-    }
 
-    const nextConfig = { ...cfg, scene_image_url: imageUrl.trim() };
+    const byRound = { ...(cfg.scene_image_by_round ?? {}), [roundKey]: urlTrim };
+    const appliesToCurrentRound = cfg.round_index === parsed.data.round_index;
+    const nextConfig = {
+      ...cfg,
+      scene_image_by_round: byRound,
+      ...(appliesToCurrentRound ? { scene_image_url: urlTrim } : {}),
+    };
 
     const [updated] = await db
       .update(sessions)

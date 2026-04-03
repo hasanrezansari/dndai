@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { PartySessionCard } from "@/components/game/party-session-card";
+import { BottomSheet } from "@/components/sheets/bottom-sheet";
 import { GhostButton } from "@/components/ui/ghost-button";
 import { GoldButton } from "@/components/ui/gold-button";
 import { useToast } from "@/components/ui/toast";
@@ -56,6 +57,13 @@ function labelForPlayer(players: GamePlayerView[], playerId: string): string {
   );
 }
 
+function shortVpLabel(players: GamePlayerView[], playerId: string): string {
+  const full = labelForPlayer(players, playerId);
+  const words = full.trim().split(/\s+/);
+  if (words[0] && words[0].length <= 12) return words[0]!;
+  return full.slice(0, 10) + (full.length > 10 ? "…" : "");
+}
+
 export function PartyPlayPanel({
   sessionId,
   currentPlayerId,
@@ -69,6 +77,7 @@ export function PartyPlayPanel({
   const [error, setError] = useState<string | null>(null);
   const [forgeryGuessSent, setForgeryGuessSent] = useState(false);
   const [partyMe, setPartyMe] = useState<PartyMeView | null>(null);
+  const [tableSheetOpen, setTableSheetOpen] = useState(false);
   const prevMyVpRef = useRef<number | null>(null);
 
   const myVp =
@@ -461,87 +470,19 @@ export function PartyPlayPanel({
     Boolean(party.mergedBeat?.trim()) &&
     isPartyBlockShownInScene(scene, party.mergedBeat);
 
+  const showPhaseDeadline =
+    phase === "submit" ||
+    phase === "vote" ||
+    phase === "forgery_guess" ||
+    phase === "reveal" ||
+    phase === "tiebreak_submit" ||
+    phase === "tiebreak_vote" ||
+    phase === "finale_tie_vote";
+
   return (
-    <div className="flex flex-col gap-3 px-4 py-4">
-      <PartySessionCard title="Table" variant="muted" className="!py-2.5">
-        <div className="flex flex-wrap items-baseline justify-between gap-2">
-          <p className="text-sm font-semibold text-[var(--color-silver-dim)]">
-            Round {party.roundIndex} / {party.totalRounds}
-          </p>
-          <span className="text-[10px] uppercase tracking-wide text-[var(--outline)]">
-            {phase}
-          </span>
-        </div>
-        {(phase === "submit" ||
-          phase === "vote" ||
-          phase === "forgery_guess" ||
-          phase === "reveal" ||
-          phase === "tiebreak_submit" ||
-          phase === "tiebreak_vote" ||
-          phase === "finale_tie_vote") && (
-          <div className="mt-2">
-            <PartyPhaseDeadline iso={party.phaseDeadlineIso} />
-          </div>
-        )}
-      </PartySessionCard>
-
-      {phase !== "lobby" ? (
-        <PartySessionCard title="Crowd score" variant="muted" contentClassName="space-y-2">
-          <p className="text-[10px] leading-relaxed text-[var(--color-outline)]">
-            Winning the crowd vote each round earns <span className="text-[var(--color-silver-dim)]">+1 VP</span>
-            {party.instigatorEnabled
-              ? ". Spotting the fake line adds instigator points."
-              : "."}
-          </p>
-          {crowdScoreRows.length === 0 ? (
-            <p className="text-xs text-[var(--color-silver-dim)]">No players yet.</p>
-          ) : (
-            <ul className="flex flex-col gap-1.5">
-              {crowdScoreRows.map((row) => (
-                <li
-                  key={row.id}
-                  className={`flex items-center justify-between gap-2 rounded-[var(--radius-chip)] border px-2.5 py-2 text-xs ${
-                    row.id === currentPlayerId
-                      ? "border-[var(--color-gold-rare)]/45 bg-[var(--color-gold-rare)]/10"
-                      : "border-white/10 bg-black/25"
-                  }`}
-                >
-                  <span className="min-w-0 truncate font-medium text-[var(--color-silver-muted)]">
-                    {row.label}
-                    {row.id === currentPlayerId ? (
-                      <span className="ml-1 text-[10px] font-normal text-[var(--color-outline)]">
-                        (you)
-                      </span>
-                    ) : null}
-                  </span>
-                  <div className="flex shrink-0 items-center gap-2">
-                    {party.instigatorEnabled && row.fp > 0 ? (
-                      <span
-                        className="text-[10px] tabular-nums text-[var(--color-outline)]"
-                        title="Instigator — spotted the fake"
-                      >
-                        🎯 {row.fp}
-                      </span>
-                    ) : null}
-                    <span className="tabular-nums font-semibold text-[var(--color-gold)]">
-                      {row.n} VP
-                    </span>
-                  </div>
-                </li>
-              ))}
-            </ul>
-          )}
-        </PartySessionCard>
-      ) : null}
-
-      {party.instigatorEnabled ? (
-        <PartySessionCard title="Mode" variant="muted" className="!py-2.5">
-          <p className="text-[10px] uppercase tracking-wide text-[var(--color-outline)]">
-            Instigator on — one anonymous line is fake; guess it before the crowd vote.
-          </p>
-        </PartySessionCard>
-      ) : null}
-
+    <>
+      <div className="flex min-h-0 flex-1 flex-col">
+        <div className="min-h-0 flex-1 space-y-2 overflow-y-auto px-3 pb-1 pt-0">
       {party.sharedRoleLabel?.trim() ? (
         <PartySessionCard title="Shared lens" variant="muted">
           <p className="text-[10px] leading-relaxed text-[var(--color-silver-muted)]">
@@ -636,168 +577,11 @@ export function PartyPlayPanel({
         </PartySessionCard>
       ) : null}
 
-      {phase === "forgery_guess" && party.submissionSlots?.length ? (
-        <PartySessionCard title="Spot the fake" contentClassName="flex flex-col gap-2">
-          <p className="text-xs text-[var(--color-silver-dim)]">
-            Which line was the instigator (the fake)?
-          </p>
-          {forgeryGuessSent ? (
-            <p className="text-sm text-[var(--color-silver-muted)]">
-              Guess locked. Waiting for others…
-            </p>
-          ) : (
-            <ul className="flex flex-col gap-2">
-              {party.submissionSlots.map((s) => (
-                <li key={s.slotId}>
-                  <GhostButton
-                    type="button"
-                    disabled={busy || !currentPlayerId}
-                    className="h-auto w-full flex-col items-stretch gap-1 py-3 text-left"
-                    onClick={() => void castForgeryGuess(s.slotId)}
-                  >
-                    <span className="text-sm text-[var(--color-silver-muted)]">
-                      {s.text}
-                    </span>
-                  </GhostButton>
-                </li>
-              ))}
-            </ul>
-          )}
-        </PartySessionCard>
-      ) : null}
-
       {phase === "tiebreak_submit" && !canTiebreakSubmit ? (
         <p className="text-sm text-[var(--color-silver-muted)]">
           The crowd tied — only the tied players submit a fresh line for a quick
           revote.
         </p>
-      ) : null}
-
-      {phase === "submit" || canTiebreakSubmit ? (
-        <PartySessionCard
-          title={canTiebreakSubmit ? "Tiebreak line" : "Your line"}
-          contentClassName="flex flex-col gap-2"
-        >
-          <p className="text-[10px] leading-relaxed text-[var(--color-outline)]">
-            {canTiebreakSubmit
-              ? "Votes tied — pitch a sharper take. Everyone else will vote anonymously again."
-              : "Same scene as everyone else — pitch how it should go next. Keep it short; the table votes on which direction sticks."}
-          </p>
-          <textarea
-            value={line}
-            onChange={(e) => setLine(e.target.value)}
-            disabled={
-              busy ||
-              Boolean(
-                phase === "submit"
-                  ? mySubmission
-                  : partyMe?.mySubmittedTiebreak,
-              )
-            }
-            maxLength={2000}
-            rows={4}
-            className="min-h-[100px] w-full resize-y rounded-[var(--radius-chip)] border border-white/15 bg-black/30 px-3 py-2 text-sm text-[var(--color-silver)] placeholder:text-[var(--color-silver-dim)] disabled:opacity-50"
-            placeholder="One punchy line for this shared beat…"
-          />
-          {phase === "submit" && mySubmission ? (
-            <p className="text-xs text-[var(--color-silver-dim)]">
-              You submitted. Waiting for others…
-            </p>
-          ) : canTiebreakSubmit && partyMe?.mySubmittedTiebreak ? (
-            <p className="text-xs text-[var(--color-silver-dim)]">
-              Tiebreak line sent. Waiting for other tied players…
-            </p>
-          ) : (
-            <GoldButton
-              type="button"
-              disabled={busy || !line.trim() || !currentPlayerId}
-              onClick={() => void submitLine()}
-            >
-              {busy ? "Sending…" : canTiebreakSubmit ? "Submit tiebreak" : "Submit line"}
-            </GoldButton>
-          )}
-        </PartySessionCard>
-      ) : null}
-
-      {phase === "vote" || phase === "tiebreak_vote" || phase === "finale_tie_vote" ? (
-        <PartySessionCard title="Vote" contentClassName="flex flex-col gap-3">
-          {isFinaleContender ? (
-            <p className="text-sm text-[var(--color-silver-muted)]">
-              You&apos;re tied for the crown — the rest of the table is picking
-              among the finalists.
-            </p>
-          ) : null}
-          {!isFinaleContender ? (
-            <>
-          <p className="text-xs text-[var(--color-silver-dim)]">
-            {phase === "finale_tie_vote"
-              ? "Pick which tied leader should take the table — anonymous cards."
-              : useAnonymousVoteCards
-                ? "Pick the line that should steer the story — cards are anonymous (not your own)."
-                : "Vote for your favorite line (not yourself)."}
-          </p>
-          {myVote ? (
-            <p className="text-sm text-[var(--color-silver-muted)]">
-              Vote locked. Waiting for others…
-            </p>
-          ) : useAnonymousVoteCards ? (
-            partyMe === null && currentPlayerId ? (
-              <p className="text-sm text-[var(--color-silver-dim)]">
-                Loading ballot…
-              </p>
-            ) : votableAnonymousSlots.length === 0 ? (
-              <p className="text-sm text-[var(--color-silver-dim)]">
-                No other lines to vote on this round.
-              </p>
-            ) : (
-              <ul className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                {votableAnonymousSlots.map((s) => (
-                  <li key={s.slotId}>
-                    <button
-                      type="button"
-                      disabled={busy || !currentPlayerId}
-                      onClick={() => void castVoteBySlot(s.slotId)}
-                      className="flex min-h-[120px] w-full flex-col items-stretch justify-between rounded-[var(--radius-card)] border border-[rgba(77,70,53,0.28)] bg-[var(--surface-container)]/45 px-4 py-3 text-left transition-colors hover:border-[var(--color-gold-rare)]/35 hover:bg-[var(--surface-container)]/65 disabled:opacity-50"
-                    >
-                      <span className="text-[9px] font-black uppercase tracking-[0.18em] text-[var(--outline)]">
-                        Card
-                      </span>
-                      <span className="mt-2 text-sm leading-snug text-[var(--color-silver-muted)]">
-                        {s.text}
-                      </span>
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            )
-          ) : voteTargets.length === 0 ? (
-            <p className="text-sm text-[var(--color-silver-dim)]">
-              Need at least one other player with a line to vote on.
-            </p>
-          ) : (
-            <ul className="flex flex-col gap-2">
-              {voteTargets.map((t) => (
-                <li key={t.playerId}>
-                  <GhostButton
-                    type="button"
-                    disabled={busy || !currentPlayerId}
-                    className="h-auto w-full flex-col items-stretch gap-1 py-3 text-left"
-                    onClick={() => void castVote(t.playerId)}
-                  >
-                    <span className="text-xs text-[var(--color-gold)]">
-                      {t.label}
-                    </span>
-                    <span className="text-sm text-[var(--color-silver-muted)]">
-                      {t.text}
-                    </span>
-                  </GhostButton>
-                </li>
-              ))}
-            </ul>
-          )}
-            </>
-          ) : null}
-        </PartySessionCard>
       ) : null}
 
       {(phase === "merge_pending" || phase === "narrate") && (
@@ -809,12 +593,291 @@ export function PartyPlayPanel({
       {phase === "reveal" && !party.mergedBeat?.trim() ? (
         <p className="text-sm text-[var(--color-silver-muted)]">Round results…</p>
       ) : null}
+        </div>
 
-      {error ? (
-        <p className="text-sm text-red-300/90" role="alert">
-          {error}
-        </p>
-      ) : null}
-    </div>
+        <div className="shrink-0 space-y-2 border-t border-white/10 bg-[var(--color-obsidian)]/96 px-3 pb-[max(0.5rem,env(safe-area-inset-bottom))] pt-2 backdrop-blur-md">
+          <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5">
+            <span className="text-[10px] font-semibold tabular-nums text-[var(--color-silver-dim)]">
+              R{party.roundIndex}/{party.totalRounds}
+            </span>
+            <span className="text-[10px] uppercase tracking-wide text-[var(--outline)]">
+              {phase}
+            </span>
+            {showPhaseDeadline && party.phaseDeadlineIso ? (
+              <PartyPhaseDeadline iso={party.phaseDeadlineIso} />
+            ) : null}
+            {party.instigatorEnabled ? (
+              <span className="rounded border border-white/12 px-1.5 py-0.5 text-[9px] uppercase tracking-wide text-[var(--color-outline)]">
+                Instigator
+              </span>
+            ) : null}
+            {phase !== "lobby" && crowdScoreRows.length > 0 ? (
+              <span
+                className="min-w-0 max-w-[min(100%,14rem)] truncate text-[10px] text-[var(--color-gold)]/95"
+                title={crowdScoreRows
+                  .map((r) => `${labelForPlayer(players, r.id)} ${r.n} VP`)
+                  .join(" · ")}
+              >
+                {crowdScoreRows
+                  .map((r) => `${shortVpLabel(players, r.id)} ${r.n}`)
+                  .join(" · ")}
+              </span>
+            ) : null}
+            <GhostButton
+              type="button"
+              className="ml-auto !min-h-[32px] shrink-0 !px-2.5 !py-1 !text-[10px]"
+              onClick={() => setTableSheetOpen(true)}
+            >
+              Table & scores
+            </GhostButton>
+          </div>
+
+          {phase === "forgery_guess" && party.submissionSlots?.length ? (
+            <PartySessionCard title="Spot the fake" contentClassName="flex flex-col gap-2">
+              <p className="text-xs text-[var(--color-silver-dim)]">
+                Which line was the instigator (the fake)?
+              </p>
+              {forgeryGuessSent ? (
+                <p className="text-sm text-[var(--color-silver-muted)]">
+                  Guess locked. Waiting for others…
+                </p>
+              ) : (
+                <ul className="flex max-h-[min(40vh,320px)] flex-col gap-2 overflow-y-auto">
+                  {party.submissionSlots.map((s) => (
+                    <li key={s.slotId}>
+                      <GhostButton
+                        type="button"
+                        disabled={busy || !currentPlayerId}
+                        className="h-auto w-full flex-col items-stretch gap-1 py-2.5 text-left"
+                        onClick={() => void castForgeryGuess(s.slotId)}
+                      >
+                        <span className="text-sm text-[var(--color-silver-muted)]">
+                          {s.text}
+                        </span>
+                      </GhostButton>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </PartySessionCard>
+          ) : null}
+
+          {phase === "submit" || canTiebreakSubmit ? (
+            <PartySessionCard
+              title={canTiebreakSubmit ? "Tiebreak line" : "Your line"}
+              contentClassName="flex flex-col gap-2"
+            >
+              <p className="text-[10px] leading-relaxed text-[var(--color-outline)]">
+                {canTiebreakSubmit
+                  ? "Votes tied — pitch a sharper take. Everyone else will vote anonymously again."
+                  : "Same scene as everyone else — pitch how it should go next. Keep it short; the table votes on which direction sticks."}
+              </p>
+              <textarea
+                value={line}
+                onChange={(e) => setLine(e.target.value)}
+                disabled={
+                  busy ||
+                  Boolean(
+                    phase === "submit"
+                      ? mySubmission
+                      : partyMe?.mySubmittedTiebreak,
+                  )
+                }
+                maxLength={2000}
+                rows={3}
+                className="min-h-[72px] w-full resize-y rounded-[var(--radius-chip)] border border-white/15 bg-black/30 px-3 py-2 text-sm text-[var(--color-silver)] placeholder:text-[var(--color-silver-dim)] disabled:opacity-50 sm:min-h-[100px]"
+                placeholder="One punchy line for this shared beat…"
+              />
+              {phase === "submit" && mySubmission ? (
+                <p className="text-xs text-[var(--color-silver-dim)]">
+                  You submitted. Waiting for others…
+                </p>
+              ) : canTiebreakSubmit && partyMe?.mySubmittedTiebreak ? (
+                <p className="text-xs text-[var(--color-silver-dim)]">
+                  Tiebreak line sent. Waiting for other tied players…
+                </p>
+              ) : (
+                <GoldButton
+                  type="button"
+                  disabled={busy || !line.trim() || !currentPlayerId}
+                  onClick={() => void submitLine()}
+                >
+                  {busy ? "Sending…" : canTiebreakSubmit ? "Submit tiebreak" : "Submit line"}
+                </GoldButton>
+              )}
+            </PartySessionCard>
+          ) : null}
+
+          {phase === "vote" || phase === "tiebreak_vote" || phase === "finale_tie_vote" ? (
+            <PartySessionCard title="Vote" contentClassName="flex flex-col gap-3">
+              {isFinaleContender ? (
+                <p className="text-sm text-[var(--color-silver-muted)]">
+                  You&apos;re tied for the crown — the rest of the table is picking
+                  among the finalists.
+                </p>
+              ) : null}
+              {!isFinaleContender ? (
+                <>
+                  <p className="text-xs text-[var(--color-silver-dim)]">
+                    {phase === "finale_tie_vote"
+                      ? "Pick which tied leader should take the table — anonymous cards."
+                      : useAnonymousVoteCards
+                        ? "Pick the line that should steer the story — cards are anonymous (not your own)."
+                        : "Vote for your favorite line (not yourself)."}
+                  </p>
+                  {myVote ? (
+                    <p className="text-sm text-[var(--color-silver-muted)]">
+                      Vote locked. Waiting for others…
+                    </p>
+                  ) : useAnonymousVoteCards ? (
+                    partyMe === null && currentPlayerId ? (
+                      <p className="text-sm text-[var(--color-silver-dim)]">
+                        Loading ballot…
+                      </p>
+                    ) : votableAnonymousSlots.length === 0 ? (
+                      <p className="text-sm text-[var(--color-silver-dim)]">
+                        No other lines to vote on this round.
+                      </p>
+                    ) : (
+                      <ul className="grid max-h-[min(42vh,360px)] grid-cols-1 gap-2 overflow-y-auto sm:grid-cols-2 sm:gap-3">
+                        {votableAnonymousSlots.map((s) => (
+                          <li key={s.slotId}>
+                            <button
+                              type="button"
+                              disabled={busy || !currentPlayerId}
+                              onClick={() => void castVoteBySlot(s.slotId)}
+                              className="flex min-h-[88px] w-full flex-col items-stretch justify-between rounded-[var(--radius-card)] border border-[rgba(77,70,53,0.28)] bg-[var(--surface-container)]/45 px-3 py-2.5 text-left transition-colors hover:border-[var(--color-gold-rare)]/35 hover:bg-[var(--surface-container)]/65 disabled:opacity-50 sm:min-h-[120px] sm:px-4 sm:py-3"
+                            >
+                              <span className="text-[9px] font-black uppercase tracking-[0.18em] text-[var(--outline)]">
+                                Card
+                              </span>
+                              <span className="mt-1.5 text-sm leading-snug text-[var(--color-silver-muted)]">
+                                {s.text}
+                              </span>
+                            </button>
+                          </li>
+                        ))}
+                      </ul>
+                    )
+                  ) : voteTargets.length === 0 ? (
+                    <p className="text-sm text-[var(--color-silver-dim)]">
+                      Need at least one other player with a line to vote on.
+                    </p>
+                  ) : (
+                    <ul className="flex max-h-[min(40vh,320px)] flex-col gap-2 overflow-y-auto">
+                      {voteTargets.map((t) => (
+                        <li key={t.playerId}>
+                          <GhostButton
+                            type="button"
+                            disabled={busy || !currentPlayerId}
+                            className="h-auto w-full flex-col items-stretch gap-1 py-2.5 text-left"
+                            onClick={() => void castVote(t.playerId)}
+                          >
+                            <span className="text-xs text-[var(--color-gold)]">
+                              {t.label}
+                            </span>
+                            <span className="text-sm text-[var(--color-silver-muted)]">
+                              {t.text}
+                            </span>
+                          </GhostButton>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </>
+              ) : null}
+            </PartySessionCard>
+          ) : null}
+
+          {error ? (
+            <p className="text-sm text-red-300/90" role="alert">
+              {error}
+            </p>
+          ) : null}
+        </div>
+      </div>
+
+      <BottomSheet
+        isOpen={tableSheetOpen}
+        onClose={() => setTableSheetOpen(false)}
+        title="Table & scores"
+      >
+        <div className="flex flex-col gap-3 px-1 pb-6">
+          <PartySessionCard title="Table" variant="muted" className="!py-2.5">
+            <div className="flex flex-wrap items-baseline justify-between gap-2">
+              <p className="text-sm font-semibold text-[var(--color-silver-dim)]">
+                Round {party.roundIndex} / {party.totalRounds}
+              </p>
+              <span className="text-[10px] uppercase tracking-wide text-[var(--outline)]">
+                {phase}
+              </span>
+            </div>
+            {showPhaseDeadline && (
+              <div className="mt-2">
+                <PartyPhaseDeadline iso={party.phaseDeadlineIso} />
+              </div>
+            )}
+          </PartySessionCard>
+
+          {phase !== "lobby" ? (
+            <PartySessionCard title="Crowd score" variant="muted" contentClassName="space-y-2">
+              <p className="text-[10px] leading-relaxed text-[var(--color-outline)]">
+                Winning the crowd vote each round earns{" "}
+                <span className="text-[var(--color-silver-dim)]">+1 VP</span>
+                {party.instigatorEnabled
+                  ? ". Spotting the fake line adds instigator points."
+                  : "."}
+              </p>
+              {crowdScoreRows.length === 0 ? (
+                <p className="text-xs text-[var(--color-silver-dim)]">No players yet.</p>
+              ) : (
+                <ul className="flex flex-col gap-1.5">
+                  {crowdScoreRows.map((row) => (
+                    <li
+                      key={row.id}
+                      className={`flex items-center justify-between gap-2 rounded-[var(--radius-chip)] border px-2.5 py-2 text-xs ${
+                        row.id === currentPlayerId
+                          ? "border-[var(--color-gold-rare)]/45 bg-[var(--color-gold-rare)]/10"
+                          : "border-white/10 bg-black/25"
+                      }`}
+                    >
+                      <span className="min-w-0 truncate font-medium text-[var(--color-silver-muted)]">
+                        {row.label}
+                        {row.id === currentPlayerId ? (
+                          <span className="ml-1 text-[10px] font-normal text-[var(--color-outline)]">
+                            (you)
+                          </span>
+                        ) : null}
+                      </span>
+                      <div className="flex shrink-0 items-center gap-2">
+                        {party.instigatorEnabled && row.fp > 0 ? (
+                          <span
+                            className="text-[10px] tabular-nums text-[var(--color-outline)]"
+                            title="Instigator — spotted the fake"
+                          >
+                            🎯 {row.fp}
+                          </span>
+                        ) : null}
+                        <span className="tabular-nums font-semibold text-[var(--color-gold)]">
+                          {row.n} VP
+                        </span>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </PartySessionCard>
+          ) : null}
+
+          {party.instigatorEnabled ? (
+            <PartySessionCard title="Mode" variant="muted" className="!py-2.5">
+              <p className="text-[10px] uppercase tracking-wide text-[var(--color-outline)]">
+                Instigator on — one anonymous line is fake; guess it before the crowd vote.
+              </p>
+            </PartySessionCard>
+          ) : null}
+        </div>
+      </BottomSheet>
+    </>
   );
 }

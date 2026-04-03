@@ -609,7 +609,7 @@ export default function SessionGameplayPage() {
     const partySceneImage = sceneImage ?? party.sceneImageUrl ?? null;
 
     return (
-      <div className="relative flex min-h-dvh flex-col bg-[var(--color-obsidian)]">
+      <div className="relative flex h-dvh max-h-dvh flex-col overflow-hidden bg-[var(--color-obsidian)]">
         <SceneTransition
           imageUrl={partySceneImage}
           locationTitle={sceneTitle}
@@ -618,7 +618,7 @@ export default function SessionGameplayPage() {
           onDismiss={() => setSceneTransitionTrigger(false)}
         />
         <ConnectionStatus />
-        <div className="relative z-[1] h-[min(36vh,320px)] w-full shrink-0 overflow-hidden">
+        <div className="relative z-[1] h-[min(32vh,280px)] w-full shrink-0 overflow-hidden sm:h-[min(36vh,320px)]">
           <button
             type="button"
             onClick={handleLeaveSession}
@@ -642,15 +642,15 @@ export default function SessionGameplayPage() {
           />
         </div>
         {narrativeText?.trim() ? (
-          <div className="relative z-[2] shrink-0 px-4 pb-2 pt-1">
-            <PartySessionCard title="Scene" contentClassName="">
+          <div className="relative z-[2] max-h-[min(28vh,220px)] shrink-0 overflow-y-auto px-3 pb-1 pt-1 sm:max-h-[min(32vh,260px)] sm:px-4">
+            <PartySessionCard title="Scene" contentClassName="!py-2.5" className="!py-0">
               <p className="text-fantasy text-sm leading-relaxed text-[var(--color-silver-muted)] whitespace-pre-wrap">
                 {narrativeText}
               </p>
             </PartySessionCard>
           </div>
         ) : null}
-        <div className="relative z-[2] min-h-0 flex-1 overflow-y-auto">
+        <div className="relative z-[2] flex min-h-0 flex-1 flex-col overflow-hidden">
           <PartyPlayPanel
             sessionId={sessionId}
             currentPlayerId={currentPlayerId}
@@ -658,11 +658,6 @@ export default function SessionGameplayPage() {
             players={players}
             sceneNarrativeForDedupe={narrativeText}
           />
-        </div>
-        <div className="mt-auto border-t border-white/10 p-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
-          <GhostButton type="button" onClick={handleLeaveSession}>
-            Leave session
-          </GhostButton>
         </div>
       </div>
     );

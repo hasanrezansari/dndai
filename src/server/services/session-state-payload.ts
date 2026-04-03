@@ -474,7 +474,9 @@ export async function loadSessionStatePayload(
           pc.carry_forward?.trim() ||
           narrativeText;
       }
-      const art = pc.scene_image_url?.trim();
+      const art =
+        pc.scene_image_by_round?.[String(pc.round_index)]?.trim() ??
+        pc.scene_image_url?.trim();
       if (art) {
         sceneImage = art;
         scenePending = false;

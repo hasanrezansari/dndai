@@ -46,6 +46,11 @@ export const PartyConfigV1Schema = z.object({
   round_scene_beat: z.string().nullable().optional(),
   /** Latest merged-round scene art URL (serving path or absolute); cleared each new round. */
   scene_image_url: z.string().nullable().optional(),
+  /**
+   * Per-round scene art (key = round_index as string). Lets late image jobs persist even if
+   * `scene_image_url` was cleared after the round advanced.
+   */
+  scene_image_by_round: z.record(z.string(), z.string()).optional(),
   instigator_enabled: z.boolean().optional(),
   instigator_slot_id: z.string().nullable().optional(),
   slot_attribution: z
@@ -212,7 +217,10 @@ export function partyConfigForSessionPayload(
     vpTotals: c.vp_totals ?? {},
     fpTotals: c.fp_totals ?? {},
     mergedBeat: c.merged_beat ?? null,
-    sceneImageUrl: c.scene_image_url ?? null,
+    sceneImageUrl:
+      c.scene_image_by_round?.[String(c.round_index)]?.trim() ??
+      c.scene_image_url ??
+      null,
     instigatorEnabled: c.instigator_enabled ?? false,
     submissionSlots: slots,
     crowdVoteSlotIds,

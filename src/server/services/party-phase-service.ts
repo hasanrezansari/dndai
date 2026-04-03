@@ -554,8 +554,10 @@ async function hydratePartyRoundSceneBeat(sessionId: string): Promise<void> {
     partyConfig,
   }).trim();
 
-  const skipDuplicateImage =
-    beatAlreadyPresent && Boolean(partyConfig.scene_image_url?.trim());
+  const urlForRound =
+    partyConfig.scene_image_by_round?.[String(partyConfig.round_index)]?.trim() ??
+    partyConfig.scene_image_url?.trim();
+  const skipDuplicateImage = beatAlreadyPresent && Boolean(urlForRound);
 
   if (narrative && !skipDuplicateImage) {
     const { schedulePartyRoundSceneImage } = await import(
