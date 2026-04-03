@@ -30,8 +30,7 @@ import type {
   SessionStatePayload,
   StatEffect,
 } from "@/lib/state/game-store";
-import { buildPartySubmitSceneText } from "@/lib/party/party-opening-narrative";
-import { getPartyRoundMilestone } from "@/lib/party/party-templates";
+import { buildPartySessionNarrativeText } from "@/lib/party/party-opening-narrative";
 import { getQuestState } from "@/server/services/quest-service";
 
 const DEFAULT_STATS = {
@@ -459,14 +458,15 @@ export async function loadSessionStatePayload(
         pc.party_phase === "submit" ||
         pc.party_phase === "tiebreak_submit"
       ) {
-        const ms = getPartyRoundMilestone(pc.template_key, pc.round_index);
-        narrativeText = buildPartySubmitSceneText({
-          adventurePrompt: sessionRow.adventure_prompt,
-          adventureTags: sessionRow.adventure_tags,
-          worldBible: sessionRow.world_bible,
-          sharedRoleLabel: pc.shared_role_label,
-          carryForward: pc.carry_forward,
-          roundMilestone: ms,
+        narrativeText = buildPartySessionNarrativeText({
+          partyPhase: pc.party_phase,
+          sessionRow: {
+            adventure_prompt: sessionRow.adventure_prompt,
+            adventure_tags: sessionRow.adventure_tags,
+            world_bible: sessionRow.world_bible,
+            art_direction: sessionRow.art_direction,
+          },
+          partyConfig: pc,
         });
       } else if (pc.party_phase === "ended") {
         narrativeText =

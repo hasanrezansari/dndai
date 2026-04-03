@@ -159,3 +159,9 @@ export const PartyVoteJudgeOutputSchema = z.object({
   winning_player_id: z.string().uuid(),
 });
 export type PartyVoteJudgeOutput = output<typeof PartyVoteJudgeOutputSchema>;
+
+/** Party: DM-style establishing beat for the current round (before player lines). */
+export const PartyRoundOpenerOutputSchema = z.object({
+  scene_beat: z.string().min(40).max(2800),
+});
+export type PartyRoundOpenerOutput = output<typeof PartyRoundOpenerOutputSchema>;

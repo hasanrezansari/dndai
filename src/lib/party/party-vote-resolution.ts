@@ -192,6 +192,7 @@ export function enterPartyVoteTiebreak(params: {
     vote_slot_owner: undefined,
     phase_deadline_iso: params.isoDeadlineFromNow(params.submitDeadlineSec),
     merged_beat: params.cfg.merged_beat ?? null,
+    round_scene_beat: null,
   };
 }
 
@@ -205,6 +206,7 @@ export function buildPartyEndedAfterFinaleVote(params: {
     votes_this_round: params.votes,
     party_phase: "ended",
     merged_beat: params.cfg.merged_beat ?? null,
+    round_scene_beat: null,
     phase_deadline_iso: null,
     submission_slots_public: undefined,
     vote_slot_owner: undefined,
@@ -286,6 +288,7 @@ export function buildNextPartyConfigAfterVote(params: {
       party_phase: "reveal",
       phase_deadline_iso: isoDeadlineFromNow(PARTY_REVEAL_DEADLINE_SEC),
       merged_beat: cfg.merged_beat ?? null,
+      round_scene_beat: null,
       ...clearTiebreakFields,
     };
   }
@@ -310,6 +313,7 @@ export function buildNextPartyConfigAfterVote(params: {
           vote_slot_owner: finSlots.vote_slot_owner,
           phase_deadline_iso: isoDeadlineFromNow(voteDeadlineSec),
           merged_beat: cfg.merged_beat ?? null,
+          round_scene_beat: null,
           ...clearTiebreakFields,
         };
       }
@@ -322,6 +326,7 @@ export function buildNextPartyConfigAfterVote(params: {
       carry_forward: carry,
       party_phase: "ended",
       merged_beat: cfg.merged_beat ?? null,
+      round_scene_beat: null,
       phase_deadline_iso: null,
       submission_slots_public: undefined,
       vote_slot_owner: undefined,
@@ -342,6 +347,7 @@ export function buildNextPartyConfigAfterVote(params: {
     submissions: {},
     votes_this_round: {},
     merged_beat: null,
+    round_scene_beat: null,
     scene_image_url: null,
     phase_deadline_iso: isoDeadlineFromNow(submitDeadlineSec),
     submission_slots_public: undefined,

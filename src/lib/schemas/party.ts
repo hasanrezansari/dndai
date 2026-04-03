@@ -39,6 +39,11 @@ export const PartyConfigV1Schema = z.object({
   votes_this_round: z.record(z.string().uuid(), z.string().uuid()).optional(),
   vp_totals: z.record(z.string().uuid(), z.number()).optional(),
   merged_beat: z.string().nullable().optional(),
+  /**
+   * AI-written establishing narration for this round’s submit phase (premise + tags + bible + art).
+   * Cleared when leaving submit for a new round.
+   */
+  round_scene_beat: z.string().nullable().optional(),
   /** Latest merged-round scene art URL (serving path or absolute); cleared each new round. */
   scene_image_url: z.string().nullable().optional(),
   instigator_enabled: z.boolean().optional(),
@@ -90,6 +95,7 @@ export function createInitialPartyConfig(
     vp_totals: {},
     fp_totals: {},
     merged_beat: null,
+    round_scene_beat: null,
     scene_image_url: null,
     instigator_enabled: opts?.instigatorEnabled ?? false,
     shared_role_label: null,

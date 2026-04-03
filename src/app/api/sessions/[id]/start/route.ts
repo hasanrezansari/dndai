@@ -5,7 +5,8 @@ import { after } from "next/server";
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 
-export const maxDuration = 60;
+/** Party start awaits AI round opener (up to ~45s) + secrets; keep headroom vs default 60s. */
+export const maxDuration = 120;
 
 import { apiError, handleApiError } from "@/lib/api/errors";
 import { requireUser, unauthorizedResponse } from "@/lib/auth/guards";

@@ -20,11 +20,9 @@ import {
   listTopVoteTargets,
   soleVpLeaderOrNull,
 } from "@/lib/party/party-vote-resolution";
-import { buildPartySubmitSceneText } from "@/lib/party/party-opening-narrative";
 import {
   DEFAULT_PARTY_TOTAL_ROUNDS,
   getDefaultPartyTemplateKeyForBrand,
-  getPartyRoundMilestone,
   PARTY_FORGERY_GUESS_DEADLINE_SEC,
   PARTY_SUBMIT_DEADLINE_SEC,
   PARTY_VOTE_DEADLINE_SEC,
@@ -304,6 +302,7 @@ export async function activatePartySessionFromLobby(
     votes_this_round: {},
     fp_totals: base.fp_totals ?? {},
     merged_beat: null,
+    round_scene_beat: null,
     scene_image_url: null,
     phase_deadline_iso: isoDeadlineFromNow(PARTY_SUBMIT_DEADLINE_SEC),
   };
@@ -324,27 +323,15 @@ export async function activatePartySessionFromLobby(
 
   await dealPartySecretsIfNeeded(sessionId);
 
-  const milestone = getPartyRoundMilestone(next.template_key, 1);
-  const preRoundNarrative = buildPartySubmitSceneText({
-    adventurePrompt: row.adventure_prompt,
-    adventureTags: row.adventure_tags,
-    worldBible: row.world_bible,
-    sharedRoleLabel: next.shared_role_label,
-    carryForward: next.carry_forward,
-    roundMilestone: milestone,
-  }).trim();
-  if (preRoundNarrative) {
-    const { schedulePartyRoundSceneImage } = await import(
-      "@/lib/orchestrator/party-image-schedule"
-    );
-    void schedulePartyRoundSceneImage({
-      sessionId,
-      mergedBeat: preRoundNarrative,
-      roundIndex: 1,
-    });
-  }
+  await hydratePartyRoundSceneBeat(sessionId);
 
-  return next;
+  const [out] = await db
+    .select({ party_config: sessions.party_config })
+    .from(sessions)
+    .where(eq(sessions.id, sessionId))
+    .limit(1);
+  const again = PartyConfigV1Schema.safeParse(out?.party_config);
+  return again.success ? again.data : next;
 }
 
 function allParticipantsSubmitted(
@@ -446,6 +433,94 @@ async function persistPartyConfigOptimistic(
 
   await broadcastPartyStateRefresh(sessionId, updated.state_version);
   return updated.state_version;
+}
+
+/**
+ * For `submit` phases with no opener yet: run AI round opener, persist `round_scene_beat`,
+ * then schedule round scene art from the same narrative the clients see.
+ */
+async function hydratePartyRoundSceneBeat(sessionId: string): Promise<void> {
+  const [row] = await db
+    .select()
+    .from(sessions)
+    .where(eq(sessions.id, sessionId))
+    .limit(1);
+  if (!row || row.game_kind !== "party" || row.status !== "active") return;
+
+  const parsed = PartyConfigV1Schema.safeParse(row.party_config);
+  if (!parsed.success) return;
+  const cfg = parsed.data;
+  if (cfg.party_phase !== "submit") return;
+  if (cfg.round_scene_beat?.trim()) return;
+
+  const tagRaw = row.adventure_tags;
+  const adventureTags = Array.isArray(tagRaw) ? tagRaw.map(String) : [];
+  const { getPartyRoundMilestone } = await import("@/lib/party/party-templates");
+  const milestone = getPartyRoundMilestone(cfg.template_key, cfg.round_index);
+
+  const { getAIProvider } = await import("@/lib/ai");
+  const { runPartyRoundOpenerWorker } = await import(
+    "@/lib/orchestrator/workers/party-round-opener"
+  );
+
+  let beat: string;
+  try {
+    beat = await runPartyRoundOpenerWorker({
+      sessionId,
+      provider: getAIProvider(),
+      templateKey: cfg.template_key,
+      roundIndex: cfg.round_index,
+      totalRounds: cfg.total_rounds,
+      milestone,
+      sharedRoleLabel: cfg.shared_role_label ?? null,
+      carryForward: cfg.carry_forward ?? null,
+      adventurePrompt: row.adventure_prompt?.trim() ?? "",
+      adventureTags,
+      worldBibleExcerpt: (row.world_bible ?? "").slice(0, 4000),
+      artDirection: row.art_direction?.trim() ?? "",
+    });
+  } catch (e) {
+    console.error("[party] round opener failed", sessionId, e);
+    beat = "";
+  }
+
+  const trimmed = beat.trim();
+  const round_scene_beat =
+    trimmed.length > 0
+      ? trimmed
+      : "The table leans in; the moment hangs open — add what happens next.";
+
+  const nextCfg: PartyConfigV1 = {
+    ...cfg,
+    round_scene_beat,
+  };
+
+  const version = await persistPartyConfigOptimistic(sessionId, row, nextCfg);
+  if (version == null) return;
+
+  const { buildPartySceneImageNarrativeText } = await import(
+    "@/lib/party/party-opening-narrative"
+  );
+  const narrative = buildPartySceneImageNarrativeText({
+    sessionRow: {
+      adventure_prompt: row.adventure_prompt,
+      adventure_tags: row.adventure_tags,
+      world_bible: row.world_bible,
+      art_direction: row.art_direction,
+    },
+    partyConfig: nextCfg,
+  }).trim();
+
+  if (narrative) {
+    const { schedulePartyRoundSceneImage } = await import(
+      "@/lib/orchestrator/party-image-schedule"
+    );
+    void schedulePartyRoundSceneImage({
+      sessionId,
+      mergedBeat: narrative,
+      roundIndex: cfg.round_index,
+    });
+  }
 }
 
 /**
@@ -814,6 +889,7 @@ export async function tryPartyRevealDeadlineAdvance(
     vote_slot_owner: undefined,
     forgery_guesses: undefined,
     merged_beat: null,
+    round_scene_beat: null,
     scene_image_url: null,
     votes_this_round: {},
   };
@@ -866,28 +942,7 @@ export async function tryPartyRevealDeadlineAdvance(
   };
   const version = await persistPartyConfigOptimistic(sessionId, row, nextConfig);
   if (version != null) {
-    const milestone = getPartyRoundMilestone(
-      nextConfig.template_key,
-      nextConfig.round_index,
-    );
-    const preRoundNarrative = buildPartySubmitSceneText({
-      adventurePrompt: row.adventure_prompt,
-      adventureTags: row.adventure_tags,
-      worldBible: row.world_bible,
-      sharedRoleLabel: nextConfig.shared_role_label,
-      carryForward: nextConfig.carry_forward,
-      roundMilestone: milestone,
-    }).trim();
-    if (preRoundNarrative) {
-      const { schedulePartyRoundSceneImage } = await import(
-        "@/lib/orchestrator/party-image-schedule"
-      );
-      void schedulePartyRoundSceneImage({
-        sessionId,
-        mergedBeat: preRoundNarrative,
-        roundIndex: nextConfig.round_index,
-      });
-    }
+    void hydratePartyRoundSceneBeat(sessionId);
   }
 }
 
