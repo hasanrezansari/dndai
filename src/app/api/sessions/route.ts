@@ -67,7 +67,15 @@ export async function POST(request: NextRequest) {
         console.error(err);
       }
     }
-    return NextResponse.json({ sessionId, joinCode }, { status: 201 });
+    return NextResponse.json(
+      {
+        sessionId,
+        joinCode,
+        /** Host row id — avoids an extra GET before ready/start (e.g. PlayRomana inline quick play). */
+        hostPlayerId: host?.id ?? null,
+      },
+      { status: 201 },
+    );
   } catch (e) {
     return handleApiError(e);
   }

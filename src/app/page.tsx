@@ -28,6 +28,14 @@ const PARTY_SIZES = [1, 2, 3, 4, 5, 6] as const;
 
 const PARTY_ROUND_OPTIONS = [3, 4, 5, 6, 7, 8, 9, 10, 12] as const;
 
+/** Rotating status under “Entering your story…” so Quick play never feels frozen (PlayRomana only). */
+const PLAYROMANA_QUICK_LINES = [
+  "Opening your portal…",
+  "Seating you at the table…",
+  "Waking the Chronicler…",
+  "Almost there…",
+] as const;
+
 export default function Home() {
   const brand = getBuildTimeBrand();
   const router = useRouter();
@@ -52,6 +60,7 @@ export default function Home() {
   const [createError, setCreateError] = useState<string | null>(null);
   const [upgradeError, setUpgradeError] = useState<string | null>(null);
   const [upgradeBusy, setUpgradeBusy] = useState(false);
+  const [playromanaQuickLineIdx, setPlayromanaQuickLineIdx] = useState(0);
 
   const isGuest =
     typeof authSession?.user?.email === "string" &&
@@ -66,6 +75,15 @@ export default function Home() {
       setTutorialComplete(false);
     }
   }, []);
+
+  useEffect(() => {
+    if (brand !== "playromana" || !createLoading) return;
+    setPlayromanaQuickLineIdx(0);
+    const id = window.setInterval(() => {
+      setPlayromanaQuickLineIdx((i) => (i + 1) % PLAYROMANA_QUICK_LINES.length);
+    }, 1300);
+    return () => window.clearInterval(id);
+  }, [brand, createLoading]);
 
   async function handleUpgradeToGoogle() {
     setUpgradeError(null);
@@ -196,6 +214,13 @@ export default function Home() {
         typeof (data as { sessionId: unknown }).sessionId === "string"
           ? (data as { sessionId: string }).sessionId
           : null;
+      const hostPlayerIdFromCreate =
+        typeof data === "object" &&
+        data !== null &&
+        "hostPlayerId" in data &&
+        typeof (data as { hostPlayerId: unknown }).hostPlayerId === "string"
+          ? (data as { hostPlayerId: string }).hostPlayerId
+          : null;
 
       const userId = authSession?.user?.id;
 
@@ -210,23 +235,28 @@ export default function Home() {
         Boolean(sessionIdOut && joinCodeOut && userId);
 
       if (inlinePlayRomanaQuick && sessionIdOut && joinCodeOut && userId) {
-        const sessRes = await fetch(`/api/sessions/${sessionIdOut}`);
-        if (!sessRes.ok) {
-          router.push(`/lobby/${joinCodeOut}`);
-          return;
+        let playerIdForQuick = hostPlayerIdFromCreate;
+        if (!playerIdForQuick) {
+          const sessRes = await fetch(`/api/sessions/${sessionIdOut}`);
+          if (!sessRes.ok) {
+            router.push(`/lobby/${joinCodeOut}`);
+            return;
+          }
+          const full = (await sessRes.json()) as {
+            players: Array<{ id: string; user_id: string }>;
+          };
+          const me = full.players.find((p) => p.user_id === userId);
+          if (!me) {
+            router.push(`/lobby/${joinCodeOut}`);
+            return;
+          }
+          playerIdForQuick = me.id;
         }
-        const full = (await sessRes.json()) as {
-          players: Array<{ id: string; user_id: string }>;
-        };
-        const me = full.players.find((p) => p.user_id === userId);
-        if (!me) {
-          router.push(`/lobby/${joinCodeOut}`);
-          return;
-        }
+
         const readyRes = await fetch(`/api/sessions/${sessionIdOut}/ready`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ playerId: me.id }),
+          body: JSON.stringify({ playerId: playerIdForQuick }),
         });
         if (!readyRes.ok) {
           setCreateError("Could not ready — opening lobby.");
@@ -236,7 +266,7 @@ export default function Home() {
         const startRes = await fetch(`/api/sessions/${sessionIdOut}/start`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ playerId: me.id, quickPlay: true }),
+          body: JSON.stringify({ playerId: playerIdForQuick, quickPlay: true }),
         });
         const startJson = (await startRes.json().catch(() => ({}))) as {
           error?: string;
@@ -324,16 +354,35 @@ export default function Home() {
       >
         {createLoading ? (
           <div
-            className="fixed inset-0 z-[100] flex flex-col items-center justify-center bg-[var(--color-obsidian)]/96 px-6 backdrop-blur-[2px]"
+            className="fixed inset-0 z-[100] flex flex-col items-center justify-center bg-[var(--color-obsidian)]/96 px-6 backdrop-blur-[2px] touch-manipulation"
             role="status"
             aria-live="polite"
+            style={{ WebkitTapHighlightColor: "transparent" }}
           >
             <p className="text-fantasy text-lg font-semibold text-[var(--color-gold-rare)] text-center tracking-wide">
               Entering your story…
             </p>
-            <p className="text-xs text-[var(--color-silver-dim)] mt-3 text-center max-w-[280px] leading-relaxed">
-              Setting up your table. This usually takes a few seconds.
+            <p
+              key={playromanaQuickLineIdx}
+              className="text-xs text-[var(--color-silver-muted)] mt-3 text-center max-w-[280px] leading-relaxed min-h-[2.5rem] flex items-center justify-center transition-opacity duration-300"
+            >
+              {PLAYROMANA_QUICK_LINES[playromanaQuickLineIdx]}
             </p>
+            <p className="text-[10px] text-[var(--color-silver-dim)] mt-1 text-center max-w-[260px] leading-relaxed">
+              Still working — hang tight. Don&apos;t refresh.
+            </p>
+            <div
+              className="mt-6 flex gap-2 justify-center"
+              aria-hidden
+            >
+              {[0, 1, 2].map((i) => (
+                <span
+                  key={i}
+                  className="h-2 w-2 rounded-full bg-[var(--color-gold-rare)]/80 animate-pulse"
+                  style={{ animationDelay: `${i * 220}ms` }}
+                />
+              ))}
+            </div>
           </div>
         ) : null}
         <div className="flex flex-col gap-[var(--void-gap-lg)] w-full max-w-md pt-10">
