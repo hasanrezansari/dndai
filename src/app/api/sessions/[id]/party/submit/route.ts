@@ -12,7 +12,10 @@ import { db } from "@/lib/db";
 import { sessions } from "@/lib/db/schema";
 import { broadcastPartyStateRefresh } from "@/lib/party/party-socket";
 import { PartyConfigV1Schema } from "@/lib/schemas/party";
-import { tryPartyMergeWhenReady } from "@/server/services/party-phase-service";
+import {
+  tryPartyMergeWhenReady,
+  tryPartyTiebreakSubmitAdvance,
+} from "@/server/services/party-phase-service";
 import { evaluatePartySecretObjectivesOnSubmit } from "@/server/services/party-secret-service";
 
 export const maxDuration = 120;
@@ -51,6 +54,7 @@ export async function POST(
     }
 
     await tryPartyMergeWhenReady(sessionId);
+    await tryPartyTiebreakSubmitAdvance(sessionId);
 
     const [row] = await db
       .select()
@@ -71,21 +75,44 @@ export async function POST(
       return apiError("Invalid party state", 500);
     }
     const cfg = configParse.data;
-    if (cfg.party_phase !== "submit") {
+    const phase = cfg.party_phase;
+    if (phase !== "submit" && phase !== "tiebreak_submit") {
       return apiError("Not in submission phase", 409);
     }
 
     const submittedAt = new Date().toISOString();
-    const nextConfig = {
-      ...cfg,
-      submissions: {
-        ...(cfg.submissions ?? {}),
-        [parsed.data.playerId]: {
-          text: parsed.data.text.trim(),
-          submitted_at: submittedAt,
-        },
-      },
-    };
+    const nextConfig =
+      phase === "tiebreak_submit"
+        ? (() => {
+            const contenders = new Set(cfg.tiebreak_contender_ids ?? []);
+            if (!contenders.has(parsed.data.playerId)) {
+              return null;
+            }
+            return {
+              ...cfg,
+              tiebreak_submissions: {
+                ...(cfg.tiebreak_submissions ?? {}),
+                [parsed.data.playerId]: {
+                  text: parsed.data.text.trim(),
+                  submitted_at: submittedAt,
+                },
+              },
+            };
+          })()
+        : {
+            ...cfg,
+            submissions: {
+              ...(cfg.submissions ?? {}),
+              [parsed.data.playerId]: {
+                text: parsed.data.text.trim(),
+                submitted_at: submittedAt,
+              },
+            },
+          };
+
+    if (nextConfig == null) {
+      return apiError("Not eligible for tiebreaker submit", 403);
+    }
 
     const [updated] = await db
       .update(sessions)
@@ -109,7 +136,11 @@ export async function POST(
       lineText: parsed.data.text.trim(),
     });
 
-    void tryPartyMergeWhenReady(sessionId);
+    if (phase === "submit") {
+      void tryPartyMergeWhenReady(sessionId);
+    } else {
+      void tryPartyTiebreakSubmitAdvance(sessionId);
+    }
 
     return NextResponse.json({ ok: true }, { status: 200 });
   } catch (e) {

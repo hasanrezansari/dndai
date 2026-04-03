@@ -199,6 +199,10 @@ export async function getPartyMePayloadForUser(params: {
     roleKey: string | null;
     bonusObjectives: Array<{ id: string; text: string; completed: boolean }>;
     secretBonusPoints: number;
+    /** During anonymous crowd vote, the slot id for this player’s line (hide from ballot). */
+    myCrowdVoteSlotId: string | null;
+    /** Tiebreak revote: whether this player already submitted a tiebreak line. */
+    mySubmittedTiebreak: boolean;
   };
 } | null> {
   const { sessionId, userId } = params;
@@ -226,6 +230,32 @@ export async function getPartyMePayloadForUser(params: {
     partySecretsRaw: row.party_secrets,
   });
 
+  const rawPartyCfg = PartyConfigV1Schema.safeParse(row.party_config);
+  let myCrowdVoteSlotId: string | null = null;
+  const voteLikePhase =
+    rawPartyCfg.success &&
+    (rawPartyCfg.data.party_phase === "vote" ||
+      rawPartyCfg.data.party_phase === "tiebreak_vote" ||
+      rawPartyCfg.data.party_phase === "finale_tie_vote");
+  if (voteLikePhase && rawPartyCfg.success) {
+    const owners = rawPartyCfg.data.vote_slot_owner ?? {};
+    for (const [slotId, pid] of Object.entries(owners)) {
+      if (pid === playerRow.id) {
+        myCrowdVoteSlotId = slotId;
+        break;
+      }
+    }
+  }
+
+  let mySubmittedTiebreak = false;
+  if (
+    rawPartyCfg.success &&
+    rawPartyCfg.data.party_phase === "tiebreak_submit"
+  ) {
+    const tb = rawPartyCfg.data.tiebreak_submissions ?? {};
+    mySubmittedTiebreak = Boolean(tb[playerRow.id]?.text?.trim());
+  }
+
   const secrets = PartySecretsV1Schema.safeParse(row.party_secrets);
   const assign = secrets.success
     ? secrets.data.assignments[playerRow.id]
@@ -245,6 +275,8 @@ export async function getPartyMePayloadForUser(params: {
       secretBonusPoints: secrets.success
         ? (secrets.data.secret_bp_totals?.[playerRow.id] ?? 0)
         : 0,
+      myCrowdVoteSlotId,
+      mySubmittedTiebreak,
     },
   };
 }

@@ -153,3 +153,9 @@ export const PartyMergeOutputSchema = z.object({
   merged_beat: z.string().min(20).max(2200),
 });
 export type PartyMergeOutput = output<typeof PartyMergeOutputSchema>;
+
+/** Party: pick one candidate uuid from the provided list (2p or tie-break). */
+export const PartyVoteJudgeOutputSchema = z.object({
+  winning_player_id: z.string().uuid(),
+});
+export type PartyVoteJudgeOutput = output<typeof PartyVoteJudgeOutputSchema>;

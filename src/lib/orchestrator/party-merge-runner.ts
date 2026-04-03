@@ -81,6 +81,7 @@ export async function runPartyMergeForConfig(params: {
     round_index: params.cfg.round_index,
     total_rounds: params.cfg.total_rounds,
     carry_forward: params.cfg.carry_forward ?? null,
+    shared_role_label: params.cfg.shared_role_label ?? null,
     adventure_prompt: params.sessionRow.adventure_prompt?.trim() ?? "",
     adventure_tags: adventureTags,
     world_bible_excerpt: (params.sessionRow.world_bible ?? "").slice(0, 4000),

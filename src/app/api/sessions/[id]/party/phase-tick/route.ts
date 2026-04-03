@@ -11,6 +11,7 @@ import {
   tryPartyForgeryGuessDeadlineAdvance,
   tryPartyMergeWhenReady,
   tryPartyRevealDeadlineAdvance,
+  tryPartyTiebreakSubmitAdvance,
   tryPartyVoteDeadlineAdvance,
 } from "@/server/services/party-phase-service";
 
@@ -36,6 +37,7 @@ export async function POST(
     }
 
     await tryPartyMergeWhenReady(sessionId);
+    await tryPartyTiebreakSubmitAdvance(sessionId);
     await tryPartyForgeryGuessDeadlineAdvance(sessionId);
     await tryPartyVoteDeadlineAdvance(sessionId);
     await tryPartyRevealDeadlineAdvance(sessionId);

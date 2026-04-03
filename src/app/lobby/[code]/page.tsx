@@ -16,6 +16,13 @@ import { LOBBY_TONE_TAG_OPTIONS } from "@/lib/session/tone-tag-options";
 
 type SessionWithPlayers = Session & { players: Player[] };
 
+function partySharedRoleFromSession(s: Session | null): string {
+  const pc = s?.party_config;
+  if (!pc || typeof pc !== "object" || Array.isArray(pc)) return "";
+  const v = (pc as { shared_role_label?: unknown }).shared_role_label;
+  return typeof v === "string" ? v : "";
+}
+
 function mapToSlotPlayer(p: Player): PlayerSlotPlayer {
   return {
     id: p.id,
@@ -209,6 +216,7 @@ export default function LobbyPage() {
   const [draftWorldBible, setDraftWorldBible] = useState("");
   const [draftArtDirection, setDraftArtDirection] = useState("");
   const [draftTags, setDraftTags] = useState<string[]>([]);
+  const [draftSharedRoleLabel, setDraftSharedRoleLabel] = useState("");
   const [premiseSaving, setPremiseSaving] = useState(false);
   const [premiseError, setPremiseError] = useState<string | null>(null);
   const [playromanaAutoLobbyBusy, setPlayromanaAutoLobbyBusy] = useState(false);
@@ -239,16 +247,19 @@ export default function LobbyPage() {
     setDraftArtDirection(session.art_direction ?? "");
     const raw = session.adventure_tags;
     setDraftTags(Array.isArray(raw) ? raw.map(String) : []);
+    setDraftSharedRoleLabel(partySharedRoleFromSession(session));
   }, [
     session?.id,
     session?.adventure_prompt,
     session?.world_bible,
     session?.art_direction,
     session?.adventure_tags,
+    session?.party_config,
+    session?.game_kind,
   ]);
 
   async function handleSavePremise() {
-    if (!sessionId || !isHost || premiseSaving) return;
+    if (!sessionId || !session || !isHost || premiseSaving) return;
     setPremiseError(null);
     setPremiseSaving(true);
     try {
@@ -260,6 +271,9 @@ export default function LobbyPage() {
           world_bible: draftWorldBible.trim() || null,
           art_direction: draftArtDirection.trim() || null,
           adventure_tags: draftTags,
+          ...(session.game_kind === "party"
+            ? { party_shared_role_label: draftSharedRoleLabel.trim() || null }
+            : {}),
         }),
       });
       const data = (await res.json().catch(() => ({}))) as SessionWithPlayers & {
@@ -610,9 +624,10 @@ export default function LobbyPage() {
 
         {session.game_kind === "party" ? (
           <p className="mb-4 rounded-[var(--radius-card)] border border-white/10 bg-black/25 px-3 py-2 text-xs leading-relaxed text-[var(--color-silver-dim)]">
-            Party mode: when the host begins, you&apos;ll open the party play
-            screen (not the hero builder). You can still make a full character if
-            you want it on your sheet — ready up when you&apos;re set.
+            Party mode: one shared story beat each round — you&apos;ll add lines
+            for the same scene, then vote on which take moves things forward (no
+            character builder here; your name is just for the table and
+            scoreboard). Ready up when you&apos;re set.
           </p>
         ) : null}
 
@@ -659,6 +674,25 @@ export default function LobbyPage() {
             <p className="text-[10px] text-[var(--outline)] leading-relaxed">
               Edit premise before start — party sees updates after you save.
             </p>
+            {session.game_kind === "party" ? (
+              <>
+                <label className="block text-[9px] uppercase tracking-[0.15em] text-[var(--outline)]">
+                  Shared story lens (optional)
+                </label>
+                <p className="text-[10px] text-[var(--outline)] leading-relaxed">
+                  One label for the table&apos;s POV (e.g. the crew, the witness).
+                  Not a character builder — names stay on the scoreboard only.
+                </p>
+                <input
+                  type="text"
+                  value={draftSharedRoleLabel}
+                  onChange={(e) => setDraftSharedRoleLabel(e.target.value)}
+                  maxLength={200}
+                  placeholder="e.g. the salvage crew"
+                  className="w-full h-10 bg-[var(--color-deep-void)] px-3 rounded-[var(--radius-card)] border border-[rgba(77,70,53,0.2)] text-sm text-[var(--color-silver-muted)]"
+                />
+              </>
+            ) : null}
             <label className="block text-[9px] uppercase tracking-[0.15em] text-[var(--outline)]">
               Narrative seed
             </label>

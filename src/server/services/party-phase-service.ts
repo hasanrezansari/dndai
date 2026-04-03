@@ -3,15 +3,27 @@ import { and, asc, eq } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { players, sessions } from "@/lib/db/schema";
 import { broadcastPartyStateRefresh } from "@/lib/party/party-socket";
-import { pickAutoForgeryGuessSlot } from "@/lib/party/party-slot-utils";
+import {
+  buildAnonymousCrowdVoteSlots,
+  buildFinaleAnonymousVoteSlots,
+  pickAutoForgeryGuessSlot,
+} from "@/lib/party/party-slot-utils";
 import {
   buildNextPartyConfigAfterVote,
+  buildPartyEndedAfterFinaleVote,
+  enterPartyVoteTiebreak,
   fillPartyAutoVotes,
+  fillPartyFinaleAutoVotes,
+  listFinaleVotersWhoMustVote,
   listParticipantsWhoMustVote,
+  listPlayersTiedForMaxVp,
+  listTopVoteTargets,
+  soleVpLeaderOrNull,
 } from "@/lib/party/party-vote-resolution";
 import {
   DEFAULT_PARTY_TOTAL_ROUNDS,
   getDefaultPartyTemplateKeyForBrand,
+  getPartyRoundMilestone,
   PARTY_FORGERY_GUESS_DEADLINE_SEC,
   PARTY_SUBMIT_DEADLINE_SEC,
   PARTY_VOTE_DEADLINE_SEC,
@@ -32,6 +44,215 @@ function isoDeadlineFromNow(seconds: number): string {
 function isDeadlinePassed(iso: string | null | undefined): boolean {
   if (!iso?.trim()) return false;
   return new Date(iso).getTime() <= Date.now();
+}
+
+async function runPartyJudgePickWinner(
+  sessionId: string,
+  sessionRow: typeof sessions.$inferSelect,
+  cfg: PartyConfigV1,
+  playerIds: string[],
+  lineSource: "submissions" | "tiebreak",
+): Promise<string | null> {
+  const src =
+    lineSource === "tiebreak"
+      ? (cfg.tiebreak_submissions ?? {})
+      : (cfg.submissions ?? {});
+  const candidates = playerIds
+    .map((id) => {
+      const t = src[id]?.text?.trim();
+      return t ? { player_id: id, text: t } : null;
+    })
+    .filter(Boolean) as Array<{ player_id: string; text: string }>;
+  if (candidates.length === 0) return playerIds.sort()[0] ?? null;
+  if (candidates.length === 1) return candidates[0]!.player_id;
+  const { getAIProvider } = await import("@/lib/ai");
+  const { runPartyVoteJudgeWorker } = await import(
+    "@/lib/orchestrator/workers/party-vote-judge"
+  );
+  try {
+    return await runPartyVoteJudgeWorker({
+      sessionId,
+      provider: getAIProvider(),
+      candidates,
+      mergedBeat: cfg.merged_beat?.trim() ?? "",
+      adventurePrompt: sessionRow.adventure_prompt?.trim() ?? "",
+    });
+  } catch (e) {
+    console.error("[party] vote judge failed", sessionId, e);
+    return candidates.sort((a, b) => a.player_id.localeCompare(b.player_id))[0]!
+      .player_id;
+  }
+}
+
+async function resolveAfterCrowdVoteFilled(params: {
+  sessionId: string;
+  row: typeof sessions.$inferSelect;
+  cfg: PartyConfigV1;
+  votes: Record<string, string>;
+  submissionPlayerIds: string[];
+  mode: "main" | "tiebreak";
+}): Promise<PartyConfigV1> {
+  const participantIds = await listPartyParticipantPlayerIds(params.sessionId);
+  const topIds = listTopVoteTargets(params.votes, params.submissionPlayerIds);
+
+  if (params.mode === "main" && topIds.length > 1) {
+    if (params.cfg.instigator_slot_id?.trim()) {
+      const judge = await runPartyJudgePickWinner(
+        params.sessionId,
+        params.row,
+        params.cfg,
+        topIds,
+        "submissions",
+      );
+      return buildNextPartyConfigAfterVote({
+        cfg: params.cfg,
+        votes: params.votes,
+        submissionPlayerIds: params.submissionPlayerIds,
+        forcedWinner: judge,
+        isoDeadlineFromNow,
+        submitDeadlineSec: PARTY_SUBMIT_DEADLINE_SEC,
+        voteDeadlineSec: PARTY_VOTE_DEADLINE_SEC,
+        participantIdsForVpTie: participantIds,
+        sessionId: params.sessionId,
+      });
+    }
+    return enterPartyVoteTiebreak({
+      cfg: params.cfg,
+      tiedContenderIds: topIds,
+      isoDeadlineFromNow,
+      submitDeadlineSec: PARTY_SUBMIT_DEADLINE_SEC,
+    });
+  }
+
+  if (params.mode === "tiebreak" && topIds.length > 1) {
+    const judge = await runPartyJudgePickWinner(
+      params.sessionId,
+      params.row,
+      params.cfg,
+      topIds,
+      "tiebreak",
+    );
+    const tb = params.cfg.tiebreak_submissions ?? {};
+    return buildNextPartyConfigAfterVote({
+      cfg: params.cfg,
+      votes: params.votes,
+      submissionPlayerIds: params.submissionPlayerIds,
+      forcedWinner: judge,
+      winnerLineSubmissions: tb,
+      isoDeadlineFromNow,
+      submitDeadlineSec: PARTY_SUBMIT_DEADLINE_SEC,
+      voteDeadlineSec: PARTY_VOTE_DEADLINE_SEC,
+      participantIdsForVpTie: participantIds,
+      sessionId: params.sessionId,
+    });
+  }
+
+  const tb =
+    params.mode === "tiebreak"
+      ? (params.cfg.tiebreak_submissions ?? {})
+      : undefined;
+  return buildNextPartyConfigAfterVote({
+    cfg: params.cfg,
+    votes: params.votes,
+    submissionPlayerIds: params.submissionPlayerIds,
+    ...(tb && Object.keys(tb).length > 0
+      ? { winnerLineSubmissions: tb }
+      : {}),
+    isoDeadlineFromNow,
+    submitDeadlineSec: PARTY_SUBMIT_DEADLINE_SEC,
+    voteDeadlineSec: PARTY_VOTE_DEADLINE_SEC,
+    participantIdsForVpTie: participantIds,
+    sessionId: params.sessionId,
+  });
+}
+
+async function resolveFinaleVotesWhenComplete(params: {
+  sessionId: string;
+  row: typeof sessions.$inferSelect;
+  cfg: PartyConfigV1;
+  votes: Record<string, string>;
+}): Promise<PartyConfigV1> {
+  const contenders = params.cfg.finale_tie_contender_ids ?? [];
+  const topIds = listTopVoteTargets(params.votes, contenders);
+  const champion =
+    topIds.length === 1
+      ? topIds[0]!
+      : await runPartyJudgePickWinner(
+          params.sessionId,
+          params.row,
+          params.cfg,
+          topIds,
+          "submissions",
+        );
+  return buildPartyEndedAfterFinaleVote({
+    cfg: params.cfg,
+    votes: params.votes,
+    championPlayerId: champion,
+  });
+}
+
+async function tryPartyFinaleVoteDeadlineAdvance(
+  sessionId: string,
+  row: typeof sessions.$inferSelect,
+  cfg: PartyConfigV1,
+  participantIds: string[],
+): Promise<void> {
+  const contenders = cfg.finale_tie_contender_ids ?? [];
+  if (contenders.length < 2) return;
+
+  const mustVote = listFinaleVotersWhoMustVote(participantIds, contenders);
+  let votes = { ...(cfg.votes_this_round ?? {}) };
+
+  if (mustVote.length === 0) {
+    const judge = await runPartyJudgePickWinner(
+      sessionId,
+      row,
+      cfg,
+      contenders,
+      "submissions",
+    );
+    const next = buildPartyEndedAfterFinaleVote({
+      cfg,
+      votes: {},
+      championPlayerId: judge,
+    });
+    await persistPartyConfigOptimistic(sessionId, row, next);
+    return;
+  }
+
+  const deadlinePassed = isDeadlinePassed(cfg.phase_deadline_iso);
+  const allVoted = mustVote.every((id) => votes[id]);
+
+  if (!deadlinePassed && !allVoted) return;
+
+  if (!deadlinePassed && allVoted) {
+    const next = await resolveFinaleVotesWhenComplete({
+      sessionId,
+      row,
+      cfg,
+      votes,
+    });
+    await persistPartyConfigOptimistic(sessionId, row, next);
+    return;
+  }
+
+  votes = fillPartyFinaleAutoVotes({
+    participantIds,
+    contenderIds: contenders,
+    votes,
+  });
+  if (!mustVote.every((id) => votes[id])) {
+    await extendPartyVoteDeadline(sessionId, row, cfg);
+    return;
+  }
+
+  const next = await resolveFinaleVotesWhenComplete({
+    sessionId,
+    row,
+    cfg,
+    votes,
+  });
+  await persistPartyConfigOptimistic(sessionId, row, next);
 }
 
 /** Players who submit/vote in party mode (excludes human DM seat). */
@@ -101,6 +322,23 @@ export async function activatePartySessionFromLobby(
   }
 
   await dealPartySecretsIfNeeded(sessionId);
+
+  const prem = row.adventure_prompt?.trim() ?? "";
+  const milestone = getPartyRoundMilestone(next.template_key, 1);
+  const preRoundNarrative = [prem, milestone ? `Round focus: ${milestone}` : ""]
+    .filter(Boolean)
+    .join("\n\n")
+    .trim();
+  if (preRoundNarrative) {
+    const { schedulePartyRoundSceneImage } = await import(
+      "@/lib/orchestrator/party-image-schedule"
+    );
+    void schedulePartyRoundSceneImage({
+      sessionId,
+      mergedBeat: preRoundNarrative,
+      roundIndex: 1,
+    });
+  }
 
   return next;
 }
@@ -273,6 +511,7 @@ export async function tryPartyMergeWhenReady(sessionId: string): Promise<void> {
       scene_image_url: null,
       phase_deadline_iso: isoDeadlineFromNow(PARTY_VOTE_DEADLINE_SEC),
     };
+    const pids = await listPartyParticipantPlayerIds(sessionId);
     const nextConfig = buildNextPartyConfigAfterVote({
       cfg: cfgWithMerged,
       votes: {},
@@ -280,8 +519,53 @@ export async function tryPartyMergeWhenReady(sessionId: string): Promise<void> {
       forcedWinner: only,
       isoDeadlineFromNow,
       submitDeadlineSec: PARTY_SUBMIT_DEADLINE_SEC,
+      voteDeadlineSec: PARTY_VOTE_DEADLINE_SEC,
+      participantIdsForVpTie: pids,
+      sessionId,
     });
 
+    const version = await persistPartyConfigOptimistic(sessionId, row, nextConfig);
+    if (version != null) {
+      const { schedulePartyRoundSceneImage } = await import(
+        "@/lib/orchestrator/party-image-schedule"
+      );
+      void schedulePartyRoundSceneImage({
+        sessionId,
+        mergedBeat,
+        roundIndex: cfg.round_index,
+      });
+    }
+    return;
+  }
+
+  if (submissionIds.length === 2 && !roundSlots) {
+    const cfgWithMerged: PartyConfigV1 = {
+      ...cfg,
+      merged_beat: mergedBeat,
+      party_phase: "vote",
+      votes_this_round: {},
+      scene_image_url: null,
+      phase_deadline_iso: isoDeadlineFromNow(PARTY_VOTE_DEADLINE_SEC),
+    };
+    const pids = await listPartyParticipantPlayerIds(sessionId);
+    const judgeWinner = await runPartyJudgePickWinner(
+      sessionId,
+      row,
+      cfgWithMerged,
+      submissionIds,
+      "submissions",
+    );
+    const nextConfig = buildNextPartyConfigAfterVote({
+      cfg: cfgWithMerged,
+      votes: {},
+      submissionPlayerIds: submissionIds,
+      forcedWinner: judgeWinner,
+      isoDeadlineFromNow,
+      submitDeadlineSec: PARTY_SUBMIT_DEADLINE_SEC,
+      voteDeadlineSec: PARTY_VOTE_DEADLINE_SEC,
+      participantIdsForVpTie: pids,
+      sessionId,
+    });
     const version = await persistPartyConfigOptimistic(sessionId, row, nextConfig);
     if (version != null) {
       const { schedulePartyRoundSceneImage } = await import(
@@ -303,20 +587,39 @@ export async function tryPartyMergeWhenReady(sessionId: string): Promise<void> {
         submission_slots_public: roundSlots.submission_slots_public,
         slot_attribution: roundSlots.slot_attribution,
         instigator_slot_id: roundSlots.instigator_slot_id,
+        vote_slot_owner: roundSlots.vote_slot_owner,
         party_phase: "forgery_guess",
         forgery_guesses: {},
         votes_this_round: {},
         scene_image_url: null,
         phase_deadline_iso: isoDeadlineFromNow(PARTY_FORGERY_GUESS_DEADLINE_SEC),
       }
-    : {
-        ...cfg,
-        party_phase: "vote",
-        merged_beat: mergedBeat,
-        votes_this_round: {},
-        scene_image_url: null,
-        phase_deadline_iso: isoDeadlineFromNow(PARTY_VOTE_DEADLINE_SEC),
-      };
+    : (() => {
+        const lines = submissionIds.map((id) => ({
+          player_id: id,
+          text: (cfg.submissions ?? {})[id]?.text ?? "",
+        }));
+        const crowd = buildAnonymousCrowdVoteSlots({
+          playerLines: lines,
+          sessionId,
+          roundIndex: cfg.round_index,
+        });
+        const base: PartyConfigV1 = {
+          ...cfg,
+          party_phase: "vote",
+          merged_beat: mergedBeat,
+          votes_this_round: {},
+          scene_image_url: null,
+          phase_deadline_iso: isoDeadlineFromNow(PARTY_VOTE_DEADLINE_SEC),
+        };
+        return crowd
+          ? {
+              ...base,
+              submission_slots_public: crowd.submission_slots_public,
+              vote_slot_owner: crowd.vote_slot_owner,
+            }
+          : base;
+      })();
 
   const version = await persistPartyConfigOptimistic(sessionId, row, nextConfig);
   if (version == null) return;
@@ -329,6 +632,89 @@ export async function tryPartyMergeWhenReady(sessionId: string): Promise<void> {
     mergedBeat,
     roundIndex: cfg.round_index,
   });
+}
+
+/**
+ * Tiebreak: when all contenders submitted (or deadline with ≥1 line), open anonymous tiebreak vote.
+ */
+export async function tryPartyTiebreakSubmitAdvance(
+  sessionId: string,
+): Promise<void> {
+  const [row] = await db
+    .select()
+    .from(sessions)
+    .where(
+      and(eq(sessions.id, sessionId), eq(sessions.game_kind, "party")),
+    )
+    .limit(1);
+  if (!row || row.status !== "active") return;
+
+  const parsed = PartyConfigV1Schema.safeParse(row.party_config);
+  if (!parsed.success || parsed.data.party_phase !== "tiebreak_submit") return;
+
+  const cfg = parsed.data;
+  const contenders = cfg.tiebreak_contender_ids ?? [];
+  if (contenders.length < 2) return;
+
+  const tb = cfg.tiebreak_submissions ?? {};
+  const allIn = contenders.every((id) => tb[id]?.text?.trim());
+  const anyIn = contenders.some((id) => tb[id]?.text?.trim());
+  const deadlinePassed = isDeadlinePassed(cfg.phase_deadline_iso);
+
+  if (!allIn) {
+    if (!(deadlinePassed && anyIn)) {
+      if (deadlinePassed && !anyIn) {
+        await extendPartySubmitDeadlineIfStale(sessionId, row, cfg);
+      }
+      return;
+    }
+  }
+
+  const lines = contenders
+    .map((id) => ({
+      player_id: id,
+      text: tb[id]?.text?.trim() ?? "",
+    }))
+    .filter((l) => l.text);
+  if (lines.length === 0) return;
+
+  if (lines.length === 1) {
+    const only = lines[0]!.player_id;
+    const participantIds = await listPartyParticipantPlayerIds(sessionId);
+    const nextConfig = buildNextPartyConfigAfterVote({
+      cfg,
+      votes: {},
+      submissionPlayerIds: [only],
+      forcedWinner: only,
+      winnerLineSubmissions: tb,
+      isoDeadlineFromNow,
+      submitDeadlineSec: PARTY_SUBMIT_DEADLINE_SEC,
+      voteDeadlineSec: PARTY_VOTE_DEADLINE_SEC,
+      participantIdsForVpTie: participantIds,
+      sessionId,
+    });
+    await persistPartyConfigOptimistic(sessionId, row, nextConfig);
+    return;
+  }
+
+  const crowd = buildAnonymousCrowdVoteSlots({
+    playerLines: lines,
+    sessionId,
+    roundIndex: cfg.round_index,
+  });
+  if (!crowd) return;
+
+  const nextConfig: PartyConfigV1 = {
+    ...cfg,
+    party_phase: "tiebreak_vote",
+    tiebreak_submissions: tb,
+    votes_this_round: {},
+    submission_slots_public: crowd.submission_slots_public,
+    vote_slot_owner: crowd.vote_slot_owner,
+    phase_deadline_iso: isoDeadlineFromNow(PARTY_VOTE_DEADLINE_SEC),
+    merged_beat: cfg.merged_beat ?? null,
+  };
+  await persistPartyConfigOptimistic(sessionId, row, nextConfig);
 }
 
 /**
@@ -421,6 +807,7 @@ export async function tryPartyRevealDeadlineAdvance(
     submission_slots_public: undefined,
     slot_attribution: undefined,
     instigator_slot_id: null,
+    vote_slot_owner: undefined,
     forgery_guesses: undefined,
     merged_beat: null,
     scene_image_url: null,
@@ -428,11 +815,38 @@ export async function tryPartyRevealDeadlineAdvance(
   };
 
   if (isLastRound) {
+    const participantIds = await listPartyParticipantPlayerIds(sessionId);
+    const vp = { ...(cfg.vp_totals ?? {}) };
+    const tiedChamps = listPlayersTiedForMaxVp(vp, participantIds);
+    if (tiedChamps.length > 1) {
+      const finSlots = buildFinaleAnonymousVoteSlots({
+        cfg,
+        contenderIds: tiedChamps,
+        sessionId,
+      });
+      if (finSlots) {
+        const nextConfig: PartyConfigV1 = {
+          ...cfg,
+          ...cleared,
+          party_phase: "finale_tie_vote",
+          finale_tie_contender_ids: tiedChamps,
+          votes_this_round: {},
+          submission_slots_public: finSlots.submission_slots_public,
+          vote_slot_owner: finSlots.vote_slot_owner,
+          phase_deadline_iso: isoDeadlineFromNow(PARTY_VOTE_DEADLINE_SEC),
+        };
+        await persistPartyConfigOptimistic(sessionId, row, nextConfig);
+        return;
+      }
+    }
+    const champion =
+      soleVpLeaderOrNull(vp, participantIds) ?? tiedChamps[0] ?? null;
     const nextConfig: PartyConfigV1 = {
       ...cfg,
       ...cleared,
       party_phase: "ended",
       phase_deadline_iso: null,
+      party_champion_player_id: champion,
     };
     await persistPartyConfigOptimistic(sessionId, row, nextConfig);
     return;
@@ -446,7 +860,28 @@ export async function tryPartyRevealDeadlineAdvance(
     submissions: {},
     phase_deadline_iso: isoDeadlineFromNow(PARTY_SUBMIT_DEADLINE_SEC),
   };
-  await persistPartyConfigOptimistic(sessionId, row, nextConfig);
+  const version = await persistPartyConfigOptimistic(sessionId, row, nextConfig);
+  if (version != null) {
+    const prem = row.adventure_prompt?.trim() ?? "";
+    const milestone = getPartyRoundMilestone(
+      nextConfig.template_key,
+      nextConfig.round_index,
+    );
+    const preRoundNarrative = [prem, milestone ? `Round focus: ${milestone}` : ""]
+      .filter(Boolean)
+      .join("\n\n")
+      .trim();
+    if (preRoundNarrative) {
+      const { schedulePartyRoundSceneImage } = await import(
+        "@/lib/orchestrator/party-image-schedule"
+      );
+      void schedulePartyRoundSceneImage({
+        sessionId,
+        mergedBeat: preRoundNarrative,
+        roundIndex: nextConfig.round_index,
+      });
+    }
+  }
 }
 
 export async function applyPartyForgeryGuessAndMaybeAdvance(params: {
@@ -553,29 +988,51 @@ export async function tryPartyVoteDeadlineAdvance(
   if (!row || row.status !== "active") return;
 
   const parsed = PartyConfigV1Schema.safeParse(row.party_config);
-  if (!parsed.success || parsed.data.party_phase !== "vote") return;
+  if (!parsed.success) return;
+
+  const phase = parsed.data.party_phase;
+  if (
+    phase !== "vote" &&
+    phase !== "tiebreak_vote" &&
+    phase !== "finale_tie_vote"
+  ) {
+    return;
+  }
 
   const cfg = parsed.data;
   const participantIds = await listPartyParticipantPlayerIds(sessionId);
-  const subs = cfg.submissions ?? {};
-  const submissionIds = participantIds.filter((id) => subs[id]?.text?.trim());
+
+  if (phase === "finale_tie_vote") {
+    await tryPartyFinaleVoteDeadlineAdvance(
+      sessionId,
+      row,
+      cfg,
+      participantIds,
+    );
+    return;
+  }
+
+  const isTiebreak = phase === "tiebreak_vote";
+  const subs = isTiebreak
+    ? (cfg.tiebreak_submissions ?? {})
+    : (cfg.submissions ?? {});
+  const submissionIds = isTiebreak
+    ? (cfg.tiebreak_contender_ids ?? []).filter((id) => subs[id]?.text?.trim())
+    : participantIds.filter((id) => (cfg.submissions ?? {})[id]?.text?.trim());
+
   if (submissionIds.length === 0) return;
 
   const mustVote = listParticipantsWhoMustVote(participantIds, submissionIds);
   let votes = { ...(cfg.votes_this_round ?? {}) };
 
   if (mustVote.length === 0) {
-    const cfgVote: PartyConfigV1 = {
-      ...cfg,
-      party_phase: "vote",
-      merged_beat: cfg.merged_beat ?? null,
-    };
-    const nextConfig = buildNextPartyConfigAfterVote({
-      cfg: cfgVote,
+    const nextConfig = await resolveAfterCrowdVoteFilled({
+      sessionId,
+      row,
+      cfg,
       votes,
       submissionPlayerIds: submissionIds,
-      isoDeadlineFromNow,
-      submitDeadlineSec: PARTY_SUBMIT_DEADLINE_SEC,
+      mode: isTiebreak ? "tiebreak" : "main",
     });
     await persistPartyConfigOptimistic(sessionId, row, nextConfig);
     return;
@@ -595,17 +1052,13 @@ export async function tryPartyVoteDeadlineAdvance(
     return;
   }
 
-  const cfgVote: PartyConfigV1 = {
-    ...cfg,
-    party_phase: "vote",
-    merged_beat: cfg.merged_beat ?? null,
-  };
-  const nextConfig = buildNextPartyConfigAfterVote({
-    cfg: cfgVote,
+  const nextConfig = await resolveAfterCrowdVoteFilled({
+    sessionId,
+    row,
+    cfg,
     votes,
     submissionPlayerIds: submissionIds,
-    isoDeadlineFromNow,
-    submitDeadlineSec: PARTY_SUBMIT_DEADLINE_SEC,
+    mode: isTiebreak ? "tiebreak" : "main",
   });
 
   await persistPartyConfigOptimistic(sessionId, row, nextConfig);
@@ -617,7 +1070,8 @@ export async function tryPartyVoteDeadlineAdvance(
 export async function applyPartyVoteAndMaybeAdvance(params: {
   sessionId: string;
   voterPlayerId: string;
-  targetPlayerId: string;
+  targetPlayerId?: string;
+  targetSlotId?: string;
 }): Promise<{ ok: true } | { ok: false; error: string; status: number }> {
   const [row] = await db
     .select()
@@ -637,7 +1091,12 @@ export async function applyPartyVoteAndMaybeAdvance(params: {
     return { ok: false, error: "Invalid party state", status: 500 };
   }
   const cfg = parsed.data;
-  if (cfg.party_phase !== "vote") {
+  const phase = cfg.party_phase;
+  if (
+    phase !== "vote" &&
+    phase !== "tiebreak_vote" &&
+    phase !== "finale_tie_vote"
+  ) {
     return { ok: false, error: "Not in voting phase", status: 409 };
   }
 
@@ -645,22 +1104,72 @@ export async function applyPartyVoteAndMaybeAdvance(params: {
   if (!participantIds.includes(params.voterPlayerId)) {
     return { ok: false, error: "Not a party participant", status: 403 };
   }
-  if (params.voterPlayerId === params.targetPlayerId) {
+
+  let targetPlayerId = params.targetPlayerId;
+  const slotTrim = params.targetSlotId?.trim();
+  if (slotTrim) {
+    const owners = cfg.vote_slot_owner ?? {};
+    const resolved = owners[slotTrim];
+    if (!resolved) {
+      return { ok: false, error: "Invalid vote slot", status: 400 };
+    }
+    targetPlayerId = resolved;
+  }
+  if (!targetPlayerId) {
+    return { ok: false, error: "Missing vote target", status: 400 };
+  }
+
+  if (params.voterPlayerId === targetPlayerId) {
     return { ok: false, error: "Cannot vote for yourself", status: 400 };
   }
-  const subs = cfg.submissions ?? {};
-  if (!subs[params.targetPlayerId]?.text?.trim()) {
-    return { ok: false, error: "Invalid vote target", status: 400 };
+
+  let submissionIds: string[];
+  let mustVote: string[];
+
+  if (phase === "finale_tie_vote") {
+    const contenders = cfg.finale_tie_contender_ids ?? [];
+    const contenderSet = new Set(contenders);
+    if (contenderSet.has(params.voterPlayerId)) {
+      return {
+        ok: false,
+        error: "Tied leaders do not vote in this ballot",
+        status: 400,
+      };
+    }
+    if (!contenderSet.has(targetPlayerId)) {
+      return { ok: false, error: "Invalid vote target", status: 400 };
+    }
+    submissionIds = contenders.filter((id) =>
+      Boolean((cfg.submissions ?? {})[id]?.text?.trim()),
+    );
+    if (!submissionIds.includes(targetPlayerId)) {
+      return { ok: false, error: "Invalid vote target", status: 400 };
+    }
+    mustVote = listFinaleVotersWhoMustVote(participantIds, contenders);
+  } else if (phase === "tiebreak_vote") {
+    const tb = cfg.tiebreak_submissions ?? {};
+    if (!tb[targetPlayerId]?.text?.trim()) {
+      return { ok: false, error: "Invalid vote target", status: 400 };
+    }
+    submissionIds = (cfg.tiebreak_contender_ids ?? []).filter((id) =>
+      tb[id]?.text?.trim(),
+    );
+    mustVote = listParticipantsWhoMustVote(participantIds, submissionIds);
+  } else {
+    const subs = cfg.submissions ?? {};
+    if (!subs[targetPlayerId]?.text?.trim()) {
+      return { ok: false, error: "Invalid vote target", status: 400 };
+    }
+    submissionIds = participantIds.filter((id) => subs[id]?.text?.trim());
+    mustVote = listParticipantsWhoMustVote(participantIds, submissionIds);
   }
 
   const votes = { ...(cfg.votes_this_round ?? {}) };
   if (votes[params.voterPlayerId]) {
     return { ok: false, error: "Already voted this round", status: 409 };
   }
-  votes[params.voterPlayerId] = params.targetPlayerId;
+  votes[params.voterPlayerId] = targetPlayerId;
 
-  const submissionIds = participantIds.filter((id) => subs[id]?.text?.trim());
-  const mustVote = listParticipantsWhoMustVote(participantIds, submissionIds);
   if (mustVote.length === 0) {
     return { ok: false, error: "No eligible voters this round", status: 409 };
   }
@@ -670,18 +1179,21 @@ export async function applyPartyVoteAndMaybeAdvance(params: {
 
   if (!allVoted) {
     nextConfig = { ...cfg, votes_this_round: votes };
+  } else if (phase === "finale_tie_vote") {
+    nextConfig = await resolveFinaleVotesWhenComplete({
+      sessionId: params.sessionId,
+      row,
+      cfg,
+      votes,
+    });
   } else {
-    const cfgVote: PartyConfigV1 = {
-      ...cfg,
-      party_phase: "vote",
-      merged_beat: cfg.merged_beat ?? null,
-    };
-    nextConfig = buildNextPartyConfigAfterVote({
-      cfg: cfgVote,
+    nextConfig = await resolveAfterCrowdVoteFilled({
+      sessionId: params.sessionId,
+      row,
+      cfg,
       votes,
       submissionPlayerIds: submissionIds,
-      isoDeadlineFromNow,
-      submitDeadlineSec: PARTY_SUBMIT_DEADLINE_SEC,
+      mode: phase === "tiebreak_vote" ? "tiebreak" : "main",
     });
   }
 

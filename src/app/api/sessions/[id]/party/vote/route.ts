@@ -12,10 +12,15 @@ import {
   tryPartyVoteDeadlineAdvance,
 } from "@/server/services/party-phase-service";
 
-const BodySchema = z.object({
-  playerId: z.string().uuid(),
-  targetPlayerId: z.string().uuid(),
-});
+const BodySchema = z
+  .object({
+    playerId: z.string().uuid(),
+    targetPlayerId: z.string().uuid().optional(),
+    targetSlotId: z.string().min(1).max(80).optional(),
+  })
+  .refine((b) => Boolean(b.targetPlayerId) || Boolean(b.targetSlotId?.trim()), {
+    message: "Provide targetPlayerId or targetSlotId",
+  });
 
 export async function POST(
   request: NextRequest,
@@ -51,6 +56,7 @@ export async function POST(
       sessionId,
       voterPlayerId: parsed.data.playerId,
       targetPlayerId: parsed.data.targetPlayerId,
+      targetSlotId: parsed.data.targetSlotId,
     });
 
     if (!result.ok) {

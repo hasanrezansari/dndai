@@ -14,7 +14,10 @@ import {
   DEFAULT_PARTY_TOTAL_ROUNDS,
   getDefaultPartyTemplateKeyForBrand,
 } from "@/lib/party/party-templates";
-import { createInitialPartyConfig } from "@/lib/schemas/party";
+import {
+  createInitialPartyConfig,
+  PartyConfigV1Schema,
+} from "@/lib/schemas/party";
 
 function generateJoinCode(): string {
   let code = "";
@@ -353,6 +356,8 @@ export async function updateSessionLobbyPremise(params: {
   world_bible?: string | null;
   art_direction?: string | null;
   adventure_tags?: string[] | null;
+  /** Party sessions only: label for the shared story lens (stored in party_config). */
+  party_shared_role_label?: string | null;
 }): Promise<void> {
   const [row] = await db
     .select()
@@ -365,6 +370,26 @@ export async function updateSessionLobbyPremise(params: {
   }
   if (row.status !== "lobby") {
     throw new SessionLobbyUpdateError("Session already started", 409);
+  }
+
+  let nextPartyConfig: (typeof sessions.$inferSelect)["party_config"] | undefined;
+  if (
+    params.party_shared_role_label !== undefined &&
+    row.game_kind === "party"
+  ) {
+    const cfgParse = PartyConfigV1Schema.safeParse(row.party_config);
+    const base = cfgParse.success
+      ? cfgParse.data
+      : createInitialPartyConfig(
+          getDefaultPartyTemplateKeyForBrand(),
+          DEFAULT_PARTY_TOTAL_ROUNDS,
+        );
+    const trimmed = params.party_shared_role_label?.trim();
+    nextPartyConfig = {
+      ...base,
+      shared_role_label:
+        trimmed && trimmed.length > 0 ? trimmed.slice(0, 200) : null,
+    };
   }
 
   const [updated] = await db
@@ -385,6 +410,7 @@ export async function updateSessionLobbyPremise(params: {
             ? params.adventure_tags
             : null,
       }),
+      ...(nextPartyConfig !== undefined && { party_config: nextPartyConfig }),
     })
     .where(and(eq(sessions.id, params.sessionId), eq(sessions.status, "lobby")))
     .returning({ id: sessions.id });

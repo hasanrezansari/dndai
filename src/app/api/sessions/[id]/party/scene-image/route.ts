@@ -58,7 +58,9 @@ export async function POST(
     }
     const cfg0 = cfgParse.data;
     const phaseOk =
-      cfg0.party_phase === "vote" || cfg0.party_phase === "forgery_guess";
+      cfg0.party_phase === "vote" ||
+      cfg0.party_phase === "forgery_guess" ||
+      cfg0.party_phase === "submit";
     if (cfg0.round_index !== parsed.data.round_index || !phaseOk) {
       return NextResponse.json({ ok: true, skipped: true }, { status: 200 });
     }
@@ -96,7 +98,9 @@ export async function POST(
     }
     const cfg = cfgParse2.data;
     const phaseOk2 =
-      cfg.party_phase === "vote" || cfg.party_phase === "forgery_guess";
+      cfg.party_phase === "vote" ||
+      cfg.party_phase === "forgery_guess" ||
+      cfg.party_phase === "submit";
     if (cfg.round_index !== parsed.data.round_index || !phaseOk2) {
       return NextResponse.json({ ok: true, skipped: true }, { status: 200 });
     }

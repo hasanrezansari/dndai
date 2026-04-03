@@ -603,15 +603,63 @@ export default function SessionGameplayPage() {
         </div>
       );
     }
+    const party = session.party;
+    const partyPhaseLabel = formatPhaseLabel(party.partyPhase);
+    const partySceneImage = sceneImage ?? party.sceneImageUrl ?? null;
+
     return (
       <div className="relative flex min-h-dvh flex-col bg-[var(--color-obsidian)]">
-        <ConnectionStatus />
-        <PartyPlayPanel
-          sessionId={sessionId}
-          currentPlayerId={currentPlayerId}
-          party={session.party}
-          players={players}
+        <SceneTransition
+          imageUrl={partySceneImage}
+          locationTitle={sceneTitle}
+          trigger={sceneTransitionTrigger}
+          kind={sceneTransitionKind}
+          onDismiss={() => setSceneTransitionTrigger(false)}
         />
+        <ConnectionStatus />
+        <div className="relative z-[1] h-[min(36vh,320px)] w-full shrink-0 overflow-hidden">
+          <button
+            type="button"
+            onClick={handleLeaveSession}
+            className="absolute left-3 top-3 z-30 min-h-[36px] min-w-[36px] rounded-[var(--radius-card)] border border-[rgba(77,70,53,0.2)] bg-[var(--color-obsidian)]/80 backdrop-blur-md px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.1em] text-[var(--outline)] transition-all hover:border-[var(--color-failure)]/30 hover:text-[var(--color-failure)] flex items-center gap-1.5"
+          >
+            <span className="material-symbols-outlined text-sm">arrow_back</span>
+            Leave
+          </button>
+          <SceneHeader
+            sceneImage={partySceneImage}
+            previousSceneImage={previousSceneImage}
+            sceneTitle={sceneTitle}
+            roundNumber={party.roundIndex}
+            currentPlayerName={null}
+            scenePending={scenePending}
+            phase={null}
+            phaseLabel={partyPhaseLabel}
+            teaser={null}
+            showTapHint={false}
+            showTurnWhenNoTeaser={false}
+          />
+        </div>
+        {narrativeText?.trim() ? (
+          <div className="relative z-[2] shrink-0 px-4 pb-2 pt-1">
+            <div className="rounded-[var(--radius-card)] border border-[rgba(77,70,53,0.2)] bg-[var(--surface-container)]/40 px-4 py-3">
+              <p className="mb-2 text-[9px] font-black uppercase tracking-[0.2em] text-[var(--outline)]">
+                Scene
+              </p>
+              <p className="text-fantasy text-sm leading-relaxed text-[var(--color-silver-muted)] whitespace-pre-wrap">
+                {narrativeText}
+              </p>
+            </div>
+          </div>
+        ) : null}
+        <div className="relative z-[2] min-h-0 flex-1 overflow-y-auto">
+          <PartyPlayPanel
+            sessionId={sessionId}
+            currentPlayerId={currentPlayerId}
+            party={party}
+            players={players}
+          />
+        </div>
         <div className="mt-auto border-t border-white/10 p-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
           <GhostButton type="button" onClick={handleLeaveSession}>
             Leave session

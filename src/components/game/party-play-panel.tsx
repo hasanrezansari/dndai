@@ -20,6 +20,8 @@ type PartyMeView = {
   roleKey: string | null;
   bonusObjectives: Array<{ id: string; text: string; completed: boolean }>;
   secretBonusPoints: number;
+  myCrowdVoteSlotId: string | null;
+  mySubmittedTiebreak: boolean;
 };
 
 function PartyPhaseDeadline({ iso }: { iso: string | null | undefined }) {
@@ -87,7 +89,7 @@ export function PartyPlayPanel({
     return () => {
       cancelled = true;
     };
-  }, [sessionId, party.partyPhase, party.roundIndex]);
+  }, [sessionId, party.partyPhase, party.roundIndex, party.tiebreakContenderIds]);
 
   useEffect(() => {
     const phase = party.partyPhase;
@@ -95,7 +97,10 @@ export function PartyPlayPanel({
       (phase !== "submit" &&
         phase !== "vote" &&
         phase !== "forgery_guess" &&
-        phase !== "reveal") ||
+        phase !== "reveal" &&
+        phase !== "tiebreak_submit" &&
+        phase !== "tiebreak_vote" &&
+        phase !== "finale_tie_vote") ||
       !party.phaseDeadlineIso
     ) {
       return;
@@ -116,12 +121,49 @@ export function PartyPlayPanel({
     ? party.votesThisRound?.[currentPlayerId]
     : undefined;
 
+  const isFinaleContender =
+    phase === "finale_tie_vote" &&
+    Boolean(
+      currentPlayerId &&
+        party.finaleTieContenderIds?.includes(currentPlayerId),
+    );
+
   const voteTargets = useMemo(() => {
     if (phase !== "vote" || !party.submissions) return [];
     return Object.entries(party.submissions)
       .filter(([pid, s]) => pid !== currentPlayerId && s.text?.trim())
       .map(([pid, s]) => ({ playerId: pid, text: s.text, label: labelForPlayer(players, pid) }));
   }, [phase, party.submissions, currentPlayerId, players]);
+
+  const votableAnonymousSlots = useMemo(() => {
+    if (
+      (phase !== "vote" &&
+        phase !== "tiebreak_vote" &&
+        phase !== "finale_tie_vote") ||
+      !party.submissionSlots?.length
+    ) {
+      return [];
+    }
+    const mine = partyMe?.myCrowdVoteSlotId ?? null;
+    const allowed = party.crowdVoteSlotIds;
+    const base =
+      allowed && allowed.length > 0
+        ? party.submissionSlots.filter((s) => allowed.includes(s.slotId))
+        : party.submissionSlots;
+    return base.filter((s) => s.slotId !== mine);
+  }, [
+    phase,
+    party.submissionSlots,
+    party.crowdVoteSlotIds,
+    partyMe?.myCrowdVoteSlotId,
+  ]);
+
+  const useAnonymousVoteCards =
+    (phase === "vote" ||
+      phase === "tiebreak_vote" ||
+      phase === "finale_tie_vote") &&
+    Boolean(party.crowdVoteSlotIds?.length) &&
+    votableAnonymousSlots.length > 0;
 
   const vpRows = useMemo(() => {
     const t = party.vpTotals ?? {};
@@ -242,12 +284,54 @@ export function PartyPlayPanel({
     [sessionId, currentPlayerId],
   );
 
+  const castVoteBySlot = useCallback(
+    async (targetSlotId: string) => {
+      if (!currentPlayerId) return;
+      setBusy(true);
+      setError(null);
+      try {
+        const res = await fetch(`/api/sessions/${sessionId}/party/vote`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            playerId: currentPlayerId,
+            targetSlotId,
+          }),
+        });
+        const body = (await res.json().catch(() => ({}))) as { error?: string };
+        if (!res.ok) {
+          setError(body.error ?? "Vote failed");
+        }
+      } catch {
+        setError("Network error");
+      } finally {
+        setBusy(false);
+      }
+    },
+    [sessionId, currentPlayerId],
+  );
+
+  const canTiebreakSubmit =
+    phase === "tiebreak_submit" &&
+    Boolean(
+      currentPlayerId &&
+        party.tiebreakContenderIds?.includes(currentPlayerId),
+    );
+
   if (phase === "ended") {
     return (
       <div className="flex flex-col gap-4 px-4 py-6">
         <h2 className="text-lg font-semibold text-[var(--color-silver)]">
           Party game over
         </h2>
+        {party.partyChampionPlayerId ? (
+          <p className="text-sm text-[var(--color-silver-muted)]">
+            Table champion:{" "}
+            <span className="font-medium text-[var(--color-gold)]">
+              {labelForPlayer(players, party.partyChampionPlayerId)}
+            </span>
+          </p>
+        ) : null}
         <p className="text-sm text-[var(--color-silver-muted)]">
           Crowd favorite scores (votes won per round):
         </p>
@@ -318,24 +402,36 @@ export function PartyPlayPanel({
   return (
     <div className="flex flex-col gap-4 px-4 py-4">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
-        <h2 className="text-lg font-semibold text-[var(--color-silver)]">
-          Party mode
+        <h2 className="text-sm font-semibold text-[var(--color-silver-dim)]">
+          Party · Round {party.roundIndex} / {party.totalRounds}
         </h2>
-        <span className="text-xs uppercase tracking-wide text-[var(--color-silver-dim)]">
-          Round {party.roundIndex} / {party.totalRounds} · {phase}
+        <span className="text-[10px] uppercase tracking-wide text-[var(--outline)]">
+          {phase}
         </span>
       </div>
 
       {(phase === "submit" ||
         phase === "vote" ||
         phase === "forgery_guess" ||
-        phase === "reveal") && (
+        phase === "reveal" ||
+        phase === "tiebreak_submit" ||
+        phase === "tiebreak_vote" ||
+        phase === "finale_tie_vote") && (
         <PartyPhaseDeadline iso={party.phaseDeadlineIso} />
       )}
 
       {party.instigatorEnabled ? (
         <p className="text-[10px] uppercase tracking-wide text-[var(--color-outline)]">
           Instigator on — one anonymous line is fake; guess it before the crowd vote.
+        </p>
+      ) : null}
+
+      {party.sharedRoleLabel?.trim() ? (
+        <p className="rounded-[var(--radius-chip)] border border-[var(--color-gold-rare)]/20 bg-[var(--color-gold-rare)]/5 px-3 py-2 text-[10px] leading-relaxed text-[var(--color-silver-muted)]">
+          <span className="font-semibold text-[var(--color-gold-rare)]">
+            Shared lens:{" "}
+          </span>
+          {party.sharedRoleLabel}
         </p>
       ) : null}
 
@@ -378,7 +474,11 @@ export function PartyPlayPanel({
         </div>
       ) : null}
 
-      {(phase === "vote" || phase === "forgery_guess") && party.mergedBeat?.trim() ? (
+      {(phase === "vote" ||
+        phase === "forgery_guess" ||
+        phase === "tiebreak_vote" ||
+        phase === "finale_tie_vote") &&
+      party.mergedBeat?.trim() ? (
         <div className="rounded-[var(--radius-card)] border border-[rgba(77,70,53,0.2)] bg-[var(--surface-container)]/40 p-4">
           <p className="text-xs font-medium uppercase tracking-wide text-[var(--color-silver-dim)]">
             Merged beat
@@ -448,23 +548,48 @@ export function PartyPlayPanel({
         </div>
       ) : null}
 
-      {phase === "submit" ? (
+      {phase === "tiebreak_submit" && !canTiebreakSubmit ? (
+        <p className="text-sm text-[var(--color-silver-muted)]">
+          The crowd tied — only the tied players submit a fresh line for a quick
+          revote.
+        </p>
+      ) : null}
+
+      {phase === "submit" || canTiebreakSubmit ? (
         <div className="flex flex-col gap-2">
           <label className="text-xs text-[var(--color-silver-dim)]">
-            Your line this round
+            {canTiebreakSubmit
+              ? "Your tiebreak line"
+              : "Your take on this moment"}
           </label>
+          <p className="text-[10px] leading-relaxed text-[var(--color-outline)]">
+            {canTiebreakSubmit
+              ? "Votes tied — pitch a sharper take. Everyone else will vote anonymously again."
+              : "Same scene as everyone else — pitch how it should go next. Keep it short; the table votes on which direction sticks."}
+          </p>
           <textarea
             value={line}
             onChange={(e) => setLine(e.target.value)}
-            disabled={busy || Boolean(mySubmission)}
+            disabled={
+              busy ||
+              Boolean(
+                phase === "submit"
+                  ? mySubmission
+                  : partyMe?.mySubmittedTiebreak,
+              )
+            }
             maxLength={2000}
             rows={4}
             className="min-h-[100px] w-full resize-y rounded-[var(--radius-chip)] border border-white/15 bg-black/30 px-3 py-2 text-sm text-[var(--color-silver)] placeholder:text-[var(--color-silver-dim)] disabled:opacity-50"
-            placeholder="Something funny, smart, or chaotic — keep it short."
+            placeholder="One punchy line for this shared beat…"
           />
-          {mySubmission ? (
+          {phase === "submit" && mySubmission ? (
             <p className="text-xs text-[var(--color-silver-dim)]">
               You submitted. Waiting for others…
+            </p>
+          ) : canTiebreakSubmit && partyMe?.mySubmittedTiebreak ? (
+            <p className="text-xs text-[var(--color-silver-dim)]">
+              Tiebreak line sent. Waiting for other tied players…
             </p>
           ) : (
             <GoldButton
@@ -472,21 +597,63 @@ export function PartyPlayPanel({
               disabled={busy || !line.trim() || !currentPlayerId}
               onClick={() => void submitLine()}
             >
-              {busy ? "Sending…" : "Submit line"}
+              {busy ? "Sending…" : canTiebreakSubmit ? "Submit tiebreak" : "Submit line"}
             </GoldButton>
           )}
         </div>
       ) : null}
 
-      {phase === "vote" ? (
-        <div className="flex flex-col gap-2">
+      {phase === "vote" || phase === "tiebreak_vote" || phase === "finale_tie_vote" ? (
+        <div className="flex flex-col gap-3">
+          {isFinaleContender ? (
+            <p className="text-sm text-[var(--color-silver-muted)]">
+              You&apos;re tied for the crown — the rest of the table is picking
+              among the finalists.
+            </p>
+          ) : null}
+          {!isFinaleContender ? (
+            <>
           <p className="text-xs text-[var(--color-silver-dim)]">
-            Vote for your favorite line (not yourself).
+            {phase === "finale_tie_vote"
+              ? "Pick which tied leader should take the table — anonymous cards."
+              : useAnonymousVoteCards
+                ? "Pick the line that should steer the story — cards are anonymous (not your own)."
+                : "Vote for your favorite line (not yourself)."}
           </p>
           {myVote ? (
             <p className="text-sm text-[var(--color-silver-muted)]">
               Vote locked. Waiting for others…
             </p>
+          ) : useAnonymousVoteCards ? (
+            partyMe === null && currentPlayerId ? (
+              <p className="text-sm text-[var(--color-silver-dim)]">
+                Loading ballot…
+              </p>
+            ) : votableAnonymousSlots.length === 0 ? (
+              <p className="text-sm text-[var(--color-silver-dim)]">
+                No other lines to vote on this round.
+              </p>
+            ) : (
+              <ul className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                {votableAnonymousSlots.map((s) => (
+                  <li key={s.slotId}>
+                    <button
+                      type="button"
+                      disabled={busy || !currentPlayerId}
+                      onClick={() => void castVoteBySlot(s.slotId)}
+                      className="flex min-h-[120px] w-full flex-col items-stretch justify-between rounded-[var(--radius-card)] border border-[rgba(77,70,53,0.28)] bg-[var(--surface-container)]/45 px-4 py-3 text-left transition-colors hover:border-[var(--color-gold-rare)]/35 hover:bg-[var(--surface-container)]/65 disabled:opacity-50"
+                    >
+                      <span className="text-[9px] font-black uppercase tracking-[0.18em] text-[var(--outline)]">
+                        Card
+                      </span>
+                      <span className="mt-2 text-sm leading-snug text-[var(--color-silver-muted)]">
+                        {s.text}
+                      </span>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )
           ) : voteTargets.length === 0 ? (
             <p className="text-sm text-[var(--color-silver-dim)]">
               Need at least one other player with a line to vote on.
@@ -512,6 +679,8 @@ export function PartyPlayPanel({
               ))}
             </ul>
           )}
+            </>
+          ) : null}
         </div>
       ) : null}
 

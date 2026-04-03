@@ -24,6 +24,7 @@ const PatchSessionBodySchema = z
     world_bible: z.string().max(32000).nullable().optional(),
     art_direction: z.string().max(2000).nullable().optional(),
     adventure_tags: z.array(z.string().max(64)).max(24).optional(),
+    party_shared_role_label: z.string().max(200).nullable().optional(),
   })
   .refine(
     (d) =>
@@ -31,7 +32,8 @@ const PatchSessionBodySchema = z
       d.adventure_prompt !== undefined ||
       d.world_bible !== undefined ||
       d.art_direction !== undefined ||
-      d.adventure_tags !== undefined,
+      d.adventure_tags !== undefined ||
+      d.party_shared_role_label !== undefined,
     { message: "At least one field required" },
   );
 
@@ -89,7 +91,8 @@ export async function PATCH(
       data.adventure_prompt !== undefined ||
       data.world_bible !== undefined ||
       data.art_direction !== undefined ||
-      data.adventure_tags !== undefined
+      data.adventure_tags !== undefined ||
+      data.party_shared_role_label !== undefined
     ) {
       await updateSessionLobbyPremise({
         sessionId: id,
@@ -98,6 +101,7 @@ export async function PATCH(
         world_bible: data.world_bible,
         art_direction: data.art_direction,
         adventure_tags: data.adventure_tags,
+        party_shared_role_label: data.party_shared_role_label,
       });
       try {
         await broadcastToSession(id, "session-premise-updated", {});

@@ -4,6 +4,7 @@ import {
   buildNextPartyConfigAfterVote,
   fillPartyAutoVotes,
   listParticipantsWhoMustVote,
+  listTopVoteTargets,
   pickAutoVoteTarget,
   pickVoteWinner,
   shouldPartyRevealAfterVote,
@@ -43,6 +44,14 @@ describe("pickVoteWinner", () => {
   });
 });
 
+describe("listTopVoteTargets", () => {
+  it("returns all ids tied at max votes", () => {
+    expect(
+      listTopVoteTargets({ x: "a", y: "b" }, ["a", "b"]).sort(),
+    ).toEqual(["a", "b"]);
+  });
+});
+
 describe("pickAutoVoteTarget", () => {
   it("excludes self and picks lowest id", () => {
     expect(pickAutoVoteTarget("b", ["a", "b", "c"])).toBe("a");
@@ -78,16 +87,18 @@ describe("buildNextPartyConfigAfterVote", () => {
     const cfg = baseCfg();
     const next = buildNextPartyConfigAfterVote({
       cfg,
-      votes: { a: "b", b: "a" },
+      votes: { a: "b", b: "b" },
       submissionPlayerIds: ["a", "b"],
       isoDeadlineFromNow: iso(60),
       submitDeadlineSec: 60,
+      voteDeadlineSec: 120,
+      participantIdsForVpTie: ["a", "b"],
+      sessionId: "00000000-0000-4000-8000-000000000001",
     });
     expect(next.party_phase).toBe("submit");
     expect(next.round_index).toBe(2);
-    // Tie-break: sorted submission id `a` wins at 1 vote each.
-    expect(next.vp_totals?.a).toBe(1);
-    expect(next.carry_forward).toBe("line a");
+    expect(next.vp_totals?.b).toBe(1);
+    expect(next.carry_forward).toBe("line b");
     expect(next.merged_beat).toBeNull();
   });
 
@@ -100,6 +111,9 @@ describe("buildNextPartyConfigAfterVote", () => {
       forcedWinner: "a",
       isoDeadlineFromNow: iso(60),
       submitDeadlineSec: 60,
+      voteDeadlineSec: 120,
+      participantIdsForVpTie: ["a"],
+      sessionId: "00000000-0000-4000-8000-000000000001",
     });
     expect(next.vp_totals?.a).toBe(1);
   });
@@ -108,10 +122,13 @@ describe("buildNextPartyConfigAfterVote", () => {
     const cfg = baseCfg({ round_index: 3, total_rounds: 3 });
     const next = buildNextPartyConfigAfterVote({
       cfg,
-      votes: { a: "b", b: "a" },
+      votes: { a: "b", b: "b" },
       submissionPlayerIds: ["a", "b"],
       isoDeadlineFromNow: iso(60),
       submitDeadlineSec: 60,
+      voteDeadlineSec: 120,
+      participantIdsForVpTie: ["a", "b"],
+      sessionId: "00000000-0000-4000-8000-000000000001",
     });
     expect(next.party_phase).toBe("ended");
   });
@@ -133,6 +150,9 @@ describe("buildNextPartyConfigAfterVote", () => {
       submissionPlayerIds: ["a", "b"],
       isoDeadlineFromNow: iso(60),
       submitDeadlineSec: 60,
+      voteDeadlineSec: 120,
+      participantIdsForVpTie: ["a", "b"],
+      sessionId: "00000000-0000-4000-8000-000000000001",
     });
     expect(next.party_phase).toBe("reveal");
     expect(next.fp_totals?.b).toBe(1);

@@ -30,6 +30,13 @@ export type PartyRoundSlots = {
   submission_slots_public: Array<{ slot_id: string; text: string }>;
   slot_attribution: Record<string, "player" | "forgery">;
   instigator_slot_id: string;
+  /** Player lines only — used for anonymous crowd vote (forgery slot omitted). */
+  vote_slot_owner: Record<string, string>;
+};
+
+export type AnonymousCrowdVoteSlots = {
+  submission_slots_public: Array<{ slot_id: string; text: string }>;
+  vote_slot_owner: Record<string, string>;
 };
 
 /**
@@ -50,10 +57,12 @@ export function buildInstigatorRoundSlots(params: {
     slot_id: string;
     text: string;
     kind: "player" | "forgery";
+    player_id?: string;
   }> = playerLines.map((l) => ({
     slot_id: randomUUID(),
     text: l.text,
     kind: "player" as const,
+    player_id: l.player_id,
   }));
 
   const instigator_slot_id = randomUUID();
@@ -65,8 +74,12 @@ export function buildInstigatorRoundSlots(params: {
 
   const shuffled = seededShuffle(slotRows, `${sessionId}:${roundIndex}`);
   const slot_attribution: Record<string, "player" | "forgery"> = {};
+  const vote_slot_owner: Record<string, string> = {};
   for (const row of slotRows) {
     slot_attribution[row.slot_id] = row.kind;
+    if (row.kind === "player" && row.player_id) {
+      vote_slot_owner[row.slot_id] = row.player_id;
+    }
   }
 
   return {
@@ -76,6 +89,56 @@ export function buildInstigatorRoundSlots(params: {
     })),
     slot_attribution,
     instigator_slot_id,
+    vote_slot_owner,
+  };
+}
+
+/** Anonymous ballot for end-game VP ties — uses last-round submission text per contender. */
+export function buildFinaleAnonymousVoteSlots(params: {
+  cfg: PartyConfigV1;
+  contenderIds: string[];
+  sessionId: string;
+}): AnonymousCrowdVoteSlots | null {
+  const subs = params.cfg.submissions ?? {};
+  const lines = params.contenderIds
+    .map((id) => {
+      const t = subs[id]?.text?.trim();
+      return t ? { player_id: id, text: t } : null;
+    })
+    .filter(Boolean) as Array<{ player_id: string; text: string }>;
+  if (lines.length < 2) return null;
+  return buildAnonymousCrowdVoteSlots({
+    playerLines: lines,
+    sessionId: params.sessionId,
+    roundIndex: params.cfg.round_index,
+  });
+}
+
+/** Anonymous shuffled cards for standard (non-instigator) crowd vote. */
+export function buildAnonymousCrowdVoteSlots(params: {
+  playerLines: Array<{ player_id: string; text: string }>;
+  sessionId: string;
+  roundIndex: number;
+}): AnonymousCrowdVoteSlots | null {
+  const lines = params.playerLines.filter((l) => l.text.trim());
+  if (lines.length === 0) return null;
+
+  const rows = lines.map((l) => ({
+    slot_id: randomUUID(),
+    text: l.text.trim(),
+    player_id: l.player_id,
+  }));
+  const shuffled = seededShuffle(rows, `${params.sessionId}:${params.roundIndex}:crowd`);
+  const vote_slot_owner: Record<string, string> = {};
+  for (const r of rows) {
+    vote_slot_owner[r.slot_id] = r.player_id;
+  }
+  return {
+    submission_slots_public: shuffled.map((r) => ({
+      slot_id: r.slot_id,
+      text: r.text,
+    })),
+    vote_slot_owner,
   };
 }
 

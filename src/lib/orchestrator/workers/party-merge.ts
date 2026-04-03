@@ -5,6 +5,8 @@ import { runOrchestrationStep } from "@/lib/orchestrator/step-runner";
 
 export const PARTY_MERGE_SYSTEM = `You merge multiple player contributions into ONE short story beat for a party game.
 
+Context: players are NOT each playing a separate protagonist unless the premise explicitly says so. Treat their lines as competing or complementary pitches for how the SAME shared moment or focal situation should go — one table, one scene, many voices. If "shared_role_label" is present in the JSON input, treat it as an optional table-agreed label for that shared lens (not a full character sheet).
+
 Rules:
 - Output JSON only with key "merged_beat".
 - Length: about 80–160 words. One or two tight paragraphs.

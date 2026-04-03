@@ -30,6 +30,7 @@ import type {
   SessionStatePayload,
   StatEffect,
 } from "@/lib/state/game-store";
+import { getPartyRoundMilestone } from "@/lib/party/party-templates";
 import { getQuestState } from "@/server/services/quest-service";
 
 const DEFAULT_STATS = {
@@ -447,12 +448,32 @@ export async function loadSessionStatePayload(
       if (
         (pc.party_phase === "vote" ||
           pc.party_phase === "forgery_guess" ||
-          pc.party_phase === "reveal") &&
+          pc.party_phase === "reveal" ||
+          pc.party_phase === "tiebreak_vote" ||
+          pc.party_phase === "finale_tie_vote") &&
         pc.merged_beat?.trim()
       ) {
         narrativeText = pc.merged_beat.trim();
-      } else if (pc.party_phase === "submit" && pc.carry_forward?.trim()) {
-        narrativeText = pc.carry_forward.trim();
+      } else if (
+        pc.party_phase === "submit" ||
+        pc.party_phase === "tiebreak_submit"
+      ) {
+        const prem = sessionRow.adventure_prompt?.trim() ?? "";
+        const ms = getPartyRoundMilestone(pc.template_key, pc.round_index);
+        const carry = pc.carry_forward?.trim() ?? "";
+        const lens = pc.shared_role_label?.trim() ?? "";
+        const chunks: string[] = [];
+        if (lens) {
+          chunks.push(
+            `You’re all steering the same moment — shared lens: ${lens}`,
+          );
+        }
+        if (prem) chunks.push(prem);
+        if (ms) chunks.push(`Round focus: ${ms}`);
+        if (carry) chunks.push(`Where we left off: ${carry}`);
+        if (chunks.length > 0) {
+          narrativeText = chunks.join("\n\n");
+        }
       } else if (pc.party_phase === "ended") {
         narrativeText =
           pc.merged_beat?.trim() ||
@@ -466,7 +487,9 @@ export async function loadSessionStatePayload(
       } else if (
         (pc.party_phase === "vote" ||
           pc.party_phase === "forgery_guess" ||
-          pc.party_phase === "reveal") &&
+          pc.party_phase === "reveal" ||
+          pc.party_phase === "tiebreak_vote" ||
+          pc.party_phase === "finale_tie_vote") &&
         pc.merged_beat?.trim()
       ) {
         scenePending = true;

@@ -11,6 +11,9 @@ export const PartyPhaseSchema = z.enum([
   "narrate",
   "forgery_guess",
   "vote",
+  "tiebreak_submit",
+  "tiebreak_vote",
+  "finale_tie_vote",
   "reveal",
   "ended",
 ]);
@@ -28,6 +31,8 @@ export const PartyConfigV1Schema = z.object({
   party_phase: PartyPhaseSchema,
   round_index: z.number().int().min(0).max(99),
   total_rounds: z.number().int().min(1).max(24),
+  /** Host-editable: shared story lens (e.g. “the crew”, “our witness”). Not a character builder. */
+  shared_role_label: z.string().max(200).nullable().optional(),
   carry_forward: z.string().nullable().optional(),
   phase_deadline_iso: z.string().nullable().optional(),
   submissions: z.record(z.string().uuid(), PartySubmissionSchema).optional(),
@@ -50,6 +55,18 @@ export const PartyConfigV1Schema = z.object({
       }),
     )
     .optional(),
+  /**
+   * Server-only: anonymous slot_id → player uuid for crowd vote (never sent to clients).
+   * Player lines only; instigator forgery slot is omitted.
+   */
+  vote_slot_owner: z.record(z.string().min(1).max(80), z.string().uuid()).optional(),
+  /** Revote among players tied after the main crowd vote. */
+  tiebreak_contender_ids: z.array(z.string().uuid()).optional(),
+  tiebreak_submissions: z.record(z.string().uuid(), PartySubmissionSchema).optional(),
+  /** End-of-game: tied VP leaders; losers vote anonymously among these ids. */
+  finale_tie_contender_ids: z.array(z.string().uuid()).optional(),
+  /** Filled when entering `ended` — who won the table (breaks VP ties after finale vote). */
+  party_champion_player_id: z.string().uuid().nullable().optional(),
   forgery_guesses: z.record(z.string().uuid(), z.string().min(1)).optional(),
   fp_totals: z.record(z.string().uuid(), z.number()).optional(),
 });
@@ -75,6 +92,7 @@ export function createInitialPartyConfig(
     merged_beat: null,
     scene_image_url: null,
     instigator_enabled: opts?.instigatorEnabled ?? false,
+    shared_role_label: null,
   };
 }
 
@@ -84,8 +102,16 @@ export type PartyConfigClientView = {
   partyPhase: PartyPhase;
   roundIndex: number;
   totalRounds: number;
+  /** Shared POV label from host (optional). */
+  sharedRoleLabel?: string | null;
   phaseDeadlineIso?: string | null;
   carryForward?: string | null;
+  /** When in a vote revote, only these players submit tiebreak lines. */
+  tiebreakContenderIds?: string[];
+  /** Tied VP leaders — losers vote among them in `finale_tie_vote`. */
+  finaleTieContenderIds?: string[];
+  /** Set when the party ends. */
+  partyChampionPlayerId?: string | null;
   submissions?: Record<string, { text: string; submitted_at: string }>;
   votesThisRound?: Record<string, string>;
   vpTotals?: Record<string, number>;
@@ -96,6 +122,8 @@ export type PartyConfigClientView = {
   instigatorEnabled: boolean;
   /** Anonymous lines (forgery_guess / vote); no per-slot kind until `reveal`. */
   submissionSlots?: Array<{ slotId: string; text: string }>;
+  /** During vote: slot ids that accept crowd VP (player lines only; excludes instigator forgery). */
+  crowdVoteSlotIds?: string[];
   /** Set only in `reveal` — which slot was the instigator line. */
   revealedForgerySlotId?: string | null;
   /** Set only in `reveal` — full attribution map for recap. */
@@ -118,6 +146,14 @@ export function partyConfigForSessionPayload(
       text: s.text,
     })) ?? undefined;
 
+  const voteOwners = c.vote_slot_owner ?? {};
+  const anonymousVotePhase =
+    c.party_phase === "vote" ||
+    c.party_phase === "tiebreak_vote" ||
+    c.party_phase === "finale_tie_vote";
+  const hasAnonymousVote =
+    anonymousVotePhase && Object.keys(voteOwners).length > 0;
+
   const reveal =
     c.party_phase === "reveal" &&
     c.instigator_slot_id?.trim() &&
@@ -132,14 +168,40 @@ export function partyConfigForSessionPayload(
     }
   }
 
+  const crowdVoteSlotIds =
+    anonymousVotePhase && Object.keys(voteOwners).length > 0
+      ? Object.keys(voteOwners).sort((a, b) => a.localeCompare(b))
+      : undefined;
+
+  const tiebreakIds = c.tiebreak_contender_ids;
+  const tiebreakContenderIds =
+    c.party_phase === "tiebreak_submit" || c.party_phase === "tiebreak_vote"
+      ? tiebreakIds && tiebreakIds.length > 0
+        ? [...tiebreakIds].sort((a, b) => a.localeCompare(b))
+        : undefined
+      : undefined;
+
+  const finaleIds = c.finale_tie_contender_ids;
+  const finaleTieContenderIds =
+    c.party_phase === "finale_tie_vote" && finaleIds && finaleIds.length > 0
+      ? [...finaleIds].sort((a, b) => a.localeCompare(b))
+      : undefined;
+
   return {
     templateKey: c.template_key,
     partyPhase: c.party_phase,
     roundIndex: c.round_index,
     totalRounds: c.total_rounds,
+    sharedRoleLabel: c.shared_role_label ?? null,
     phaseDeadlineIso: c.phase_deadline_iso ?? null,
     carryForward: c.carry_forward ?? null,
-    submissions: c.submissions ?? {},
+    tiebreakContenderIds,
+    finaleTieContenderIds,
+    partyChampionPlayerId:
+      c.party_phase === "ended"
+        ? (c.party_champion_player_id ?? null)
+        : undefined,
+    submissions: hasAnonymousVote ? {} : (c.submissions ?? {}),
     votesThisRound: c.votes_this_round ?? {},
     vpTotals: c.vp_totals ?? {},
     fpTotals: c.fp_totals ?? {},
@@ -147,6 +209,7 @@ export function partyConfigForSessionPayload(
     sceneImageUrl: c.scene_image_url ?? null,
     instigatorEnabled: c.instigator_enabled ?? false,
     submissionSlots: slots,
+    crowdVoteSlotIds,
     revealedForgerySlotId: reveal ? c.instigator_slot_id : undefined,
     slotAttribution: reveal ? c.slot_attribution : undefined,
     secretBpTotals,
