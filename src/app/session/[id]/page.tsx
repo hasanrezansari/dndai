@@ -618,7 +618,7 @@ export default function SessionGameplayPage() {
           onDismiss={() => setSceneTransitionTrigger(false)}
         />
         <ConnectionStatus />
-        <div className="relative z-[1] h-[min(32vh,280px)] w-full shrink-0 overflow-hidden sm:h-[min(36vh,320px)]">
+        <div className="relative z-[1] h-[min(40vh,300px)] w-full shrink-0 overflow-hidden sm:h-[min(36vh,320px)]">
           <button
             type="button"
             onClick={handleLeaveSession}
@@ -642,9 +642,13 @@ export default function SessionGameplayPage() {
           />
         </div>
         {narrativeText?.trim() ? (
-          <div className="relative z-[2] max-h-[min(28vh,220px)] shrink-0 overflow-y-auto px-3 pb-1 pt-1 sm:max-h-[min(32vh,260px)] sm:px-4">
-            <PartySessionCard title="Scene" contentClassName="!py-2.5" className="!py-0">
-              <p className="text-fantasy text-sm leading-relaxed text-[var(--color-silver-muted)] whitespace-pre-wrap">
+          <div className="relative z-[2] max-h-[min(24vh,200px)] shrink-0 overflow-y-auto px-3 pb-1 pt-0.5 sm:max-h-[min(32vh,260px)] sm:px-4 sm:pt-1">
+            <PartySessionCard
+              title="Scene"
+              contentClassName="!py-2 !leading-relaxed sm:!py-2.5"
+              className="!py-0 sm:!py-0 [&_h3]:text-[8px] sm:[&_h3]:text-[9px]"
+            >
+              <p className="text-fantasy text-[13px] leading-relaxed text-[var(--color-silver-muted)] whitespace-pre-wrap sm:text-sm">
                 {narrativeText}
               </p>
             </PartySessionCard>

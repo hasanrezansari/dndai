@@ -59,7 +59,11 @@ function labelForPlayer(players: GamePlayerView[], playerId: string): string {
 
 function shortVpLabel(players: GamePlayerView[], playerId: string): string {
   const full = labelForPlayer(players, playerId);
+  if (/^seat\s+\d+$/i.test(full.trim())) return full.trim();
   const words = full.trim().split(/\s+/);
+  if (words.length >= 2 && /^seat$/i.test(words[0]!)) {
+    return `${words[0]} ${words[1]}`;
+  }
   if (words[0] && words[0].length <= 12) return words[0]!;
   return full.slice(0, 10) + (full.length > 10 ? "…" : "");
 }
@@ -595,8 +599,8 @@ export function PartyPlayPanel({
       ) : null}
         </div>
 
-        <div className="shrink-0 space-y-2 border-t border-white/10 bg-[var(--color-obsidian)]/96 px-3 pb-[max(0.5rem,env(safe-area-inset-bottom))] pt-2 backdrop-blur-md">
-          <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5">
+        <div className="shrink-0 space-y-1.5 border-t border-white/10 bg-[var(--color-obsidian)]/96 px-2 pb-[max(0.35rem,env(safe-area-inset-bottom))] pt-1.5 backdrop-blur-md sm:space-y-2 sm:px-3 sm:pb-[max(0.5rem,env(safe-area-inset-bottom))] sm:pt-2">
+          <div className="flex flex-wrap items-center gap-x-1.5 gap-y-1 sm:gap-x-2 sm:gap-y-1.5">
             <span className="text-[10px] font-semibold tabular-nums text-[var(--color-silver-dim)]">
               R{party.roundIndex}/{party.totalRounds}
             </span>
@@ -665,9 +669,10 @@ export function PartyPlayPanel({
           {phase === "submit" || canTiebreakSubmit ? (
             <PartySessionCard
               title={canTiebreakSubmit ? "Tiebreak line" : "Your line"}
-              contentClassName="flex flex-col gap-2"
+              className="[&_h3]:!mb-1 sm:[&_h3]:!mb-2 !border-white/10 !bg-black/20 !px-2.5 !py-2 sm:!border-[rgba(77,70,53,0.24)] sm:!bg-[var(--surface-container)]/55 sm:!px-4 sm:!py-3"
+              contentClassName="flex flex-col gap-1.5 sm:gap-2"
             >
-              <p className="text-[10px] leading-relaxed text-[var(--color-outline)]">
+              <p className="hidden text-[10px] leading-relaxed text-[var(--color-outline)] sm:block">
                 {canTiebreakSubmit
                   ? "Votes tied — pitch a sharper take. Everyone else will vote anonymously again."
                   : "Same scene as everyone else — pitch how it should go next. Keep it short; the table votes on which direction sticks."}
@@ -684,22 +689,28 @@ export function PartyPlayPanel({
                   )
                 }
                 maxLength={2000}
-                rows={3}
-                className="min-h-[72px] w-full resize-y rounded-[var(--radius-chip)] border border-white/15 bg-black/30 px-3 py-2 text-sm text-[var(--color-silver)] placeholder:text-[var(--color-silver-dim)] disabled:opacity-50 sm:min-h-[100px]"
-                placeholder="One punchy line for this shared beat…"
+                rows={2}
+                className="min-h-[48px] w-full resize-y rounded-[var(--radius-chip)] border border-white/15 bg-black/40 px-2.5 py-2 text-sm leading-snug text-[var(--color-silver)] placeholder:text-[var(--color-silver-dim)] placeholder:text-xs disabled:opacity-50 sm:min-h-[88px] sm:px-3 sm:py-2 sm:placeholder:text-sm"
+                placeholder={
+                  canTiebreakSubmit
+                    ? "Sharper tiebreak line…"
+                    : "Your line for this beat — keep it short…"
+                }
+                aria-label={canTiebreakSubmit ? "Tiebreak line" : "Your line for this round"}
               />
               {phase === "submit" && mySubmission ? (
-                <p className="text-xs text-[var(--color-silver-dim)]">
+                <p className="text-[11px] text-[var(--color-silver-dim)] sm:text-xs">
                   You submitted. Waiting for others…
                 </p>
               ) : canTiebreakSubmit && partyMe?.mySubmittedTiebreak ? (
-                <p className="text-xs text-[var(--color-silver-dim)]">
+                <p className="text-[11px] text-[var(--color-silver-dim)] sm:text-xs">
                   Tiebreak line sent. Waiting for other tied players…
                 </p>
               ) : (
                 <GoldButton
                   type="button"
                   disabled={busy || !line.trim() || !currentPlayerId}
+                  className="min-h-[44px] py-2.5 text-sm sm:min-h-[48px] sm:py-3 sm:text-base"
                   onClick={() => void submitLine()}
                 >
                   {busy ? "Sending…" : canTiebreakSubmit ? "Submit tiebreak" : "Submit line"}

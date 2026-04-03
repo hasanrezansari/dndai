@@ -489,6 +489,12 @@ export async function loadSessionStatePayload(
         pc.merged_beat?.trim()
       ) {
         scenePending = true;
+      } else if (
+        (pc.party_phase === "submit" || pc.party_phase === "tiebreak_submit") &&
+        pc.round_scene_beat?.trim()
+      ) {
+        /** Round art is scheduled from hydrate; poll clients so the hero updates without reload. */
+        scenePending = true;
       }
     }
   }

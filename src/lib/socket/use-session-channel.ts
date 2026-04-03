@@ -154,11 +154,18 @@ export function useSessionChannel(
       return (await res.json()) as SessionStatePayload;
     }
 
+    function maybeStartPartyScenePoll(data: SessionStatePayload | null) {
+      if (data?.session?.gameKind === "party" && data.scenePending) {
+        startScenePoll();
+      }
+    }
+
     /** Pusher-driven deltas: keep client feed / overlays; align everything else to DB. */
     async function applyPatchFromServerState() {
       const data = await fetchSessionState();
       if (!data?.session) return;
       useGameStore.getState().patchSessionFromStateApi(data);
+      maybeStartPartyScenePoll(data);
     }
 
     let fullResyncInFlight: Promise<void> | null = null;
@@ -176,6 +183,7 @@ export function useSessionChannel(
           if (!data?.session || accessForbidden) return;
           const store = useGameStore.getState();
           store.patchSessionFromStateApi(data);
+          maybeStartPartyScenePoll(data);
           store.setIsThinking(false);
           store.hideDiceOverlay();
           channelOptionsRef.current?.onFullResyncComplete?.();
@@ -518,7 +526,7 @@ export function useSessionChannel(
 
     function startScenePoll() {
       stopScenePoll();
-      scenePollTimer = setInterval(pollSceneImage, 8_000);
+      scenePollTimer = setInterval(pollSceneImage, 5_000);
     }
 
     const onSceneImagePending = (raw: unknown) => {

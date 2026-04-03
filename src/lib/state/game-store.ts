@@ -395,23 +395,29 @@ export const useGameStore = create<GameState>((set) => ({
     }),
 
   patchSessionFromStateApi: (data) =>
-    set((s) => ({
-      ...s,
-      session: data.session,
-      players: data.players,
-      npcs: data.npcs ?? [],
-      sceneImage: data.sceneImage ?? null,
-      previousSceneImage: null,
-      sceneTitle: data.sceneTitle ?? null,
-      narrativeText: data.narrativeText ?? null,
-      scenePending: data.scenePending ?? false,
-      waitingForDm: Boolean(data.dmAwaiting),
-      dmAwaiting: data.dmAwaiting ?? null,
-      quest: data.quest ?? null,
-      rollingMemories: data.rollingMemories ?? [],
-      activeTurnId:
-        data.activeTurnId === undefined ? null : data.activeTurnId,
-    })),
+    set((s) => {
+      const nextImg = data.sceneImage ?? null;
+      const partyCrossfade =
+        data.session?.gameKind === "party" &&
+        Boolean(nextImg && s.sceneImage && nextImg !== s.sceneImage);
+      return {
+        ...s,
+        session: data.session,
+        players: data.players,
+        npcs: data.npcs ?? [],
+        sceneImage: nextImg,
+        previousSceneImage: partyCrossfade ? s.sceneImage : null,
+        sceneTitle: data.sceneTitle ?? null,
+        narrativeText: data.narrativeText ?? null,
+        scenePending: data.scenePending ?? false,
+        waitingForDm: Boolean(data.dmAwaiting),
+        dmAwaiting: data.dmAwaiting ?? null,
+        quest: data.quest ?? null,
+        rollingMemories: data.rollingMemories ?? [],
+        activeTurnId:
+          data.activeTurnId === undefined ? null : data.activeTurnId,
+      };
+    }),
 
   reset: () => set({ ...emptyState, activeTurnId: null }),
 }));
