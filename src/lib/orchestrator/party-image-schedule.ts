@@ -49,10 +49,18 @@ export async function schedulePartyRoundSceneImage(params: {
       });
       if (res.status !== 401) break;
     }
-    console.log("[party-image] scheduled, status:", res?.status);
-    if (res?.status === 401) {
+    const st = res?.status ?? 0;
+    console.log("[party-image] schedule response status:", st);
+    if (st === 401) {
       console.error(
         "[party-image] 401 after trying all secrets — align INTERNAL_API_SECRET and NEXTAUTH_SECRET in Vercel (or remove a bad INTERNAL_API_SECRET)",
+      );
+    } else if (st !== 200 && st !== 202) {
+      const body = await res?.text().catch(() => "");
+      console.error(
+        "[party-image] unexpected status",
+        st,
+        body?.slice(0, 300) ?? "",
       );
     }
   } catch (err) {

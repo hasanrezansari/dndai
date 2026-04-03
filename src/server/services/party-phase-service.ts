@@ -304,6 +304,7 @@ export async function activatePartySessionFromLobby(
     merged_beat: null,
     round_scene_beat: null,
     scene_image_url: null,
+    scene_image_by_round: {},
     phase_deadline_iso: isoDeadlineFromNow(PARTY_SUBMIT_DEADLINE_SEC),
   };
 
@@ -436,6 +437,54 @@ async function persistPartyConfigOptimistic(
 }
 
 /**
+ * Submit phase + round opener text exists but no scene URL for this round — enqueue art
+ * (repairs dropped internal fetches / failed first pipeline).
+ */
+async function tryPartyHealMissingSubmitSceneImage(
+  sessionId: string,
+): Promise<void> {
+  const [row] = await db
+    .select()
+    .from(sessions)
+    .where(eq(sessions.id, sessionId))
+    .limit(1);
+  if (!row || row.game_kind !== "party" || row.status !== "active") return;
+
+  const parsed = PartyConfigV1Schema.safeParse(row.party_config);
+  if (!parsed.success) return;
+  const cfg = parsed.data;
+  if (cfg.party_phase !== "submit" || !cfg.round_scene_beat?.trim()) return;
+
+  const urlForRoundHeal =
+    cfg.scene_image_by_round?.[String(cfg.round_index)]?.trim() ??
+    cfg.scene_image_url?.trim();
+  if (urlForRoundHeal) return;
+
+  const { buildPartySceneImageNarrativeText } = await import(
+    "@/lib/party/party-opening-narrative"
+  );
+  const narrativeHeal = buildPartySceneImageNarrativeText({
+    sessionRow: {
+      adventure_prompt: row.adventure_prompt,
+      adventure_tags: row.adventure_tags,
+      world_bible: row.world_bible,
+      art_direction: row.art_direction,
+    },
+    partyConfig: cfg,
+  }).trim();
+  if (!narrativeHeal) return;
+
+  const { schedulePartyRoundSceneImage } = await import(
+    "@/lib/orchestrator/party-image-schedule"
+  );
+  await schedulePartyRoundSceneImage({
+    sessionId,
+    mergedBeat: narrativeHeal,
+    roundIndex: cfg.round_index,
+  });
+}
+
+/**
  * For `submit` phases with no opener yet: run AI round opener, persist `round_scene_beat`,
  * then schedule round scene art from the same narrative the clients see.
  */
@@ -451,7 +500,12 @@ async function hydratePartyRoundSceneBeat(sessionId: string): Promise<void> {
   if (!parsed.success) return;
   const cfg = parsed.data;
   if (cfg.party_phase !== "submit") return;
-  if (cfg.round_scene_beat?.trim()) return;
+
+  /** Beat already persisted — only heal missing art, do not rerun opener. */
+  if (cfg.round_scene_beat?.trim()) {
+    await tryPartyHealMissingSubmitSceneImage(sessionId);
+    return;
+  }
 
   const tagRaw = row.adventure_tags;
   const adventureTags = Array.isArray(tagRaw) ? tagRaw.map(String) : [];
@@ -532,9 +586,6 @@ async function hydratePartyRoundSceneBeat(sessionId: string): Promise<void> {
     return;
   }
 
-  const { buildPartySceneImageNarrativeText } = await import(
-    "@/lib/party/party-opening-narrative"
-  );
   const [rowForImage] = await db
     .select()
     .from(sessions)
@@ -544,6 +595,9 @@ async function hydratePartyRoundSceneBeat(sessionId: string): Promise<void> {
   const partyConfig = cfgForImage.success ? cfgForImage.data : null;
   if (!partyConfig || partyConfig.party_phase !== "submit") return;
 
+  const { buildPartySceneImageNarrativeText } = await import(
+    "@/lib/party/party-opening-narrative"
+  );
   const narrative = buildPartySceneImageNarrativeText({
     sessionRow: {
       adventure_prompt: rowForImage?.adventure_prompt,
@@ -563,7 +617,7 @@ async function hydratePartyRoundSceneBeat(sessionId: string): Promise<void> {
     const { schedulePartyRoundSceneImage } = await import(
       "@/lib/orchestrator/party-image-schedule"
     );
-    void schedulePartyRoundSceneImage({
+    await schedulePartyRoundSceneImage({
       sessionId,
       mergedBeat: narrative,
       roundIndex: partyConfig.round_index,
@@ -659,7 +713,7 @@ export async function tryPartyMergeWhenReady(sessionId: string): Promise<void> {
         const { schedulePartyRoundSceneImage } = await import(
           "@/lib/orchestrator/party-image-schedule"
         );
-        void schedulePartyRoundSceneImage({
+        await schedulePartyRoundSceneImage({
           sessionId,
           mergedBeat,
           roundIndex: nextConfig.round_index,
@@ -705,7 +759,7 @@ export async function tryPartyMergeWhenReady(sessionId: string): Promise<void> {
         const { schedulePartyRoundSceneImage } = await import(
           "@/lib/orchestrator/party-image-schedule"
         );
-        void schedulePartyRoundSceneImage({
+        await schedulePartyRoundSceneImage({
           sessionId,
           mergedBeat,
           roundIndex: nextConfig.round_index,
@@ -762,7 +816,7 @@ export async function tryPartyMergeWhenReady(sessionId: string): Promise<void> {
   const { schedulePartyRoundSceneImage } = await import(
     "@/lib/orchestrator/party-image-schedule"
   );
-  void schedulePartyRoundSceneImage({
+  await schedulePartyRoundSceneImage({
     sessionId,
     mergedBeat,
     roundIndex: nextConfig.round_index,
