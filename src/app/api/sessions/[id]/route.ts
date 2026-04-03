@@ -12,12 +12,28 @@ import {
   getSession,
   IncreaseMaxPlayersError,
   increaseSessionMaxPlayers,
+  SessionLobbyUpdateError,
   SessionNotFoundError,
+  updateSessionLobbyPremise,
 } from "@/server/services/session-service";
 
-const PatchSessionBodySchema = z.object({
-  max_players: z.number().int().min(1).max(6),
-});
+const PatchSessionBodySchema = z
+  .object({
+    max_players: z.number().int().min(1).max(6).optional(),
+    adventure_prompt: z.string().max(8000).nullable().optional(),
+    world_bible: z.string().max(32000).nullable().optional(),
+    art_direction: z.string().max(2000).nullable().optional(),
+    adventure_tags: z.array(z.string().max(64)).max(24).optional(),
+  })
+  .refine(
+    (d) =>
+      d.max_players !== undefined ||
+      d.adventure_prompt !== undefined ||
+      d.world_bible !== undefined ||
+      d.art_direction !== undefined ||
+      d.adventure_tags !== undefined,
+    { message: "At least one field required" },
+  );
 
 export async function GET(
   _request: NextRequest,
@@ -67,25 +83,55 @@ export async function PATCH(
     if (!parsed.success) {
       return apiError("Invalid body", 400);
     }
-    await increaseSessionMaxPlayers({
-      sessionId: id,
-      actingUserId: user.id,
-      newMaxPlayers: parsed.data.max_players,
-    });
-    const session = await getSession(id);
-    try {
-      await broadcastToSession(id, "session-cap-updated", {
-        max_players: session.max_players,
+    const data = parsed.data;
+
+    if (
+      data.adventure_prompt !== undefined ||
+      data.world_bible !== undefined ||
+      data.art_direction !== undefined ||
+      data.adventure_tags !== undefined
+    ) {
+      await updateSessionLobbyPremise({
+        sessionId: id,
+        actingUserId: user.id,
+        adventure_prompt: data.adventure_prompt,
+        world_bible: data.world_bible,
+        art_direction: data.art_direction,
+        adventure_tags: data.adventure_tags,
       });
-    } catch (err) {
-      console.error(err);
+      try {
+        await broadcastToSession(id, "session-premise-updated", {});
+      } catch (err) {
+        console.error(err);
+      }
     }
+
+    if (data.max_players !== undefined) {
+      await increaseSessionMaxPlayers({
+        sessionId: id,
+        actingUserId: user.id,
+        newMaxPlayers: data.max_players,
+      });
+      try {
+        const sessionAfterCap = await getSession(id);
+        await broadcastToSession(id, "session-cap-updated", {
+          max_players: sessionAfterCap.max_players,
+        });
+      } catch (err) {
+        console.error(err);
+      }
+    }
+
+    const session = await getSession(id);
     return NextResponse.json(session);
   } catch (e) {
     if (e instanceof SessionNotFoundError) {
       return apiError("Not found", 404);
     }
     if (e instanceof IncreaseMaxPlayersError) {
+      return apiError(e.message, e.statusCode);
+    }
+    if (e instanceof SessionLobbyUpdateError) {
       return apiError(e.message, e.statusCode);
     }
     return handleApiError(e);

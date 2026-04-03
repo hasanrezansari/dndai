@@ -71,7 +71,7 @@ async function buildCanonicalState(sessionId: string): Promise<string> {
           ? vp.mechanical_class.trim().toLowerCase()
           : c.class;
       charParts.push(
-        `${c.name} (${classLabel}, mechanical ${mechanicalClass}, HP ${c.hp}/${c.max_hp}, Mana ${c.mana}/${c.max_mana}${conditions})`,
+        `${c.name} (${classLabel}, HP ${c.hp}/${c.max_hp}, Mana ${c.mana}/${c.max_mana}${conditions})`,
       );
     }
   }
@@ -88,11 +88,16 @@ async function buildCanonicalState(sessionId: string): Promise<string> {
   const questLine = quest ? questProgressForModel(quest) : "";
 
   const worldSummary = typeof sess.world_summary === "string" ? sess.world_summary : "";
+  const worldBible =
+    typeof sess.world_bible === "string" && sess.world_bible.trim().length > 0
+      ? sess.world_bible.trim()
+      : "";
 
   const parts = [
     `Round ${sess.current_round} | Phase: ${sess.phase} | Mode: ${sess.mode}`,
     sess.campaign_title ? `Campaign: ${sess.campaign_title}` : "",
     worldSummary ? `World: ${worldSummary}` : "",
+    worldBible ? `Premise (host): ${worldBible}` : "",
     `Party: ${charParts.join("; ") || "none"}`,
     npcParts.length > 0 ? `NPCs: ${npcParts.join("; ")}` : "",
     questLine,

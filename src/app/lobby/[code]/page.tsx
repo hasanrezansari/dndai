@@ -9,6 +9,7 @@ import { GhostButton } from "@/components/ui/ghost-button";
 import { SkeletonCard } from "@/components/ui/loading-skeleton";
 import { getPusherClient, getSessionChannel } from "@/lib/socket/client";
 import type { Player, Session } from "@/lib/schemas/domain";
+import { LOBBY_TONE_TAG_OPTIONS } from "@/lib/session/tone-tag-options";
 
 type SessionWithPlayers = Session & { players: Player[] };
 
@@ -130,6 +131,7 @@ export default function LobbyPage() {
     channel.bind("player-ready", bump);
     channel.bind("player-disconnected", bump);
     channel.bind("session-cap-updated", bump);
+    channel.bind("session-premise-updated", bump);
     channel.bind("session-started", onSessionStarted);
 
     return () => {
@@ -137,6 +139,7 @@ export default function LobbyPage() {
       channel.unbind("player-ready");
       channel.unbind("player-disconnected");
       channel.unbind("session-cap-updated");
+      channel.unbind("session-premise-updated");
       channel.unbind("session-started");
       pusher.unsubscribe(name);
     };
@@ -185,6 +188,58 @@ export default function LobbyPage() {
 
   const [startLoading, setStartLoading] = useState(false);
   const [capLoading, setCapLoading] = useState(false);
+
+  const [draftAdventure, setDraftAdventure] = useState("");
+  const [draftWorldBible, setDraftWorldBible] = useState("");
+  const [draftArtDirection, setDraftArtDirection] = useState("");
+  const [draftTags, setDraftTags] = useState<string[]>([]);
+  const [premiseSaving, setPremiseSaving] = useState(false);
+  const [premiseError, setPremiseError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!session) return;
+    setDraftAdventure(session.adventure_prompt ?? "");
+    setDraftWorldBible(session.world_bible ?? "");
+    setDraftArtDirection(session.art_direction ?? "");
+    const raw = session.adventure_tags;
+    setDraftTags(Array.isArray(raw) ? raw.map(String) : []);
+  }, [
+    session?.id,
+    session?.adventure_prompt,
+    session?.world_bible,
+    session?.art_direction,
+    session?.adventure_tags,
+  ]);
+
+  async function handleSavePremise() {
+    if (!sessionId || !isHost || premiseSaving) return;
+    setPremiseError(null);
+    setPremiseSaving(true);
+    try {
+      const res = await fetch(`/api/sessions/${sessionId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          adventure_prompt: draftAdventure.trim() || null,
+          world_bible: draftWorldBible.trim() || null,
+          art_direction: draftArtDirection.trim() || null,
+          adventure_tags: draftTags,
+        }),
+      });
+      const data = (await res.json().catch(() => ({}))) as SessionWithPlayers & {
+        error?: string;
+      };
+      if (!res.ok) {
+        setPremiseError(
+          typeof data.error === "string" ? data.error : "Could not save",
+        );
+        return;
+      }
+      setSession(data);
+    } finally {
+      setPremiseSaving(false);
+    }
+  }
 
   async function handleAddSeat() {
     if (!sessionId || !session || capLoading) return;
@@ -365,6 +420,7 @@ export default function LobbyPage() {
   const totalSeats = session.max_players;
   const lobbyTeaser =
     session.adventure_prompt?.trim() ||
+    session.world_bible?.trim().slice(0, 280) ||
     "Gather your party. The portal stirs beyond the veil.";
 
   return (
@@ -438,6 +494,82 @@ export default function LobbyPage() {
             </div>
           </div>
         </section>
+
+        {isHost && session.status === "lobby" ? (
+          <section className="mb-6 rounded-[var(--radius-card)] border border-[rgba(77,70,53,0.2)] bg-[var(--surface-high)]/40 p-4 space-y-3">
+            <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-[var(--color-gold-rare)]">
+              Tune the portal
+            </p>
+            <p className="text-[10px] text-[var(--outline)] leading-relaxed">
+              Edit premise before start — party sees updates after you save.
+            </p>
+            <label className="block text-[9px] uppercase tracking-[0.15em] text-[var(--outline)]">
+              Narrative seed
+            </label>
+            <textarea
+              value={draftAdventure}
+              onChange={(e) => setDraftAdventure(e.target.value)}
+              rows={3}
+              maxLength={8000}
+              className="w-full bg-[var(--color-deep-void)] p-3 rounded-[var(--radius-card)] border border-[rgba(77,70,53,0.2)] text-sm text-[var(--color-silver-muted)] resize-none"
+            />
+            <label className="block text-[9px] uppercase tracking-[0.15em] text-[var(--outline)]">
+              World bible
+            </label>
+            <textarea
+              value={draftWorldBible}
+              onChange={(e) => setDraftWorldBible(e.target.value)}
+              rows={4}
+              maxLength={32000}
+              className="w-full bg-[var(--color-deep-void)] p-3 rounded-[var(--radius-card)] border border-[rgba(77,70,53,0.2)] text-sm text-[var(--color-silver-muted)] resize-y min-h-[88px]"
+            />
+            <label className="block text-[9px] uppercase tracking-[0.15em] text-[var(--outline)]">
+              Art direction
+            </label>
+            <input
+              type="text"
+              value={draftArtDirection}
+              onChange={(e) => setDraftArtDirection(e.target.value)}
+              maxLength={2000}
+              className="w-full h-10 bg-[var(--color-deep-void)] px-3 rounded-[var(--radius-card)] border border-[rgba(77,70,53,0.2)] text-sm text-[var(--color-silver-muted)]"
+            />
+            <div className="flex flex-wrap gap-2">
+              {LOBBY_TONE_TAG_OPTIONS.map((t) => {
+                const on = draftTags.includes(t.id);
+                return (
+                  <button
+                    key={t.id}
+                    type="button"
+                    onClick={() =>
+                      setDraftTags((prev) =>
+                        on ? prev.filter((x) => x !== t.id) : [...prev, t.id],
+                      )
+                    }
+                    className={`px-2.5 py-1 rounded-full text-[9px] font-bold uppercase tracking-[0.12em] border ${
+                      on
+                        ? "border-[var(--color-gold-rare)] text-[var(--color-gold-rare)] bg-[var(--color-gold-rare)]/10"
+                        : "border-[rgba(77,70,53,0.35)] text-[var(--color-silver-dim)]"
+                    }`}
+                  >
+                    {t.label}
+                  </button>
+                );
+              })}
+            </div>
+            {premiseError ? (
+              <p className="text-xs text-[var(--color-failure)]">{premiseError}</p>
+            ) : null}
+            <GoldButton
+              type="button"
+              size="md"
+              className="w-full min-h-[44px]"
+              disabled={premiseSaving}
+              onClick={() => void handleSavePremise()}
+            >
+              {premiseSaving ? "Saving…" : "Save premise"}
+            </GoldButton>
+          </section>
+        ) : null}
 
         {/* Party List */}
         <section className="flex-1 space-y-0 overflow-hidden rounded-[var(--radius-card)] border border-[rgba(77,70,53,0.15)] divide-y divide-[rgba(77,70,53,0.1)]">

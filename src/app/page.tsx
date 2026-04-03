@@ -14,6 +14,8 @@ import { GhostButton } from "@/components/ui/ghost-button";
 import { ModeCardsSkeleton } from "@/components/ui/loading-skeleton";
 import { PillSelect } from "@/components/ui/pill-select";
 import type { CampaignMode, SessionMode } from "@/lib/schemas/enums";
+import { COPY } from "@/lib/copy/ashveil";
+import { LOBBY_TONE_TAG_OPTIONS } from "@/lib/session/tone-tag-options";
 
 const CAMPAIGN_OPTIONS: { value: CampaignMode; label: string }[] = [
   { value: "user_prompt", label: "User Prompt" },
@@ -32,6 +34,9 @@ export default function Home() {
   const [campaignMode, setCampaignMode] = useState<CampaignMode>("user_prompt");
   const [maxPlayers, setMaxPlayers] = useState<(typeof PARTY_SIZES)[number]>(4);
   const [adventurePrompt, setAdventurePrompt] = useState("");
+  const [worldBible, setWorldBible] = useState("");
+  const [artDirection, setArtDirection] = useState("");
+  const [toneTags, setToneTags] = useState<string[]>([]);
   const [joinOpen, setJoinOpen] = useState(false);
   const [joinCode, setJoinCode] = useState("");
   const [joinError, setJoinError] = useState<string | null>(null);
@@ -90,17 +95,28 @@ export default function Home() {
         campaignMode: CampaignMode;
         maxPlayers: number;
         adventurePrompt?: string;
+        worldBible?: string;
+        artDirection?: string;
+        adventureTags?: string[];
         moduleKey?: string;
       } = {
         mode: effectiveMode,
         campaignMode: options.forceCampaignMode ?? campaignMode,
         maxPlayers: options.forceMaxPlayers ?? maxPlayers,
       };
-      if (
-        (options.forceCampaignMode ?? campaignMode) === "user_prompt" &&
-        adventurePrompt.trim()
-      ) {
-        body.adventurePrompt = adventurePrompt.trim();
+      if ((options.forceCampaignMode ?? campaignMode) === "user_prompt") {
+        if (adventurePrompt.trim()) {
+          body.adventurePrompt = adventurePrompt.trim();
+        }
+        if (worldBible.trim()) {
+          body.worldBible = worldBible.trim();
+        }
+        if (artDirection.trim()) {
+          body.artDirection = artDirection.trim();
+        }
+        if (toneTags.length > 0) {
+          body.adventureTags = toneTags;
+        }
       }
       if ((options.forceCampaignMode ?? campaignMode) === "module") {
         body.moduleKey = options.forceModuleKey ?? "module_remix_default";
@@ -439,13 +455,16 @@ export default function Home() {
 
           <div className="relative text-center flex flex-col gap-2">
             <p className="text-[10px] uppercase tracking-[0.22em] text-[var(--outline)]">
-              Multiplayer AI tabletop
+              {COPY.landing.eyebrow}
             </p>
             <h1 className="text-fantasy text-4xl font-black text-[var(--color-gold-rare)] tracking-tight uppercase">
               {getBrandName(brand)}
             </h1>
             <p className="text-[var(--color-silver-dim)] text-sm italic tracking-wide font-serif">
               &ldquo;{getBrandTagline(brand)}&rdquo;
+            </p>
+            <p className="text-xs text-[var(--color-silver-dim)] leading-relaxed text-left mt-2 px-0.5 border-t border-[rgba(77,70,53,0.2)] pt-3">
+              {COPY.landing.lead}
             </p>
 
             <div className="mt-3 flex items-center justify-center gap-2 flex-wrap">
@@ -529,6 +548,39 @@ export default function Home() {
             ) : null}
           </div>
         </header>
+
+        <section
+          className="rounded-[var(--radius-card)] border border-[rgba(77,70,53,0.15)] bg-[var(--color-midnight)]/80 p-4 space-y-3"
+          aria-labelledby="how-it-works-heading"
+        >
+          <div className="flex items-center gap-2">
+            <span className="w-1 h-4 bg-[var(--color-gold-rare)]/80 rounded-full" />
+            <h2
+              id="how-it-works-heading"
+              className="text-[10px] font-black uppercase tracking-[0.2em] text-[var(--outline)]"
+            >
+              {COPY.landing.howTitle}
+            </h2>
+          </div>
+          <ol className="space-y-3 list-none m-0 p-0">
+            {COPY.landing.steps.map((step, i) => (
+              <li key={step.title} className="flex gap-3">
+                <span className="shrink-0 w-6 h-6 rounded-full border border-[rgba(212,175,55,0.35)] text-[10px] font-black text-[var(--color-gold-rare)] grid place-items-center">
+                  {i + 1}
+                </span>
+                <div className="min-w-0">
+                  <p className="text-xs font-bold text-[var(--color-silver-muted)]">
+                    {step.title}
+                  </p>
+                  <p className="text-[11px] text-[var(--color-silver-dim)] leading-relaxed mt-0.5">
+                    {step.body}
+                  </p>
+                </div>
+              </li>
+            ))}
+          </ol>
+        </section>
+
         {/* Mode Selection */}
         <section className="space-y-4">
           {!tutorialComplete ? (
@@ -543,7 +595,7 @@ export default function Home() {
           <div className="flex items-center gap-3 mb-2">
             <span className="w-1.5 h-6 bg-[var(--color-gold-rare)]" />
             <h2 className="text-fantasy font-bold text-base uppercase tracking-[0.12em] text-[var(--color-silver-dim)]">
-              Select Master Presence
+              {COPY.landing.modesTitle}
             </h2>
           </div>
 
@@ -592,10 +644,10 @@ export default function Home() {
               )}
               <div className="relative">
                 <h3 className="text-fantasy font-bold text-xl text-[var(--color-silver-muted)]">
-                AI Dungeon Master
+                  {COPY.landing.aiCardTitle}
                 </h3>
                 <p className="text-xs text-[var(--color-silver-dim)] leading-relaxed mt-1">
-                Boundless worlds generated in real-time by the obsidian core.
+                  {COPY.landing.aiCardBody}
                 </p>
               </div>
             </div>
@@ -644,10 +696,10 @@ export default function Home() {
               )}
               <div className="relative">
                 <h3 className="text-fantasy font-bold text-xl text-[var(--color-silver-muted)]">
-                  Human Dungeon Master
+                  {COPY.landing.humanCardTitle}
                 </h3>
                 <p className="text-xs text-[var(--color-silver-dim)] leading-relaxed mt-1">
-                  Host a session for your party with manual control and custom lore.
+                  {COPY.landing.humanCardBody}
                 </p>
               </div>
             </div>
@@ -660,7 +712,7 @@ export default function Home() {
             {/* Campaign Pills */}
             <div>
               <label className="block text-[10px] font-bold uppercase tracking-[0.2em] text-[var(--outline)] mb-4">
-                Origin Method
+                {COPY.landing.originLabel}
               </label>
               <PillSelect
                 options={CAMPAIGN_OPTIONS}
@@ -677,16 +729,72 @@ export default function Home() {
                   htmlFor="adventure-prompt"
                   className="block text-[10px] font-bold uppercase tracking-[0.2em] text-[var(--outline)] mb-4"
                 >
-                  The Narrative Seed
+                  {COPY.landing.narrativeSeedLabel}
                 </label>
                 <textarea
                   id="adventure-prompt"
                   value={adventurePrompt}
                   onChange={(e) => setAdventurePrompt(e.target.value)}
-                  placeholder="Describe your adventure..."
+                  placeholder="Short pitch: setting, hook, or vibe (any genre)."
                   rows={4}
-                  maxLength={500}
+                  maxLength={8000}
                   className="w-full h-36 bg-[var(--color-deep-void)] p-5 rounded-[var(--radius-card)] border border-[rgba(77,70,53,0.2)] focus:border-[var(--color-gold-rare)]/50 focus:ring-0 text-[var(--color-silver-muted)] font-serif italic text-base leading-relaxed placeholder:text-[var(--outline)]/40 resize-none transition-all"
+                />
+                <p className="text-[10px] text-[var(--outline)] mt-2 uppercase tracking-[0.12em]">
+                  {COPY.landing.toneTagsHint}
+                </p>
+                <div className="flex flex-wrap gap-2 mt-2">
+                  {LOBBY_TONE_TAG_OPTIONS.map((t) => {
+                    const on = toneTags.includes(t.id);
+                    return (
+                      <button
+                        key={t.id}
+                        type="button"
+                        onClick={() =>
+                          setToneTags((prev) =>
+                            on ? prev.filter((x) => x !== t.id) : [...prev, t.id],
+                          )
+                        }
+                        className={`px-3 py-1.5 rounded-full text-[10px] font-bold uppercase tracking-[0.14em] border transition-colors ${
+                          on
+                            ? "border-[var(--color-gold-rare)] bg-[var(--color-gold-rare)]/15 text-[var(--color-gold-rare)]"
+                            : "border-[rgba(77,70,53,0.35)] text-[var(--color-silver-dim)] hover:border-[var(--color-gold-rare)]/40"
+                        }`}
+                      >
+                        {t.label}
+                      </button>
+                    );
+                  })}
+                </div>
+                <label
+                  htmlFor="world-bible"
+                  className="block text-[10px] font-bold uppercase tracking-[0.2em] text-[var(--outline)] mt-6 mb-2"
+                >
+                  World bible (optional)
+                </label>
+                <textarea
+                  id="world-bible"
+                  value={worldBible}
+                  onChange={(e) => setWorldBible(e.target.value)}
+                  placeholder="Longer premise, NPCs, plot beats — fed to the AI as canon."
+                  rows={5}
+                  maxLength={32000}
+                  className="w-full min-h-[120px] bg-[var(--color-deep-void)] p-4 rounded-[var(--radius-card)] border border-[rgba(77,70,53,0.2)] focus:border-[var(--color-gold-rare)]/50 focus:ring-0 text-[var(--color-silver-muted)] text-sm leading-relaxed placeholder:text-[var(--outline)]/40 resize-y transition-all"
+                />
+                <label
+                  htmlFor="art-direction"
+                  className="block text-[10px] font-bold uppercase tracking-[0.2em] text-[var(--outline)] mt-4 mb-2"
+                >
+                  Art direction (optional)
+                </label>
+                <input
+                  id="art-direction"
+                  type="text"
+                  value={artDirection}
+                  onChange={(e) => setArtDirection(e.target.value)}
+                  placeholder="e.g. soft anime watercolor, 90s film grain, travel photography…"
+                  maxLength={2000}
+                  className="w-full h-12 bg-[var(--color-deep-void)] px-4 rounded-[var(--radius-card)] border border-[rgba(77,70,53,0.2)] focus:border-[var(--color-gold-rare)]/50 focus:ring-0 text-[var(--color-silver-muted)] text-sm placeholder:text-[var(--outline)]/40"
                 />
               </div>
             ) : null}
@@ -694,7 +802,7 @@ export default function Home() {
             {/* Party Size */}
             <div>
               <label className="block text-[10px] font-bold uppercase tracking-[0.2em] text-[var(--outline)] mb-4">
-                Fellowship Count
+                {COPY.landing.partyLabel}
               </label>
               <div className="flex items-center bg-[var(--color-midnight)] p-1.5 rounded-[var(--radius-card)] border border-[rgba(77,70,53,0.1)]">
                 {PARTY_SIZES.map((n) => (
@@ -745,7 +853,7 @@ export default function Home() {
                 </>
               ) : (
                 <>
-                  <span>Create Session</span>
+                  <span>{COPY.landing.ctaCreate}</span>
                   <span className="material-symbols-outlined text-lg">swords</span>
                 </>
               )}
@@ -755,10 +863,10 @@ export default function Home() {
               <form onSubmit={handleJoinSubmit} className="flex flex-col gap-3 w-full">
                 <div className="text-center mb-2">
                   <h3 className="text-fantasy text-xl text-[var(--color-silver-muted)] tracking-tight">
-                    Summoning Ritual
+                    {COPY.landing.joinTitle}
                   </h3>
                   <p className="text-[var(--color-silver-dim)] text-xs mt-1">
-                    Enter the ancient cipher to join your party.
+                    {COPY.landing.joinSubtitle}
                   </p>
                 </div>
                 <div>
@@ -791,7 +899,9 @@ export default function Home() {
                   className="w-full min-h-[48px] flex items-center justify-center gap-3"
                   disabled={joinLoading}
                 >
-                  <span>{joinLoading ? "Joining…" : "Enter Portal"}</span>
+                  <span>
+                    {joinLoading ? "Joining…" : COPY.landing.ctaEnterSession}
+                  </span>
                   {!joinLoading && (
                     <span className="material-symbols-outlined text-lg">
                       login
@@ -809,7 +919,7 @@ export default function Home() {
                   <span className="material-symbols-outlined text-sm">
                     arrow_back
                   </span>
-                  Back to Create Session
+                  {COPY.landing.backToCreate}
                 </button>
               </form>
             ) : (
@@ -823,7 +933,7 @@ export default function Home() {
                     setJoinShakeKey(0);
                   }}
                 >
-                  Join with code
+                  {COPY.landing.ctaJoin}
                 </button>
                 <Link
                   href="/tv"

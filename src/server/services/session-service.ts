@@ -107,6 +107,9 @@ export async function createSession(params: {
   maxPlayers: number;
   hostUserId: string;
   adventurePrompt?: string;
+  adventureTags?: string[];
+  artDirection?: string;
+  worldBible?: string;
   moduleKey?: string;
 }): Promise<{ sessionId: string; joinCode: string }> {
   const joinCode = await allocateUniqueJoinCode();
@@ -122,6 +125,9 @@ export async function createSession(params: {
       join_code: joinCode,
       host_user_id: params.hostUserId,
       adventure_prompt: params.adventurePrompt ?? null,
+      adventure_tags: params.adventureTags?.length ? params.adventureTags : null,
+      art_direction: params.artDirection?.trim() || null,
+      world_bible: params.worldBible?.trim() || null,
       module_key: params.moduleKey ?? null,
     })
     .returning();
@@ -299,6 +305,64 @@ export async function increaseSessionMaxPlayers(params: {
     .returning({ id: sessions.id });
   if (!updated) {
     throw new IncreaseMaxPlayersError("Could not update session", 409);
+  }
+}
+
+export class SessionLobbyUpdateError extends Error {
+  constructor(
+    message: string,
+    public readonly statusCode: 403 | 404 | 409,
+  ) {
+    super(message);
+    this.name = "SessionLobbyUpdateError";
+  }
+}
+
+/** Host-only: edit adventure seed / world bible / tags while status is lobby. */
+export async function updateSessionLobbyPremise(params: {
+  sessionId: string;
+  actingUserId: string;
+  adventure_prompt?: string | null;
+  world_bible?: string | null;
+  art_direction?: string | null;
+  adventure_tags?: string[] | null;
+}): Promise<void> {
+  const [row] = await db
+    .select()
+    .from(sessions)
+    .where(eq(sessions.id, params.sessionId))
+    .limit(1);
+  if (!row) throw new SessionNotFoundError();
+  if (row.host_user_id !== params.actingUserId) {
+    throw new SessionLobbyUpdateError("Forbidden", 403);
+  }
+  if (row.status !== "lobby") {
+    throw new SessionLobbyUpdateError("Session already started", 409);
+  }
+
+  const [updated] = await db
+    .update(sessions)
+    .set({
+      updated_at: new Date(),
+      state_version: sql`${sessions.state_version} + 1`,
+      ...(params.adventure_prompt !== undefined && {
+        adventure_prompt: params.adventure_prompt,
+      }),
+      ...(params.world_bible !== undefined && { world_bible: params.world_bible }),
+      ...(params.art_direction !== undefined && {
+        art_direction: params.art_direction,
+      }),
+      ...(params.adventure_tags !== undefined && {
+        adventure_tags:
+          params.adventure_tags && params.adventure_tags.length > 0
+            ? params.adventure_tags
+            : null,
+      }),
+    })
+    .where(and(eq(sessions.id, params.sessionId), eq(sessions.status, "lobby")))
+    .returning({ id: sessions.id });
+  if (!updated) {
+    throw new SessionLobbyUpdateError("Could not update session", 409);
   }
 }
 

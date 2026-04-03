@@ -24,7 +24,8 @@ export async function generateSceneImageFreepik(params: {
       image: { size: "widescreen_16_9" },
       guidance_scale: 1.5,
       styling: {
-        style: "fantasy",
+        // Prefer genre-neutral API preset; scene prompt carries setting.
+        style: "cinematic",
         effects: {
           lightning: "cinematic",
           color: "dramatic",

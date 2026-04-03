@@ -7,7 +7,8 @@ import {
 } from "@/lib/schemas/ai-io";
 import type { DiceRoll } from "@/lib/schemas/domain";
 
-export const NARRATOR_SYSTEM = `You are the Dungeon Master of Ashveil, a dark fantasy tabletop RPG. Generate cinematic narration that continues the story.
+/** Core instructions; prepend `buildFacilitatorRoleLine` via `buildNarratorSystemPrompt`. */
+export const NARRATOR_INSTRUCTIONS_CORE = `Generate cinematic narration that continues the story.
 
 CRITICAL — PLAYER ACTION:
 The JSON you receive contains a "player_action" field with the EXACT text the player typed.
@@ -37,11 +38,12 @@ MEMORY CONTEXT:
 - "canonical_state" is the authoritative world state: round, phase, party, NPCs, quest. Use it to stay consistent.
 - "rolling_summary" (if present) is a compressed memory of earlier events: key events, active plot hooks, NPC relationships, world changes. Weave relevant details naturally — do NOT dump facts.
 - "style_rules" (if present) provides additional narration style guidance specific to this campaign.
+- "world_bible_excerpt" (if non-empty) is host-supplied premise or setting write-up—treat as canon for tone and facts unless contradicted by newer narrative.
 
 RULES:
 - 60-140 words STRICTLY
 - Narrate the outcome of the player's SPECIFIC action (from "player_action") based on dice results
-- Weave in atmosphere: sounds, smells, shadows
+- Weave in atmosphere: sensory detail that fits the scene (sound, light, weather, texture, mood)
 - If critical success: make it epic and dramatic
 - If critical failure: make it dramatic but not punishing
 - Reference the character by name
@@ -55,6 +57,15 @@ RULES:
   - "tone": mood of the scene (e.g. "tense", "triumphant", "ominous")
   - "next_actor_id": always set to null
   - "image_hint": {"subjects": ["key visual subjects in the scene"], "environment": "environment description", "mood": "visual mood", "avoid": ["things to avoid"]} (scene hints for image generation)`;
+
+export function buildNarratorSystemPrompt(facilitatorRoleLine: string): string {
+  return `${facilitatorRoleLine.trim()}\n\n${NARRATOR_INSTRUCTIONS_CORE}`;
+}
+
+/** @deprecated Use buildNarratorSystemPrompt(buildFacilitatorRoleLine(...)) for session-aware prompts. */
+export const NARRATOR_SYSTEM = buildNarratorSystemPrompt(
+  "You are the facilitator for a collaborative tabletop RPG. Genre and tone follow the table's premise.",
+);
 
 export function wordCount(s: string): number {
   return s.trim().split(/\s+/).filter(Boolean).length;
@@ -73,7 +84,7 @@ function describeAction(actionType: string, rawContext: string): string {
   const cleaned = cleanAction(rawContext);
   const verbMap: Record<string, string> = {
     attack: "strikes out",
-    cast_spell: "channels arcane energy",
+    cast_spell: "unleashes a practiced technique",
     move: "pushes forward",
     talk: "speaks",
     inspect: "studies their surroundings",
@@ -87,18 +98,87 @@ function pick<T>(arr: T[]): T {
   return arr[Math.floor(Math.random() * arr.length)]!;
 }
 
-const ATMOSPHERE = [
+/** Default when premise does not imply a specific genre. */
+const ATMOSPHERE_NEUTRAL = [
+  "The moment tightens — every small sound seems louder than it should.",
+  "Tension hangs in the air; the table leans in without noticing.",
+  "Time does a half-step; outcomes feel sharp and immediate.",
+  "A breath is held collectively, then released in uneven pieces.",
+  "The fiction settles differently now — something has shifted.",
+  "Quiet pressure builds, the kind that precedes a decisive beat.",
+  "Stakes sharpen; attention narrows to what happens next.",
+  "The scene steadies just enough to make the next choice matter more.",
+  "Possibility and risk share the same edge for a heartbeat.",
+  "The world of the table feels vivid, immediate, and unforgivingly fair.",
+] as const;
+
+const ATMOSPHERE_TECH = [
+  "A low hull-hum underscores the moment; panels flicker with standby light.",
+  "Sterile LEDs wash the scene in cool white as systems whisper status ticks.",
+  "Magnetic locks thunk somewhere distant; recycled air tastes of ozone.",
+  "A console chirps — soft, insistent — like the ship is paying attention.",
+  "Static hisses through an open channel, then snaps to silence.",
+] as const;
+
+const ATMOSPHERE_URBAN = [
+  "Distant traffic murmurs through glass; rain tracks slow lines down the pane.",
+  "Neon bleed colors the wet pavement in uneven stripes.",
+  "An elevator chime punctuates the hush of the corridor.",
+  "City grit clings to the moment — sirens far off, never quite arriving.",
+  "Fluorescents buzz overhead, honest and unromantic.",
+] as const;
+
+const ATMOSPHERE_HORROR = [
+  "The air tastes wrong — metallic, too still, like the room is listening.",
+  "A sound almost forms in the silence, then thinks better of it.",
+  "Shadows pool a little thicker than physics should allow.",
+  "Something in the periphery refuses to resolve into a clean shape.",
+  "Your skin insists you are watched, even when logic disagrees.",
+] as const;
+
+const ATMOSPHERE_FANTASY = [
   "The air thickens with the scent of damp stone and old iron.",
-  "Shadows twist along the walls, alive with whispered secrets.",
-  "A cold draft carries the faint echo of something moving in the dark.",
   "Dust motes dance in a shaft of pale light from above.",
-  "The silence stretches, broken only by the distant drip of water.",
   "An ember-glow pulses from somewhere deep ahead, warm and beckoning.",
   "The ground trembles faintly, as if the earth itself draws breath.",
-  "Cobwebs glisten like silver threads in the half-light.",
   "Somewhere far off, a bell tolls once and falls silent.",
-  "The torches flicker as though acknowledging something unseen.",
-];
+  "Torches shiver along the passage, greedy for oxygen.",
+] as const;
+
+function resolveAtmosphereLines(premiseFingerprint: string): readonly string[] {
+  const t = premiseFingerprint.toLowerCase();
+  if (
+    /\b(sci[-\s]?fi|spaceship|starship|space station|android|cyborg|cyberpunk|neon|orbital|laser|warp|hologram|mech|droid)\b/.test(
+      t,
+    )
+  ) {
+    return ATMOSPHERE_TECH;
+  }
+  if (
+    /\b(noir|detective|police|agency|corporate|heist|subway|skyscraper|modern|present[-\s]?day|urban)\b/.test(
+      t,
+    )
+  ) {
+    return ATMOSPHERE_URBAN;
+  }
+  if (
+    /\b(horror|eldritch|haunted|cosmic|cult|ghost|undead|dread)\b/.test(t)
+  ) {
+    return ATMOSPHERE_HORROR;
+  }
+  if (
+    /\b(fantasy|dragon|knight|dungeon|medieval|castle|wizard|arcane|temple|crypt)\b/.test(
+      t,
+    )
+  ) {
+    return ATMOSPHERE_FANTASY;
+  }
+  return ATMOSPHERE_NEUTRAL;
+}
+
+function pickAtmosphere(premiseFingerprint: string): string {
+  return pick([...resolveAtmosphereLines(premiseFingerprint)]);
+}
 
 const NEUTRAL_HANDOFFS = [
   "The circle holds its breath — the table will show who stirs next.",
@@ -107,62 +187,76 @@ const NEUTRAL_HANDOFFS = [
   "The story leans forward, waiting on the next beat.",
 ];
 
-const CRIT_SUCCESS = [
-  (name: string, action: string) =>
-    `${name} moves with breathtaking precision. The attempt to ${action} succeeds beyond all expectation — the kind of moment that shifts the air in the room. ${pick(ATMOSPHERE)} For a heartbeat, even the shadows seem impressed. A moment of triumph, pure and undeniable. ${pick(NEUTRAL_HANDOFFS)}`,
-  (name: string, action: string) =>
-    `Something extraordinary unfolds. As ${name} reaches to ${action}, fate answers with a resounding yes. Every element aligns — strength, will, and fortune conspire in perfect harmony. ${pick(ATMOSPHERE)} The party watches in awe. ${pick(NEUTRAL_HANDOFFS)}`,
-  (name: string, action: string) =>
-    `Brilliance. ${name} attempts to ${action} and the result is nothing short of legendary. The world bends to accommodate the deed. ${pick(ATMOSPHERE)} Tales will be told of this moment. ${pick(NEUTRAL_HANDOFFS)}`,
-];
+function buildCritSuccess(atm: string): Array<
+  (name: string, action: string) => string
+> {
+  return [
+    (name, action) =>
+      `${name} moves with breathtaking precision. The attempt to ${action} succeeds beyond all expectation — the kind of moment that shifts the air in the room. ${atm} For a heartbeat, the table itself seems to lean toward triumph. A moment of triumph, pure and undeniable. ${pick(NEUTRAL_HANDOFFS)}`,
+    (name, action) =>
+      `Something extraordinary unfolds. As ${name} reaches to ${action}, fate answers with a resounding yes. Every element aligns — strength, will, and fortune conspire in perfect harmony. ${atm} The party watches in awe. ${pick(NEUTRAL_HANDOFFS)}`,
+    (name, action) =>
+      `Brilliance. ${name} attempts to ${action} and the result is nothing short of legendary. The world bends to accommodate the deed. ${atm} Tales will be told of this moment. ${pick(NEUTRAL_HANDOFFS)}`,
+  ];
+}
 
-const SUCCESS = [
-  (name: string, action: string) =>
-    `${name} sets their mind to ${action} — and the effort pays off. The tension eases just a fraction as success settles over the moment. ${pick(ATMOSPHERE)} The party presses on, emboldened. ${pick(NEUTRAL_HANDOFFS)}`,
-  (name: string, action: string) =>
-    `With practiced resolve, ${name} manages to ${action}. The world seems to acknowledge the deed — a subtle shift, a flicker of something that might be hope. ${pick(ATMOSPHERE)} ${pick(NEUTRAL_HANDOFFS)}`,
-  (name: string, action: string) =>
-    `${name} commits fully, and the attempt to ${action} finds its mark. A small victory, but in these dark places, small victories are everything. ${pick(ATMOSPHERE)} The group steadies. ${pick(NEUTRAL_HANDOFFS)}`,
-  (name: string, action: string) =>
-    `The dice fall kindly. ${name} reaches to ${action} and the outcome is favorable. A ripple of quiet relief passes through the party. ${pick(ATMOSPHERE)} ${pick(NEUTRAL_HANDOFFS)}`,
-];
+function buildSuccess(atm: string): Array<(name: string, action: string) => string> {
+  return [
+    (name, action) =>
+      `${name} sets their mind to ${action} — and the effort pays off. The tension eases just a fraction as success settles over the moment. ${atm} The party presses on, emboldened. ${pick(NEUTRAL_HANDOFFS)}`,
+    (name, action) =>
+      `With practiced resolve, ${name} manages to ${action}. The world seems to acknowledge the deed — a subtle shift, a flicker of something that might be hope. ${atm} ${pick(NEUTRAL_HANDOFFS)}`,
+    (name, action) =>
+      `${name} commits fully, and the attempt to ${action} finds its mark. A small victory, but right now small victories are everything. ${atm} The group steadies. ${pick(NEUTRAL_HANDOFFS)}`,
+    (name, action) =>
+      `The dice fall kindly. ${name} reaches to ${action} and the outcome is favorable. A ripple of quiet relief passes through the party. ${atm} ${pick(NEUTRAL_HANDOFFS)}`,
+  ];
+}
 
-const FAILURE = [
-  (name: string, action: string) =>
-    `${name} reaches to ${action}, but the moment betrays them. The air feels heavier, the darkness just a shade deeper. ${pick(ATMOSPHERE)} But the journey is far from over. ${pick(NEUTRAL_HANDOFFS)}`,
-  (name: string, action: string) =>
-    `The attempt falters. ${name} tries to ${action}, but something goes wrong — timing, angle, perhaps simple bad luck. ${pick(ATMOSPHERE)} ${pick(NEUTRAL_HANDOFFS)}`,
-  (name: string, action: string) =>
-    `${name}'s effort to ${action} doesn't find its mark. The darkness offers no sympathy, only the quiet reminder that fortune is fickle. ${pick(ATMOSPHERE)} ${pick(NEUTRAL_HANDOFFS)}`,
-  (name: string, action: string) =>
-    `Not this time. ${name} attempts to ${action}, but the world resists. The shadows seem to lean in just a little closer. ${pick(ATMOSPHERE)} ${pick(NEUTRAL_HANDOFFS)}`,
-];
+function buildFailure(atm: string): Array<(name: string, action: string) => string> {
+  return [
+    (name, action) =>
+      `${name} reaches to ${action}, but the moment betrays them. The air feels heavier; the cost of failure lands squarely. ${atm} But the journey is far from over. ${pick(NEUTRAL_HANDOFFS)}`,
+    (name, action) =>
+      `The attempt falters. ${name} tries to ${action}, but something goes wrong — timing, angle, perhaps simple bad luck. ${atm} ${pick(NEUTRAL_HANDOFFS)}`,
+    (name, action) =>
+      `${name}'s effort to ${action} doesn't find its mark. Fortune offers no favors this time — only the quiet reminder that risk is real. ${atm} ${pick(NEUTRAL_HANDOFFS)}`,
+    (name, action) =>
+      `Not this time. ${name} attempts to ${action}, but the world resists. Consequences press closer, insistent but fair. ${atm} ${pick(NEUTRAL_HANDOFFS)}`,
+  ];
+}
 
-const CRIT_FAILURE = [
-  (name: string, action: string) =>
-    `Everything goes wrong at once. ${name} attempts to ${action}, and the result is spectacularly unfortunate — the kind of failure that draws gasps. ${pick(ATMOSPHERE)} The shadows close in tighter. But despair is a luxury the party cannot afford. ${pick(NEUTRAL_HANDOFFS)}`,
-  (name: string, action: string) =>
-    `Fate has a cruel sense of humor. As ${name} tries to ${action}, disaster strikes with almost theatrical timing. The ground shifts, the air sours. ${pick(ATMOSPHERE)} ${pick(NEUTRAL_HANDOFFS)}`,
-  (name: string, action: string) =>
-    `A terrible moment. ${name}'s attempt to ${action} goes catastrophically wrong. Something breaks, something shifts, and the party collectively holds its breath. ${pick(ATMOSPHERE)} ${pick(NEUTRAL_HANDOFFS)}`,
-];
+function buildCritFailure(atm: string): Array<
+  (name: string, action: string) => string
+> {
+  return [
+    (name, action) =>
+      `Everything goes wrong at once. ${name} attempts to ${action}, and the result is spectacularly unfortunate — the kind of failure that draws gasps. ${atm} The situation worsens — but despair is a luxury the party cannot afford. ${pick(NEUTRAL_HANDOFFS)}`,
+    (name, action) =>
+      `Fate has a cruel sense of humor. As ${name} tries to ${action}, disaster strikes with almost theatrical timing. The ground shifts, the air sours. ${atm} ${pick(NEUTRAL_HANDOFFS)}`,
+    (name, action) =>
+      `A terrible moment. ${name}'s attempt to ${action} goes catastrophically wrong. Something breaks, something shifts, and the party collectively holds its breath. ${atm} ${pick(NEUTRAL_HANDOFFS)}`,
+  ];
+}
 
 function pickTemplate(
   result: DiceRoll["result"] | undefined,
   name: string,
   action: string,
+  premiseFingerprint: string,
 ): string {
+  const atm = pickAtmosphere(premiseFingerprint);
   switch (result) {
     case "critical_success":
-      return pick(CRIT_SUCCESS)(name, action);
+      return pick(buildCritSuccess(atm))(name, action);
     case "success":
-      return pick(SUCCESS)(name, action);
+      return pick(buildSuccess(atm))(name, action);
     case "failure":
-      return pick(FAILURE)(name, action);
+      return pick(buildFailure(atm))(name, action);
     case "critical_failure":
-      return pick(CRIT_FAILURE)(name, action);
+      return pick(buildCritFailure(atm))(name, action);
     default:
-      return pick(SUCCESS)(name, action);
+      return pick(buildSuccess(atm))(name, action);
   }
 }
 
@@ -171,11 +265,14 @@ export function buildNarratorFallback(
   actionSummary: string,
   rollResult: DiceRoll["result"] | undefined,
   nextActorId: string | null,
-  sceneContext?: string,
+  sceneContext: string | undefined,
+  /** Tags + premise + world bible (and optionally scene) to flavor atmosphere lines. */
+  premiseHint: string | undefined,
+  actionType: string,
 ): NarratorOutput {
-  void sceneContext;
-  const action = describeAction("other", actionSummary);
-  const text = pickTemplate(rollResult, playerName, action);
+  const fingerprint = [premiseHint, sceneContext].filter(Boolean).join(" ").slice(0, 1200);
+  const action = describeAction(actionType, actionSummary);
+  const text = pickTemplate(rollResult, playerName, action, fingerprint);
 
   const toneMap: Record<string, string> = {
     critical_success: "triumphant",
@@ -217,6 +314,11 @@ export async function generateNarration(params: {
   canonicalState?: string;
   rollingSummary?: string | null;
   stylePolicy?: string;
+  facilitatorSystemPrompt: string;
+  /** Long-form premise excerpt for model context (optional). */
+  worldBibleExcerpt?: string;
+  /** Short bundle for narrator fallback atmosphere (tags + prompt + bible slice). */
+  fallbackPremiseHint?: string;
   provider: AIProvider;
 }): Promise<OrchestrationStepResult<NarratorOutput>> {
   const normalizedDisplayClass = (params.characterClassIdentity ?? "").trim();
@@ -245,6 +347,7 @@ export async function generateNarration(params: {
     canonical_state: params.canonicalState ?? "",
     rolling_summary: params.rollingSummary ?? "",
     style_rules: params.stylePolicy ?? "",
+    world_bible_excerpt: params.worldBibleExcerpt ?? "",
   });
 
   const rollResult = params.diceResults[0]?.result as DiceRoll["result"] | undefined;
@@ -255,7 +358,7 @@ export async function generateNarration(params: {
     turnId: params.turnId,
     provider: params.provider,
     model: "heavy",
-    systemPrompt: NARRATOR_SYSTEM,
+    systemPrompt: params.facilitatorSystemPrompt,
     userPrompt,
     schema: NarratorOutputSchema,
     maxTokens: 900,
@@ -265,10 +368,12 @@ export async function generateNarration(params: {
         params.characterName,
         params.rawInput ||
           (params.intent.suggested_roll_context ??
-          params.intent.action_type.replace(/_/g, " ")),
+            params.intent.action_type.replace(/_/g, " ")),
         rollResult,
         null,
         params.sceneContext,
+        params.fallbackPremiseHint,
+        params.intent.action_type,
       ),
     timeoutMs: 20_000,
   });

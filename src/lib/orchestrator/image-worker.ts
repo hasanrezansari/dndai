@@ -1,6 +1,9 @@
 import { desc, eq } from "drizzle-orm";
 
 import { generateSceneImage } from "@/lib/ai/image-provider";
+import {
+  buildOpenRouterSceneSystemPrompt,
+} from "@/lib/ai/narrative-session-profile";
 import { generateSceneImageOpenRouter } from "@/lib/ai/openrouter-image-provider";
 import { isCustomClassesEnabled } from "@/lib/config/features";
 import { db } from "@/lib/db";
@@ -16,15 +19,15 @@ import { logTrace } from "@/lib/orchestrator/trace";
 import { ClassProfileSchema } from "@/lib/schemas/domain";
 
 const STYLE_PROFILES = {
+  /** Sword-and-sorcery / mythic adventure keywords only — not the global default. */
   fantasy: {
     keywords: ["fantasy", "medieval", "knight", "arcane", "dragon", "paladin", "sorcerer"],
     style: [
-      "dark fantasy oil painting",
-      "muted earth tones with amber torchlight and deep shadows",
+      "painted fantasy and adventure illustration",
+      "cohesive palette with clear focal lighting (warm torchlight, jewel tones, or open sky as fits the scene)",
       "detailed painterly brushwork",
-      "medieval high-fantasy aesthetic",
-      "cinematic dramatic lighting",
-      "rich atmospheric perspective",
+      "heroic adventure atmosphere aligned to the described setting, not a fixed medieval default",
+      "cinematic composition, readable silhouettes, atmospheric depth",
     ],
     negative: ["futuristic tech", "holograms", "cybernetic implants", "sci-fi UI"],
   },
@@ -38,7 +41,7 @@ const STYLE_PROFILES = {
       "cinematic dramatic lighting",
       "rich atmospheric perspective",
     ],
-    negative: ["medieval armor tropes", "fantasy castles", "parchment textures"],
+    negative: ["medieval armor tropes", "castle spires and heraldic fantasy", "parchment textures"],
   },
   postApoc: {
     keywords: ["wasteland", "post-apoc", "post apoc", "ruins", "survival", "mutant", "desolation"],
@@ -48,7 +51,7 @@ const STYLE_PROFILES = {
       "high-contrast survival aesthetics",
       "environmental storytelling through ruins",
     ],
-    negative: ["clean utopian skyline", "bright polished fantasy castles"],
+    negative: ["clean utopian skyline", "bright polished palace or storybook castle imagery"],
   },
   noir: {
     keywords: ["noir", "detective", "gritty", "rain", "smoke", "crime", "alley"],
@@ -96,10 +99,18 @@ function buildStylePack(themeHint: string): {
     .sort((a, b) => b.score - a.score);
 
   const chosen = scored.filter((x) => x.score > 0).slice(0, 2);
-  const fallback = chosen.length > 0 ? chosen : [{ key: "fantasy" as StyleProfileKey, profile: STYLE_PROFILES.fantasy, score: 0 }];
-  const style = fallback.flatMap((c) => c.profile.style).join(", ");
-  const negatives = [...new Set(fallback.flatMap((c) => c.profile.negative))];
-  const selected = fallback.map((x) => x.key);
+  if (chosen.length === 0) {
+    const style = [
+      "cinematic wide-format illustration",
+      "cohesive lighting and palette suited to the scene",
+      "atmospheric depth, readable composition",
+    ].join(", ");
+    const negatives = ["text overlay", "watermark", "UI elements", "subtitles"];
+    return { style, negatives, selected: [] };
+  }
+  const style = chosen.flatMap((c) => c.profile.style).join(", ");
+  const negatives = [...new Set(chosen.flatMap((c) => c.profile.negative))];
+  const selected = chosen.map((x) => x.key);
   return { style, negatives, selected };
 }
 
@@ -331,8 +342,13 @@ export async function runImagePipeline(params: {
   const [sessionRow] = await db
     .select({
       id: sessions.id,
+      campaign_mode: sessions.campaign_mode,
+      module_key: sessions.module_key,
       campaign_title: sessions.campaign_title,
       adventure_prompt: sessions.adventure_prompt,
+      adventure_tags: sessions.adventure_tags,
+      art_direction: sessions.art_direction,
+      world_bible: sessions.world_bible,
       tone: sessions.tone,
       style_policy: sessions.style_policy,
       current_round: sessions.current_round,
@@ -358,11 +374,22 @@ export async function runImagePipeline(params: {
     return { imageUrl: null };
   }
 
+  const tagRaw = sessionRow.adventure_tags;
+  const narrativeForImage = {
+    campaign_mode: sessionRow.campaign_mode,
+    module_key: sessionRow.module_key,
+    adventure_prompt: sessionRow.adventure_prompt,
+    adventure_tags: Array.isArray(tagRaw) ? tagRaw.map(String) : null,
+    art_direction: sessionRow.art_direction,
+    world_bible: sessionRow.world_bible,
+  };
   const styleHint = [
     sessionRow.campaign_title,
     sessionRow.adventure_prompt,
     sessionRow.tone,
     sessionRow.style_policy,
+    sessionRow.art_direction,
+    ...(Array.isArray(tagRaw) ? tagRaw.map(String) : []),
   ]
     .filter(Boolean)
     .join(" ");
@@ -397,6 +424,7 @@ export async function runImagePipeline(params: {
     const out = await generateSceneImageOpenRouter({
       prompt: composedPrompt,
       negativePrompt: composedNegative,
+      systemPrompt: buildOpenRouterSceneSystemPrompt(narrativeForImage),
     });
     base64 = out.base64;
     generatedBy = "openrouter";

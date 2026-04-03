@@ -77,7 +77,7 @@ export async function POST(
       `Character name: ${row.name}.`,
       `Class: ${row.hero_class}. Race: ${row.race}.`,
       concept ? `Concept: ${concept}.` : "",
-      fantasy ? `Fantasy: ${fantasy}.` : "",
+      fantasy ? `One-line class pitch: ${fantasy}.` : "",
       style ? `Style hint: ${style}.` : "",
       "Portrait rules: single character only, chest-up, heroic, readable silhouette, no text.",
     ]

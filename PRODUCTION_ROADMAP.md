@@ -663,7 +663,7 @@ Prevent harmful user-generated content in adventure prompts and player actions.
 - Twitter/X campaign with gameplay GIFs
 - Discord server for community
 - Influencer outreach to D&D content creators
-- Blog post: "How we built an AI Dungeon Master"
+- Blog post: "How we built an AI game facilitator" (or "AI + human tables" — product supports both hosts)
 
 **Acceptance criteria:**
 - [ ] PWA installable on mobile

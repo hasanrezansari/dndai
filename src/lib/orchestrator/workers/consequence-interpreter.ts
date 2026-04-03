@@ -26,7 +26,7 @@ interface NpcInfo {
   attitude: string;
 }
 
-const CONSEQUENCE_SYSTEM = `You are the consequence engine for Ashveil, a dark-fantasy tabletop RPG. Given a player's action, the dice results, and current game state, determine the EXACT mechanical consequences.
+const CONSEQUENCE_SYSTEM = `You are the consequence engine for a collaborative tabletop RPG. Given a player's action, the dice results, and current game state, determine the EXACT mechanical consequences.
 
 You output JSON with:
 - "effects": array of stat changes for affected characters

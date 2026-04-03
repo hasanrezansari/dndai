@@ -15,6 +15,7 @@ import {
   sessions,
   turns,
 } from "@/lib/db/schema";
+import { resolveCharacterDisplayFields } from "@/lib/characters/display-class";
 import { CharacterStatsSchema } from "@/lib/schemas/domain";
 import { mapNpcRowToCombatantView } from "@/lib/state/npc-combatant-mapper";
 import type {
@@ -37,6 +38,7 @@ const DEFAULT_STATS = {
 } as const;
 
 function mapSession(row: typeof sessions.$inferSelect): GameSessionView {
+  const tags = row.adventure_tags;
   return {
     status: row.status,
     mode: row.mode,
@@ -50,6 +52,10 @@ function mapSession(row: typeof sessions.$inferSelect): GameSessionView {
     stateVersion: row.state_version,
     finalChapterPublished: false,
     joinCode: row.join_code,
+    adventurePrompt: row.adventure_prompt,
+    adventureTags: Array.isArray(tags) ? tags.map(String) : undefined,
+    artDirection: row.art_direction,
+    worldBible: row.world_bible,
   };
 }
 
@@ -90,9 +96,15 @@ function mapPlayerRow(
       ? (c.abilities as Array<Record<string, unknown>>)
       : [];
     const conditions = Array.isArray(c.conditions) ? c.conditions : [];
+    const { displayClass, mechanicalClass } = resolveCharacterDisplayFields({
+      classColumn: c.class,
+      visualProfile,
+    });
     base.character = {
       name: c.name,
       class: c.class,
+      displayClass,
+      mechanicalClass,
       race: c.race,
       level: c.level,
       hp: c.hp,

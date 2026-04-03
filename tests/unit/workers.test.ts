@@ -6,13 +6,26 @@ vi.mock("@/lib/orchestrator/trace", () => ({
 
 import { logTrace } from "@/lib/orchestrator/trace";
 import { MockProvider } from "@/lib/ai/mock-provider";
+import { buildFacilitatorRoleLine } from "@/lib/ai/narrative-session-profile";
 import { parseIntent } from "@/lib/orchestrator/workers/intent-parser";
 import { interpretRules } from "@/lib/orchestrator/workers/rules-interpreter";
 import { checkVisualDelta } from "@/lib/orchestrator/workers/visual-delta";
 import {
+  buildNarratorSystemPrompt,
   generateNarration,
   wordCount,
 } from "@/lib/orchestrator/workers/narrator";
+
+const TEST_NARRATOR_SYSTEM = buildNarratorSystemPrompt(
+  buildFacilitatorRoleLine({
+    campaign_mode: "user_prompt",
+    module_key: null,
+    adventure_prompt: null,
+    adventure_tags: null,
+    art_direction: null,
+    world_bible: null,
+  }),
+);
 import { ActionIntentSchema } from "@/lib/schemas/ai-io";
 import type { CharacterStats } from "@/lib/schemas/domain";
 
@@ -74,6 +87,18 @@ describe("orchestration workers", () => {
     expect(r.data.image_needed).toBe(false);
   });
 
+  it("visual delta flags modern / sci-fi location shifts", async () => {
+    const r = await checkVisualDelta({
+      sessionId: SESSION_ID,
+      turnId: TURN_ID,
+      narrativeText:
+        "The shuttle lands in the hangar; you step onto the tarmac.",
+      currentSceneDescription: "A cramped briefing room aboard the station.",
+    });
+    expect(r.data.image_needed).toBe(true);
+    expect(r.data.reasons.length).toBeGreaterThan(0);
+  });
+
   it("narrator output stays within word bounds via mock fixture", async () => {
     const provider = new MockProvider();
     const intent = ActionIntentSchema.parse({
@@ -93,6 +118,7 @@ describe("orchestration workers", () => {
       nextPlayerName: "Mira",
       recentNarrative: "",
       sceneContext: "A torchlit hall.",
+      facilitatorSystemPrompt: TEST_NARRATOR_SYSTEM,
       provider,
     });
     const n = wordCount(r.data.scene_text);
@@ -158,6 +184,7 @@ describe("orchestration workers", () => {
       nextPlayerName: "Mira",
       recentNarrative: "",
       sceneContext: "",
+      facilitatorSystemPrompt: TEST_NARRATOR_SYSTEM,
       provider,
     });
     expect(

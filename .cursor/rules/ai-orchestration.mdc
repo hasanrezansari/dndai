@@ -6,6 +6,8 @@ alwaysApply: false
 
 # AI Orchestration Rules
 
+**Genre:** New prompts and workers must follow the **session’s** premise (`adventure_prompt`, `adventure_tags`, `world_bible`, `art_direction`). Do not assume fantasy or dark-fantasy as the default setting (see `ashveil-project.mdc`).
+
 ## Pipeline Architecture
 The orchestrator is DETERMINISTIC CODE that calls AI workers in explicit order — not autonomous agents. Each step: typed input -> AI call -> Zod validate -> fallback if invalid -> trace log.
 

@@ -28,7 +28,7 @@ This document encodes every product, design, and technical decision for **Ashvei
 
 - **Name:** Ashveil  
 - **Tagline:** "A living world awaits"  
-- **Product thesis:** Ashveil is a **mobile-first, browser-based multiplayer tabletop RPG engine** where **2–6 players** join via link, share the **same evolving game world in real time**, and play through an **AI-powered or human Dungeon Master**. This is **not** a chat app with fantasy flavor — it is a **structured game engine** with **AI narrative orchestration** layered on top of **authoritative game state**. The AI narrates and interprets; it does not unilaterally rewrite truth.
+- **Product thesis:** Ashveil is a **mobile-first, browser-based multiplayer tabletop RPG engine** where **2–6 players** join via link, share the **same evolving game world in real time**, and play through an **AI-powered or human Dungeon Master**. Campaigns are **open-genre**: hosts set premise, tone tags, and optional world bible so fantasy, sci-fi, horror, modern, and hybrids are first-class. This is **not** a chat app with a single default setting — it is a **structured game engine** with **AI narrative orchestration** layered on top of **authoritative game state**. The AI narrates and interprets; it does not unilaterally rewrite truth.
 
 **Positioning vs. adjacent products:**
 
@@ -38,7 +38,7 @@ This document encodes every product, design, and technical decision for **Ashvei
 
 ## 1.2 Core Promise
 
-> "Open a link on your phone, join your friends, pick AI DM or Human DM, and play a seamless tabletop fantasy session where the story evolves live, your dice matter, everyone sees the same action, and the world remains coherent."
+> "Open a link on your phone, join your friends, pick AI DM or Human DM, and play a seamless tabletop session in the genre you choose — the story evolves live, your dice matter, everyone sees the same action, and the world remains coherent."
 
 **Success looks like:**
 
@@ -63,7 +63,7 @@ This document encodes every product, design, and technical decision for **Ashvei
 
 ## 1.4 Campaign Entry Options
 
-1. **User-led prompt** — Host or table provides a seed (e.g. "dark fantasy plague city"). Campaign Seeder uses this as creative constraint.
+1. **User-led prompt** — Host or table provides a seed (e.g. "noir harbor investigation", "generation-ship murder mystery", "bronze-age mythic voyage"). Campaign Seeder uses this as creative constraint and must not assume a default genre unless the seed implies it.
 2. **AI-randomized journey** — Seeder invents premise, tone, and opening hook with variety controls (avoid repeating last N themes per session fingerprint where feasible).
 3. **Structured module remix** — Pre-authored skeletons (e.g. haunted manor, prison break, crypt descent) supply **structure**; AI fills **details**, **NPCs**, and **branching** within module bounds.
 
@@ -94,7 +94,7 @@ This document encodes every product, design, and technical decision for **Ashvei
 
 The UI should evoke **Diablo IV** meets **Elden Ring inventory** meets **Destiny** polish: **moody**, **premium**, **readable**, and **alive**. The product is **experience-first** — layout serves **emotion and clarity**, not arbitrary grid density.
 
-The app should feel like **"a living dungeon reacting to you"**, not **"a static RPG dashboard"**.
+The app should feel like **"a living table reacting to you"** — immediate, shared, tense when the fiction demands it — not **"a static RPG dashboard"**.
 
 **Anti-patterns:**
 
@@ -156,7 +156,7 @@ UI **mood** shifts subtly with **game phase** (server-driven `phase` field). The
 
 | Role | Font | Usage |
 |------|------|--------|
-| Fantasy headers | **Noto Serif** (or equivalent high-quality serif) | Lore blocks, character names, scene titles, chapter labels. Major headers: uppercase + letter-spacing. |
+| Serif headers (`.text-fantasy` in code) | **Noto Serif** (or equivalent high-quality serif) | Lore blocks, character names, scene titles, chapter labels. Major headers: uppercase + letter-spacing. Class name is historical; not a genre lock. |
 | Gameplay text | **Manrope** | Actions, feed, descriptions — maximize readability at small sizes. |
 | Data / stats | **Inter** | HP, dice, modifiers, timestamps — tabular clarity. |
 
@@ -230,7 +230,7 @@ The AI DM must feel **present**, not invisible.
 
 ## 3.1 Screen 1 — Home / Entry (Mode Select Portal)
 
-**Feel:** Approaching a door in a dungeon — a **portal**, not a form.
+**Feel:** Approaching a threshold into play — a **portal**, not a form.
 
 ### Layout
 
@@ -238,8 +238,8 @@ The AI DM must feel **present**, not invisible.
 - **Ashveil** centered, large **serif** with subtle **breathing glow** (opacity / blur pulse, 3–5s loop).
 - Tagline: *"A living world awaits"*.
 - Two large **glass cards** (mode selection):
-  - **AI Dungeon Master** — purple + gold aura, sigil icon. Copy: *"An intelligent narrator guides your journey"*.
-  - **Human Dungeon Master** — calmer glow, shield icon. Copy: *"One player commands the world"*.
+  - **AI Dungeon Master** — purple + gold aura, sigil icon. Copy: *"An intelligent narrator guides your session"* (setting-agnostic).
+  - **Human Dungeon Master** — calmer glow, shield icon. Copy: *"One player guides the fiction"* (setting-agnostic).
 - Below: **[Create Session]** primary gold CTA, **[Join with Code]** secondary ghost button.
 - Maximum breathing space; background visible through glass.
 
@@ -263,7 +263,7 @@ The AI DM must feel **present**, not invisible.
 - Atmospheric background, **center light** (fire pit / rune circle).
 - **Session / adventure title** at top (default "Untitled Adventure" until seeded).
 - **Player slots** in **arc or circle** — not a sterile vertical list. Empty slots: dim outline, *"Awaiting hero…"*. Filled: avatar, name, class, **Ready** glow.
-- **AI DM presence** (Mode A): hooded silhouette or pulsing sigil — *"AI Dungeon Master — Waiting to begin"*.
+- **AI DM presence** (Mode A): hooded silhouette or pulsing sigil — *"AI Dungeon Master — Ready when the table is"*.
 - **Human DM** (Mode B): designated seat has **crown / shield** badge; host may assign DM before start.
 - **Adventure config:** campaign entry option (prompt / random / module), optional prompt field, party size cap.
 - **[Start Adventure]** gold CTA — **host only**, enabled when **all connected players ready** (configurable: allow start with min players if host confirms — default **all ready**).

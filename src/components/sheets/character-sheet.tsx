@@ -101,7 +101,7 @@ export function CharacterSheet({ viewPlayerId = null }: CharacterSheetProps) {
             />
           ) : (
             <span className="text-4xl select-none" aria-hidden>
-              {classIcon(character.class)}
+              {classIcon(character.mechanicalClass)}
             </span>
           )}
         </div>
@@ -110,7 +110,7 @@ export function CharacterSheet({ viewPlayerId = null }: CharacterSheetProps) {
             {character.name}
           </h3>
           <p className="mt-1 text-xs text-[var(--outline)] capitalize">
-            {character.class} · {character.race}
+            {character.displayClass} · {character.race}
           </p>
           <div className="flex items-center gap-3 mt-2">
             <span className="bg-[var(--color-gold-rare)]/10 text-[var(--color-gold-rare)] text-[9px] font-black px-2 py-0.5 border border-[var(--color-gold-rare)]/30 rounded-sm tracking-[0.15em] uppercase">

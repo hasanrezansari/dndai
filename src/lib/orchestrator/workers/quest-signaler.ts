@@ -6,11 +6,11 @@ import {
 } from "@/lib/schemas/ai-io";
 import type { DiceRoll } from "@/lib/schemas/domain";
 
-export const QUEST_SIGNALER_SYSTEM = `You generate one concise tactical quest signal for Ashveil.
+export const QUEST_SIGNALER_SYSTEM = `You generate one concise quest hint for the table's next beat.
 
 Rules:
 - Respond as JSON only.
-- Keep "signal_text" practical and actionable for next turn.
+- Keep "signal_text" practical and actionable for the next turn (genre-agnostic: investigation, social, travel, combat, etc.).
 - Keep "signal_text" to 1 short sentence (max 18 words).
 - Signal must connect objective + latest action + latest narration.
 - Never output spoilers or impossible knowledge.

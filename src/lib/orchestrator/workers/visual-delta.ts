@@ -4,12 +4,16 @@ import {
   type VisualDeltaOutput,
 } from "@/lib/schemas/ai-io";
 
-const LOCATION_WORDS = /\b(enter|arrive|travel|descend|ascend|emerge|cross|portal|door|gate|cave|forest|dungeon|castle|tower|village|temple|tomb|chamber|hall|throne|river|mountain|cliff|bridge)\b/i;
-const DRAMATIC_WORDS = /\b(explod|collaps|transform|summon|dragon|demon|fire|flood|earthquake|lightning|storm|destroy|shatter|crumble|rise|awaken)\b/i;
-const SCENE_SHIFT_WORDS = /\b(arrive at|step into|enter the|emerge from|find (themselves|yourself) in|the scene (shifts|changes)|now stands? (in|before|at))\b/i;
+const LOCATION_WORDS =
+  /\b(enter|arrive|travel|descend|ascend|emerge|cross|portal|door|gate|cave|forest|dungeon|castle|tower|village|temple|tomb|chamber|hall|throne|river|mountain|cliff|bridge|hangar|corridor|lobby|airlock|cockpit|warehouse|office|subway|alley|bunker|laboratory|studio|apartment|penthouse|cabin|deck|dock|clinic|cafeteria|runway|tarmac|elevator|sidewalk|highway)\b/i;
+const DRAMATIC_WORDS =
+  /\b(explod|collaps|transform|summon|dragon|demon|fire|flood|earthquake|lightning|storm|destroy|shatter|crumble|rise|awaken|detonat|meltdown|breach|meteor|asteroid|reactor|implosion|blackout|outbreak)\b/i;
+const SCENE_SHIFT_WORDS =
+  /\b(arrive at|step into|enter the|emerge from|find (themselves|yourself) in|the scene (shifts|changes)|now stands? (in|before|at)|pull(?:s|ed)? (in|up) to|docks? at|lands? in|materializes? in|beams? (?:down|over) to)\b/i;
 
 function extractLocationNouns(text: string): string[] {
-  const pattern = /\b(cave|forest|dungeon|castle|tower|village|temple|tomb|chamber|hall|throne|river|mountain|cliff|bridge|tavern|market|cathedral|ruins|camp|shore|clearing|library|prison|crypt|garden|arena|palace|swamp|desert|canyon)\b/gi;
+  const pattern =
+    /\b(cave|forest|dungeon|castle|tower|village|temple|tomb|chamber|hall|throne|river|mountain|cliff|bridge|tavern|market|cathedral|ruins|camp|shore|clearing|library|prison|crypt|garden|arena|palace|swamp|desert|canyon|hangar|corridor|lobby|airlock|cockpit|warehouse|office|subway|alley|bunker|laboratory|studio|apartment|penthouse|cabin|dock|clinic|cafeteria|runway|tarmac|elevator|sidewalk|highway|skyscraper|starship|shuttle|station)\b/gi;
   const matches = text.match(pattern) ?? [];
   return [...new Set(matches.map((m) => m.toLowerCase()))];
 }

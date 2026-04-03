@@ -40,13 +40,13 @@ function buildFinalChapter(params: {
     params.party.length > 0 ? params.party.join(", ") : "the adventuring party";
   const outcomeLine =
     params.questStatus === "failed"
-      ? "Though the cost was heavy, their tale endures in the halls of memory."
-      : "Their resolve carried them through shadow and flame to carve their place in legend.";
+      ? "Though the cost was heavy, their tale endures in memory."
+      : "Their resolve carried the story to a close worth remembering.";
 
   return [
     `Final Chapter: ${params.campaignTitle}`,
     "",
-    `${partyLine} crossed the threshold of Ashveil and set their fate against the unknown.`,
+    `${partyLine} closed this chapter of their journey together.`,
     params.earlyBeat,
     params.lateBeat,
     outcomeLine,

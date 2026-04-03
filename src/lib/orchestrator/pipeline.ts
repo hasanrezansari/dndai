@@ -1,6 +1,7 @@
 import { and, desc, eq } from "drizzle-orm";
 
 import { getAIProvider } from "@/lib/ai";
+import { buildFacilitatorRoleLine } from "@/lib/ai/narrative-session-profile";
 import { db } from "@/lib/db";
 import { actions, narrativeEvents, npcStates, sceneSnapshots, turns } from "@/lib/db/schema";
 import { broadcastToSession } from "@/lib/socket/server";
@@ -11,7 +12,7 @@ import { logTrace } from "@/lib/orchestrator/trace";
 import { parseIntent } from "@/lib/orchestrator/workers/intent-parser";
 import { interpretRules } from "@/lib/orchestrator/workers/rules-interpreter";
 import { interpretConsequences, consequenceToPatches } from "@/lib/orchestrator/workers/consequence-interpreter";
-import { generateNarration } from "@/lib/orchestrator/workers/narrator";
+import { buildNarratorSystemPrompt, generateNarration } from "@/lib/orchestrator/workers/narrator";
 import { checkVisualDelta } from "@/lib/orchestrator/workers/visual-delta";
 import { buildMemoryBundle, shouldSummarize, runSummarizer } from "@/lib/memory";
 
@@ -790,6 +791,29 @@ export async function runTurnPipeline(params: {
     ctx.session.adventurePrompt?.trim() ||
     "";
 
+  const facilitatorSystemPrompt = buildNarratorSystemPrompt(
+    buildFacilitatorRoleLine({
+      campaign_mode: ctx.session.campaignMode,
+      module_key: ctx.session.moduleKey,
+      adventure_prompt: ctx.session.adventurePrompt,
+      adventure_tags: ctx.session.adventureTags,
+      art_direction: ctx.session.artDirection,
+      world_bible: ctx.session.worldBible,
+    }),
+  );
+  const worldBibleExcerpt =
+    ctx.session.worldBible?.trim().slice(0, 4000) ?? "";
+
+  const fallbackPremiseHint = [
+    ...(ctx.session.adventureTags ?? []),
+    ctx.session.adventurePrompt ?? "",
+    ctx.session.worldBible?.trim().slice(0, 600) ?? "",
+    ctx.session.artDirection ?? "",
+  ]
+    .filter(Boolean)
+    .join(" ")
+    .slice(0, 1500);
+
   const narr0 = actionDenied
     ? null
     : await generateNarration({
@@ -820,6 +844,9 @@ export async function runTurnPipeline(params: {
       canonicalState: memoryBundle.canonicalState,
       rollingSummary: memoryBundle.rollingSummary,
       stylePolicy: memoryBundle.stylePolicy,
+      facilitatorSystemPrompt,
+      worldBibleExcerpt: worldBibleExcerpt || undefined,
+      fallbackPremiseHint: fallbackPremiseHint || undefined,
       provider,
     });
 

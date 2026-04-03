@@ -4,6 +4,7 @@ import { z } from "zod";
 import { apiError, handleApiError } from "@/lib/api/errors";
 import { requireUser, unauthorizedResponse } from "@/lib/auth/guards";
 import { generatePortraitImageOpenRouter } from "@/lib/ai/openrouter-image-provider";
+import { CHARACTER_RACE_MAX_LEN, normalizeCharacterRace } from "@/lib/rules/character";
 import {
   assertAndConsumeFreePortraitUse,
   PortraitPaymentRequiredError,
@@ -12,7 +13,7 @@ import {
 const BodySchema = z.object({
   name: z.string().trim().min(1).max(48),
   heroClass: z.string().trim().min(1).max(60),
-  race: z.string().trim().min(1).max(40),
+  race: z.string().trim().min(1).max(CHARACTER_RACE_MAX_LEN + 8),
   concept: z.string().trim().max(220).optional(),
   appearance: z.string().trim().max(220).optional(),
   // If true, treat as reroll (paid); for now we gate it.
@@ -33,6 +34,9 @@ export async function POST(request: NextRequest) {
     const parsed = BodySchema.safeParse(json);
     if (!parsed.success) return apiError("Invalid body", 400);
 
+    const raceNorm = normalizeCharacterRace(parsed.data.race);
+    if (!raceNorm.ok) return apiError(raceNorm.error, 400);
+
     if (parsed.data.reroll) {
       return apiError("Portrait reroll costs Sparks", 402);
     }
@@ -48,7 +52,7 @@ export async function POST(request: NextRequest) {
 
     const prompt = [
       `Character name: ${parsed.data.name}.`,
-      `Class: ${parsed.data.heroClass}. Race: ${parsed.data.race}.`,
+      `Class: ${parsed.data.heroClass}. Race: ${raceNorm.value}.`,
       parsed.data.concept ? `Concept: ${parsed.data.concept}.` : "",
       parsed.data.appearance ? `Appearance: ${parsed.data.appearance}.` : "",
       "Portrait rules: single character only, chest-up, heroic, readable silhouette, no text.",

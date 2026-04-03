@@ -32,7 +32,7 @@ export const metadata: Metadata = {
   description:
     getBuildTimeBrand() === "playromana"
       ? "Curated Roman adventures. Start instantly, invite friends, and let the world respond."
-      : "Mobile-first multiplayer AI-powered tabletop RPG. Play with friends online — AI or Human DM.",
+      : "Play together from your phone: co-op storytelling in any genre, with an AI or human host. Sessions, heroes, and turns in one link.",
   metadataBase: new URL(
     process.env.NEXTAUTH_URL ?? "https://playdndai.com",
   ),
@@ -41,7 +41,7 @@ export const metadata: Metadata = {
     description:
       getBuildTimeBrand() === "playromana"
         ? "Curated Roman adventures. Start instantly, invite friends, and let the world respond."
-        : "Mobile-first multiplayer AI-powered tabletop RPG. Play with friends online.",
+        : "Co-op storytelling in any setting — AI or human host. Play with friends from one link.",
     siteName: getBrandName(getBuildTimeBrand()),
     type: "website",
   },

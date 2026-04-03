@@ -22,7 +22,7 @@ export function getBrandTagline(brand: AppBrand): string {
       return "Curated Roman adventures — play instantly with friends.";
     case "falvos":
     default:
-      return "A living world awaits";
+      return "Your table. Any setting. One link.";
   }
 }
 

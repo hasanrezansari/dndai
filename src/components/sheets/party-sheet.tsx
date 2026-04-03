@@ -163,7 +163,7 @@ export function PartySheet() {
         const name =
           c?.name?.trim() || p.displayName?.trim() || `Seat ${p.seatIndex + 1}`;
         const subtitle = c
-          ? `${c.class} · ${c.race}`
+          ? `${c.displayClass} · ${c.race}`
           : "No character";
         const hp = c?.hp ?? 0;
         const maxHp = c?.maxHp ?? 1;

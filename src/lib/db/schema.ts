@@ -204,6 +204,12 @@ export const sessions = pgTable(
     host_user_id: text("host_user_id").notNull(),
     state_version: integer("state_version").notNull().default(0),
     adventure_prompt: text("adventure_prompt"),
+    /** Optional lobby chips / tone hints for seeding and AI context (string array JSON). */
+    adventure_tags: jsonb("adventure_tags").$type<string[]>(),
+    /** Free-text art direction for image models (style, medium, palette). */
+    art_direction: text("art_direction"),
+    /** Long-form premise / world bible pasted by the host; fed to seeder and memory. */
+    world_bible: text("world_bible"),
     module_key: text("module_key"),
     campaign_title: text("campaign_title"),
     world_summary: text("world_summary"),

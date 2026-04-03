@@ -49,7 +49,7 @@ alwaysApply: false
 ## Typography
 | Class | Font | Use For |
 |-------|------|---------|
-| `.text-fantasy` | Noto Serif (serif) | Lore text, titles, character names, headings |
+| `.text-fantasy` | Noto Serif (serif) | Lore text, titles, character names, headings (class name is historical — not a genre default) |
 | default (Manrope) | sans-serif | Gameplay text, UI labels, body copy |
 | `.text-data` | Inter (mono-like) | HP numbers, dice values, stats, numerical data |
 

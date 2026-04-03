@@ -28,13 +28,13 @@ describe("image style arbitration", () => {
 
   it("omits empty lower-priority directives while preserving order", () => {
     const result = buildArbitratedStyleDirectives({
-      sessionThemeStyle: "dark fantasy oil painting",
+      sessionThemeStyle: "painted adventure illustration, cinematic lighting",
       classVisualTags: [],
       classConcepts: [],
     });
 
     expect(result.orderedStyleDirectives).toEqual([
-      "Session theme (highest priority): dark fantasy oil painting",
+      "Session theme (highest priority): painted adventure illustration, cinematic lighting",
     ]);
     expect(result.policyLine).toContain("session theme has final authority");
   });

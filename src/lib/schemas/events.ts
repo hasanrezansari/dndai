@@ -27,6 +27,12 @@ export const SessionCapUpdatedEventSchema = z.object({
 });
 export type SessionCapUpdatedEvent = output<typeof SessionCapUpdatedEventSchema>;
 
+/** Lobby host updated premise fields; clients refetch session. Payload may grow later. */
+export const SessionPremiseUpdatedEventSchema = z.object({});
+export type SessionPremiseUpdatedEvent = output<
+  typeof SessionPremiseUpdatedEventSchema
+>;
+
 export const SessionStartedEventSchema = z.object({
   campaign_title: z.string(),
   opening_scene: z.string(),

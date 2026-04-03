@@ -133,7 +133,7 @@ function buildHeuristicFallback(raw: string): ActionIntent {
   });
 }
 
-const INTENT_SYSTEM = `You are the intent parser for Ashveil, a dark fantasy tabletop RPG. Given a player's raw action text, classify it into a structured intent.
+const INTENT_SYSTEM = `You are the intent parser for a collaborative tabletop RPG. Given a player's raw action text, classify it into a structured intent.
 
 Output JSON with these fields:
 - "action_type": one of "attack", "cast_spell", "move", "talk", "inspect", "use_item", "defend", "heal", "other"

@@ -1,3 +1,5 @@
+import { getStartingEquipmentForPack } from "@/lib/rules/gear-presets";
+
 export const CLASSES = [
   {
     value: "warrior",
@@ -61,6 +63,40 @@ export const RACES = [
 export type CharacterClass = (typeof CLASSES)[number]["value"];
 export type CharacterRace = (typeof RACES)[number]["value"];
 
+/** Canonical preset keys; custom free-text is stored as-is (trimmed, whitespace collapsed). */
+export const PRESET_RACE_SET = new Set<string>(RACES.map((r) => r.value));
+
+/** Max length for custom race text (presets are shorter). */
+export const CHARACTER_RACE_MAX_LEN = 48;
+
+export type NormalizeCharacterRaceResult =
+  | { ok: true; value: string }
+  | { ok: false; error: string };
+
+/**
+ * Preset names (any casing) normalize to lowercase snake keys.
+ * Any other non-empty string becomes custom display text (casing preserved).
+ */
+export function normalizeCharacterRace(raw: string): NormalizeCharacterRaceResult {
+  const t = raw.trim();
+  if (!t) return { ok: false, error: "Race is required" };
+  if (t === "__custom__") {
+    return { ok: false, error: "Invalid race" };
+  }
+  const asPreset = t.toLowerCase();
+  if (PRESET_RACE_SET.has(asPreset)) {
+    return { ok: true, value: asPreset };
+  }
+  const collapsed = t.replace(/\s+/g, " ");
+  if (collapsed.length > CHARACTER_RACE_MAX_LEN) {
+    return {
+      ok: false,
+      error: `Race must be at most ${CHARACTER_RACE_MAX_LEN} characters`,
+    };
+  }
+  return { ok: true, value: collapsed };
+}
+
 export type RolledStats = {
   str: number;
   dex: number;
@@ -102,47 +138,7 @@ function normClass(c: string): string {
 }
 
 export function getStartingEquipment(characterClass: string): StartingItem[] {
-  switch (normClass(characterClass)) {
-    case "warrior":
-      return [
-        { name: "Longsword", type: "weapon" },
-        { name: "Shield", type: "armor" },
-        { name: "Chain mail", type: "armor" },
-      ];
-    case "ranger":
-      return [
-        { name: "Longbow", type: "weapon" },
-        { name: "Short sword", type: "weapon" },
-        { name: "Leather armor", type: "armor" },
-      ];
-    case "mage":
-      return [
-        { name: "Staff", type: "weapon" },
-        { name: "Spellbook", type: "focus" },
-        { name: "Robes", type: "armor" },
-      ];
-    case "rogue":
-      return [
-        { name: "Daggers (2)", type: "weapon" },
-        { name: "Thieves' tools", type: "tool" },
-        { name: "Leather armor", type: "armor" },
-      ];
-    case "cleric":
-      return [
-        { name: "Mace", type: "weapon" },
-        { name: "Shield", type: "armor" },
-        { name: "Scale mail", type: "armor" },
-        { name: "Holy symbol", type: "focus" },
-      ];
-    case "paladin":
-      return [
-        { name: "Greatsword", type: "weapon" },
-        { name: "Chain mail", type: "armor" },
-        { name: "Holy symbol", type: "focus" },
-      ];
-    default:
-      return [];
-  }
+  return getStartingEquipmentForPack(characterClass, "fantasy");
 }
 
 export function getStartingAbilities(characterClass: string): StartingAbility[] {

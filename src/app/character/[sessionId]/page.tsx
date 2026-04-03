@@ -16,13 +16,18 @@ import {
   type CharacterStats,
   type ClassProfile,
 } from "@/lib/schemas/domain";
+import { getPresetClassesForPremise } from "@/lib/rules/class-presets";
+import { getStartingEquipmentForPremise } from "@/lib/rules/gear-presets";
+import { getRacesForPremise } from "@/lib/rules/race-presets";
 import {
-  CLASSES,
-  getStartingEquipment,
-  RACES,
+  CHARACTER_RACE_MAX_LEN,
+  normalizeCharacterRace,
   type CharacterClass,
   type CharacterRace,
 } from "@/lib/rules/character";
+
+const CUSTOM_RACE_PILL = "__custom__" as const;
+type RacePillValue = CharacterRace | typeof CUSTOM_RACE_PILL;
 
 const CUSTOM_CLASSES_ENABLED =
   (process.env.NEXT_PUBLIC_CUSTOM_CLASSES_ENABLED ?? "true").toLowerCase() !== "false";
@@ -60,12 +65,15 @@ export default function CharacterCreationPage() {
 
   const [name, setName] = useState("");
   const [characterClass, setCharacterClass] = useState<CharacterClass>("warrior");
-  const [classMode, setClassMode] = useState<"preset" | "custom">("preset");
+  const [classMode, setClassMode] = useState<"preset" | "custom">(
+    CUSTOM_CLASSES_ENABLED ? "custom" : "preset",
+  );
   const [customConcept, setCustomConcept] = useState("");
   const [customRole, setCustomRole] = useState<ClassProfile["combat_role"]>("specialist");
   const [customClassProfile, setCustomClassProfile] = useState<ClassProfile | null>(null);
   const [classGenLoading, setClassGenLoading] = useState(false);
-  const [race, setRace] = useState<CharacterRace>("human");
+  const [racePill, setRacePill] = useState<RacePillValue>("human");
+  const [customRaceText, setCustomRaceText] = useState("");
   const [pronouns, setPronouns] = useState("they/them");
   const [traits, setTraits] = useState("");
   const [backstory, setBackstory] = useState("");
@@ -87,6 +95,44 @@ export default function CharacterCreationPage() {
   const [selectedHeroId, setSelectedHeroId] = useState<string | null>(null);
   const [portraitUrl, setPortraitUrl] = useState<string | null>(null);
   const [portraitBusy, setPortraitBusy] = useState(false);
+  const [tablePremise, setTablePremise] = useState<{
+    adventure_prompt: string | null;
+    adventure_tags: string[] | null;
+    world_bible: string | null;
+    art_direction: string | null;
+  } | null>(null);
+
+  const premiseFields = useMemo(
+    () => ({
+      adventure_prompt: tablePremise?.adventure_prompt,
+      adventure_tags: tablePremise?.adventure_tags,
+      world_bible: tablePremise?.world_bible,
+    }),
+    [tablePremise],
+  );
+
+  const presetClasses = useMemo(
+    () => getPresetClassesForPremise(premiseFields),
+    [premiseFields],
+  );
+
+  const premiseRaceOptions = useMemo(
+    () => getRacesForPremise(premiseFields),
+    [premiseFields],
+  );
+
+  const racePillOptions = useMemo(
+    () => [
+      ...premiseRaceOptions,
+      { value: CUSTOM_RACE_PILL, label: "Custom…" },
+    ],
+    [premiseRaceOptions],
+  );
+
+  const raceForApi = useMemo(() => {
+    if (racePill === CUSTOM_RACE_PILL) return customRaceText.trim();
+    return racePill;
+  }, [racePill, customRaceText]);
 
   useEffect(() => {
     try {
@@ -112,7 +158,22 @@ export default function CharacterCreationPage() {
       if (!res.ok || cancelled) return;
       const data = (await res.json()) as {
         players?: { id: string; user_id: string }[];
+        adventure_prompt?: string | null;
+        adventure_tags?: unknown;
+        world_bible?: string | null;
+        art_direction?: string | null;
       };
+      const tags = Array.isArray(data.adventure_tags)
+        ? data.adventure_tags.map(String)
+        : null;
+      if (!cancelled) {
+        setTablePremise({
+          adventure_prompt: data.adventure_prompt ?? null,
+          adventure_tags: tags,
+          world_bible: data.world_bible ?? null,
+          art_direction: data.art_direction ?? null,
+        });
+      }
       const me = data.players?.find((p) => p.user_id === uid);
       if (!cancelled && me) setResolvedPlayerId(me.id);
     })();
@@ -183,13 +244,13 @@ export default function CharacterCreationPage() {
             name: item.name,
             type: item.type,
           }))
-        : getStartingEquipment(characterClass),
-    [characterClass, classMode, customClassProfile],
+        : getStartingEquipmentForPremise(characterClass, premiseFields),
+    [characterClass, classMode, customClassProfile, premiseFields],
   );
 
   const selectedMeta = useMemo(
-    () => CLASSES.find((c) => c.value === characterClass),
-    [characterClass],
+    () => presetClasses.find((c) => c.value === characterClass),
+    [characterClass, presetClasses],
   );
   const classPreviewLabel =
     classMode === "custom"
@@ -246,6 +307,10 @@ export default function CharacterCreationPage() {
         body: JSON.stringify({
           concept: customConcept.trim(),
           rolePreference: customRole,
+          adventure_prompt: tablePremise?.adventure_prompt ?? undefined,
+          adventure_tags: tablePremise?.adventure_tags ?? undefined,
+          world_bible: tablePremise?.world_bible ?? undefined,
+          art_direction: tablePremise?.art_direction ?? undefined,
         }),
       });
       if (!res.ok) {
@@ -307,6 +372,12 @@ export default function CharacterCreationPage() {
         return;
       }
     }
+    const raceNorm = normalizeCharacterRace(raceForApi);
+    if (!raceNorm.ok) {
+      setError(raceNorm.error);
+      return;
+    }
+
     setSubmitLoading(true);
     setError(null);
     try {
@@ -321,7 +392,7 @@ export default function CharacterCreationPage() {
             classMode === "custom"
               ? (customClassProfile?.display_name.trim() || customConcept.trim() || "custom")
               : characterClass,
-          race,
+          race: raceNorm.value,
           stats,
           portraitUrl: portraitUrl?.trim() || undefined,
           pronouns: pronouns.trim() || "they/them",
@@ -359,6 +430,11 @@ export default function CharacterCreationPage() {
       toast("Enter a name first", "error");
       return;
     }
+    const portraitRace = normalizeCharacterRace(raceForApi);
+    if (!portraitRace.ok) {
+      toast(portraitRace.error, "error");
+      return;
+    }
     setPortraitBusy(true);
     setError(null);
     try {
@@ -371,7 +447,7 @@ export default function CharacterCreationPage() {
             classMode === "custom"
               ? (customClassProfile?.display_name.trim() || customConcept.trim() || "custom")
               : characterClass,
-          race,
+          race: portraitRace.value,
           concept: classMode === "custom" ? customConcept.trim() : undefined,
           appearance: appearance.trim() || undefined,
         }),
@@ -404,7 +480,8 @@ export default function CharacterCreationPage() {
       (customClassProfile !== null &&
         customProfileValidation !== null &&
         customProfileValidation.success)) &&
-    Boolean(playerIdResolved);
+    Boolean(playerIdResolved) &&
+    (racePill !== CUSTOM_RACE_PILL || raceForApi.length > 0);
 
   if (!sessionId) {
     return (
@@ -423,6 +500,11 @@ export default function CharacterCreationPage() {
         </h1>
         <p className="text-[10px] text-[var(--outline)] uppercase tracking-[0.2em]">
           Shape the vessel that enters Falvos
+        </p>
+        <p className="text-xs text-[var(--color-silver-dim)] leading-relaxed max-w-md mx-auto mt-2">
+          Start by describing who you are in <em>this</em> story — tone and setting follow your table.
+          Quick archetypes stay balanced under the hood; custom builds use the host&apos;s premise when
+          generating gear and abilities.
         </p>
       </header>
 
@@ -544,39 +626,6 @@ export default function CharacterCreationPage() {
         )}
       </section>
 
-      {/* Class Preview */}
-      <div className="relative overflow-hidden rounded-[var(--radius-card)] border border-[rgba(77,70,53,0.15)] bg-gradient-to-b from-[var(--surface-container)] to-[var(--color-obsidian)] p-6 flex flex-col items-center gap-3">
-        {classMode === "preset" && selectedMeta?.imageUrl ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={selectedMeta.imageUrl}
-            alt=""
-            className="absolute inset-0 h-full w-full object-cover opacity-45"
-            loading="eager"
-            decoding="async"
-          />
-        ) : null}
-        <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-[var(--color-obsidian)] via-[var(--color-obsidian)]/65 to-transparent" />
-        <span className="relative text-7xl leading-none select-none drop-shadow-[0_4px_12px_rgba(0,0,0,0.85)]" aria-hidden>
-          {selectedMeta?.icon ?? "—"}
-        </span>
-        <div className="text-center space-y-1.5">
-          <h2 className="relative text-fantasy text-xl text-[var(--color-silver-muted)]">
-            {classPreviewLabel}
-          </h2>
-          {classPreviewRole ? (
-            <p className="relative text-[9px] font-black uppercase tracking-[0.2em] text-[var(--color-gold-rare)]">
-              {classPreviewRole}
-            </p>
-          ) : null}
-          {classPreviewFantasy ? (
-            <p className="relative text-xs text-[var(--color-silver-dim)] max-w-[28ch] italic leading-relaxed">
-              {classPreviewFantasy}
-            </p>
-          ) : null}
-        </div>
-      </div>
-
       {/* Portrait */}
       <section className="rounded-[var(--radius-card)] border border-[rgba(77,70,53,0.15)] bg-[var(--surface-container)]/30 p-5">
         <p className="text-[10px] font-black uppercase tracking-[0.2em] text-[var(--outline)]">
@@ -664,88 +713,29 @@ export default function CharacterCreationPage() {
         </div>
       </section>
 
-
-      {/* Appearance */}
-      <section className="flex flex-col gap-3">
-        <label
-          htmlFor="hero-appearance"
-          className="text-[10px] font-black uppercase tracking-[0.2em] text-[var(--outline)]"
-        >
-          Appearance
-          <span className="text-[var(--outline)]/40 normal-case tracking-normal ml-2 font-normal">
-            optional
-          </span>
-        </label>
-        <textarea
-          id="hero-appearance"
-          value={appearance}
-          onChange={(e) => setAppearance(e.target.value)}
-          maxLength={220}
-          rows={2}
-          className="w-full rounded-[var(--radius-button)] bg-[var(--color-deep-void)] border border-[rgba(77,70,53,0.2)] px-4 py-3 text-sm text-[var(--color-silver-muted)] placeholder:text-[var(--outline)]/40 focus:outline-none focus:border-[var(--color-gold-rare)]/40 resize-none transition-colors leading-relaxed"
-          placeholder="e.g. scarred jaw, raven cloak, silver-trim armor, amber eyes"
-        />
-      </section>
-      {/* Backstory */}
-      <section className="flex flex-col gap-3">
-        <label
-          htmlFor="hero-backstory"
-          className="text-[10px] font-black uppercase tracking-[0.2em] text-[var(--outline)]"
-        >
-          Backstory
-          <span className="text-[var(--outline)]/40 normal-case tracking-normal ml-2 font-normal">
-            optional
-          </span>
-        </label>
-        <textarea
-          id="hero-backstory"
-          value={backstory}
-          onChange={(e) => setBackstory(e.target.value)}
-          maxLength={500}
-          rows={3}
-          className="w-full rounded-[var(--radius-button)] bg-[var(--color-deep-void)] border border-[rgba(77,70,53,0.2)] px-4 py-3 text-sm font-serif italic text-[var(--color-silver-muted)] placeholder:text-[var(--outline)]/40 focus:outline-none focus:border-[var(--color-gold-rare)]/40 resize-none transition-colors leading-relaxed"
-          placeholder="A brief origin story — the AI weaves it into narration"
-        />
-      </section>
-
-      {/* Traits */}
-      <section className="flex flex-col gap-3">
-        <label
-          htmlFor="hero-traits"
-          className="text-[10px] font-black uppercase tracking-[0.2em] text-[var(--outline)]"
-        >
-          Traits
-          <span className="text-[var(--outline)]/40 normal-case tracking-normal ml-2 font-normal">
-            comma-separated, optional
-          </span>
-        </label>
-        <input
-          id="hero-traits"
-          type="text"
-          value={traits}
-          onChange={(e) => setTraits(e.target.value)}
-          autoComplete="off"
-          maxLength={200}
-          className="w-full min-h-[44px] rounded-[var(--radius-button)] bg-[var(--color-deep-void)] border border-[rgba(77,70,53,0.2)] px-4 text-sm text-[var(--color-silver-muted)] placeholder:text-[var(--outline)]/40 focus:outline-none focus:border-[var(--color-gold-rare)]/40 transition-colors"
-          placeholder="e.g. cautious, scarred, short-tempered"
-        />
-      </section>
-
-      {/* Class */}
+      {/* Class / role */}
       <section className="flex flex-col gap-3">
         <div className="flex items-center gap-3">
           <span className="w-1 h-5 bg-[var(--color-gold-rare)]" />
           <h2 className="text-[10px] font-black uppercase tracking-[0.2em] text-[var(--outline)]">
-            Class
+            Your role
           </h2>
         </div>
+        <p className="text-xs text-[var(--color-silver-dim)] leading-relaxed">
+          The story is yours — describe who you are. Under the hood we map you to a{" "}
+          <span className="text-[var(--color-silver-muted)]">balanced combat baseline</span> so
+          dice and HP stay fair.{" "}
+          {CUSTOM_CLASSES_ENABLED
+            ? "Generate Build uses this session’s premise from the host when present."
+            : null}
+        </p>
         <div className="overflow-x-auto scrollbar-hide -mx-1 px-1">
           <PillSelect
             options={[
-              { value: "preset", label: "Preset" },
               ...(CUSTOM_CLASSES_ENABLED
-                ? [{ value: "custom", label: "Create Your Own" }]
+                ? [{ value: "custom", label: "Describe your role" }]
                 : []),
+              { value: "preset", label: "Quick archetype" },
             ]}
             value={classMode}
             onChange={(value) => setClassMode(value as "preset" | "custom")}
@@ -756,7 +746,7 @@ export default function CharacterCreationPage() {
         {classMode === "preset" ? (
         <div className="overflow-x-auto scrollbar-hide -mx-1 px-1">
           <div className="flex gap-3 pb-1 w-max">
-            {CLASSES.map((c) => (
+            {presetClasses.map((c) => (
               <ClassCard
                 key={c.value}
                 icon={c.icon}
@@ -775,7 +765,7 @@ export default function CharacterCreationPage() {
               htmlFor="custom-class-concept"
               className="text-[10px] font-black uppercase tracking-[0.2em] text-[var(--outline)]"
             >
-              Class Concept
+              Who are you in this story?
             </label>
             <textarea
               id="custom-class-concept"
@@ -784,8 +774,36 @@ export default function CharacterCreationPage() {
               maxLength={180}
               rows={3}
               className="w-full rounded-[var(--radius-button)] bg-[var(--color-deep-void)] border border-[rgba(77,70,53,0.2)] px-4 py-3 text-sm text-[var(--color-silver-muted)] placeholder:text-[var(--outline)]/40 focus:outline-none focus:border-[var(--color-gold-rare)]/40 resize-none transition-colors leading-relaxed"
-              placeholder="e.g. cybernetic ronin with a mono-katana and tactical neural reflexes"
+              placeholder="e.g. timid lady's maid who notices everything; salvage tech on a dying ship; noir fixer with a code"
             />
+            <p className="text-[10px] uppercase tracking-[0.12em] text-[var(--outline)]">
+              Quick chassis hint (optional)
+            </p>
+            <div className="flex flex-wrap gap-2">
+              {(
+                [
+                  { role: "specialist" as const, label: "Social / nerve" },
+                  { role: "skirmisher", label: "Agile / mobile" },
+                  { role: "support", label: "Care / bolster" },
+                  { role: "arcane", label: "Weird / trained edge" },
+                  { role: "frontline", label: "Hold the line" },
+                  { role: "guardian", label: "Protect others" },
+                ] as const
+              ).map(({ role, label }) => (
+                <button
+                  key={role}
+                  type="button"
+                  onClick={() => setCustomRole(role)}
+                  className={`min-h-[36px] rounded-full border px-3 text-[10px] font-bold uppercase tracking-[0.12em] transition-colors ${
+                    customRole === role
+                      ? "border-[var(--color-gold-rare)]/50 bg-[var(--color-gold-rare)]/10 text-[var(--color-gold-rare)]"
+                      : "border-white/10 bg-black/20 text-[var(--outline)] hover:border-white/20"
+                  }`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
             <div className="overflow-x-auto scrollbar-hide -mx-1 px-1">
               <PillSelect
                 options={[
@@ -817,7 +835,7 @@ export default function CharacterCreationPage() {
                   htmlFor="custom-class-name"
                   className="text-[10px] font-black uppercase tracking-[0.2em] text-[var(--outline)]"
                 >
-                  Custom Class Name
+                  Name shown in play
                 </label>
                 <input
                   id="custom-class-name"
@@ -834,7 +852,7 @@ export default function CharacterCreationPage() {
                   htmlFor="custom-class-fantasy"
                   className="text-[10px] font-black uppercase tracking-[0.2em] text-[var(--outline)]"
                 >
-                  Fantasy Summary
+                  One-line pitch
                 </label>
                 <textarea
                   id="custom-class-fantasy"
@@ -1056,6 +1074,106 @@ export default function CharacterCreationPage() {
         )}
       </section>
 
+      {/* Role preview — updates from your choices above */}
+      <div className="relative overflow-hidden rounded-[var(--radius-card)] border border-[rgba(77,70,53,0.15)] bg-gradient-to-b from-[var(--surface-container)] to-[var(--color-obsidian)] p-6 flex flex-col items-center gap-3">
+        {classMode === "preset" && selectedMeta?.imageUrl ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={selectedMeta.imageUrl}
+            alt=""
+            className="absolute inset-0 h-full w-full object-cover opacity-45"
+            loading="eager"
+            decoding="async"
+          />
+        ) : null}
+        <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-[var(--color-obsidian)] via-[var(--color-obsidian)]/65 to-transparent" />
+        <span className="relative text-7xl leading-none select-none drop-shadow-[0_4px_12px_rgba(0,0,0,0.85)]" aria-hidden>
+          {selectedMeta?.icon ?? "—"}
+        </span>
+        <div className="text-center space-y-1.5">
+          <h2 className="relative text-fantasy text-xl text-[var(--color-silver-muted)]">
+            {classPreviewLabel}
+          </h2>
+          {classPreviewRole ? (
+            <p className="relative text-[9px] font-black uppercase tracking-[0.2em] text-[var(--color-gold-rare)]">
+              {classPreviewRole}
+            </p>
+          ) : null}
+          {classPreviewFantasy ? (
+            <p className="relative text-xs text-[var(--color-silver-dim)] max-w-[28ch] italic leading-relaxed">
+              {classPreviewFantasy}
+            </p>
+          ) : null}
+        </div>
+      </div>
+
+      {/* Appearance */}
+      <section className="flex flex-col gap-3">
+        <label
+          htmlFor="hero-appearance"
+          className="text-[10px] font-black uppercase tracking-[0.2em] text-[var(--outline)]"
+        >
+          Appearance
+          <span className="text-[var(--outline)]/40 normal-case tracking-normal ml-2 font-normal">
+            optional
+          </span>
+        </label>
+        <textarea
+          id="hero-appearance"
+          value={appearance}
+          onChange={(e) => setAppearance(e.target.value)}
+          maxLength={220}
+          rows={2}
+          className="w-full rounded-[var(--radius-button)] bg-[var(--color-deep-void)] border border-[rgba(77,70,53,0.2)] px-4 py-3 text-sm text-[var(--color-silver-muted)] placeholder:text-[var(--outline)]/40 focus:outline-none focus:border-[var(--color-gold-rare)]/40 resize-none transition-colors leading-relaxed"
+          placeholder="e.g. scarred jaw, raven cloak, silver-trim armor, amber eyes"
+        />
+      </section>
+      {/* Backstory */}
+      <section className="flex flex-col gap-3">
+        <label
+          htmlFor="hero-backstory"
+          className="text-[10px] font-black uppercase tracking-[0.2em] text-[var(--outline)]"
+        >
+          Backstory
+          <span className="text-[var(--outline)]/40 normal-case tracking-normal ml-2 font-normal">
+            optional
+          </span>
+        </label>
+        <textarea
+          id="hero-backstory"
+          value={backstory}
+          onChange={(e) => setBackstory(e.target.value)}
+          maxLength={500}
+          rows={3}
+          className="w-full rounded-[var(--radius-button)] bg-[var(--color-deep-void)] border border-[rgba(77,70,53,0.2)] px-4 py-3 text-sm font-serif italic text-[var(--color-silver-muted)] placeholder:text-[var(--outline)]/40 focus:outline-none focus:border-[var(--color-gold-rare)]/40 resize-none transition-colors leading-relaxed"
+          placeholder="A brief origin story — the AI weaves it into narration"
+        />
+      </section>
+
+      {/* Traits */}
+      <section className="flex flex-col gap-3">
+        <label
+          htmlFor="hero-traits"
+          className="text-[10px] font-black uppercase tracking-[0.2em] text-[var(--outline)]"
+        >
+          Traits
+          <span className="text-[var(--outline)]/40 normal-case tracking-normal ml-2 font-normal">
+            comma-separated, optional
+          </span>
+        </label>
+        <input
+          id="hero-traits"
+          type="text"
+          value={traits}
+          onChange={(e) => setTraits(e.target.value)}
+          autoComplete="off"
+          maxLength={200}
+          className="w-full min-h-[44px] rounded-[var(--radius-button)] bg-[var(--color-deep-void)] border border-[rgba(77,70,53,0.2)] px-4 text-sm text-[var(--color-silver-muted)] placeholder:text-[var(--outline)]/40 focus:outline-none focus:border-[var(--color-gold-rare)]/40 transition-colors"
+          placeholder="e.g. cautious, scarred, short-tempered"
+        />
+      </section>
+
+
       {/* Race */}
       <section className="flex flex-col gap-3">
         <div className="flex items-center gap-3">
@@ -1064,18 +1182,34 @@ export default function CharacterCreationPage() {
             Race
           </h2>
           <span className="text-[10px] text-[var(--outline)]/70">
-            optional (defaults to Human)
+            presets match this table&apos;s vibe; Custom is free text (no stat change)
           </span>
         </div>
         <div className="overflow-x-auto scrollbar-hide -mx-1 px-1">
-          <PillSelect
-            options={[...RACES]}
-            value={race}
-            onChange={setRace}
+          <PillSelect<RacePillValue>
+            options={racePillOptions}
+            value={racePill}
+            onChange={setRacePill}
             wrap={false}
             className="w-max pb-1"
           />
         </div>
+        {racePill === CUSTOM_RACE_PILL ? (
+          <label className="flex flex-col gap-2 mt-1">
+            <span className="text-[10px] font-black uppercase tracking-[0.2em] text-[var(--outline)]">
+              Describe your people / origin
+            </span>
+            <input
+              type="text"
+              value={customRaceText}
+              onChange={(e) => setCustomRaceText(e.target.value)}
+              autoComplete="off"
+              maxLength={CHARACTER_RACE_MAX_LEN}
+              placeholder="e.g. Belt miner clone, uplifted octopus, Martian settler"
+              className="w-full min-h-[44px] rounded-[var(--radius-button)] bg-[var(--color-deep-void)] border border-[rgba(77,70,53,0.2)] px-4 text-sm text-[var(--color-silver-muted)] placeholder:text-[var(--outline)]/40 focus:outline-none focus:border-[var(--color-gold-rare)]/40 transition-colors"
+            />
+          </label>
+        ) : null}
       </section>
 
       {/* Ability Scores */}

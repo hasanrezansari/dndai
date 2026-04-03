@@ -134,20 +134,37 @@ function normalizeVisualTags(value: z.infer<typeof LooseClassProfileSchema>["vis
   return [...new Set(source.map((s) => s.trim().toLowerCase()).filter(Boolean).concat([role]))].slice(0, 10);
 }
 
+export type SessionPremiseForClassGen = {
+  adventure_prompt?: string;
+  adventure_tags?: string[];
+  world_bible?: string;
+  art_direction?: string;
+};
+
 export async function generateCustomClassProfileFromAI(params: {
   concept: string;
   rolePreference?: z.infer<typeof ClassProfileRoleSchema>;
+  sessionPremise?: SessionPremiseForClassGen;
 }) {
   const provider = getAIProvider();
-  const systemPrompt = `You generate balanced custom RPG class profiles for Ashveil.
+  const premise = params.sessionPremise;
+  const hasPremise = Boolean(
+    premise &&
+      (premise.adventure_prompt?.trim() ||
+        (premise.adventure_tags && premise.adventure_tags.length > 0) ||
+        premise.world_bible?.trim() ||
+        premise.art_direction?.trim()),
+  );
+
+  const systemPrompt = `You generate balanced custom RPG class profiles for a tabletop RPG session.
 Return ONLY JSON that matches the provided schema.
 
 Hard requirements:
 - source must be "custom"
-- class fantasy must reflect the player's concept prompt
+- the "fantasy" JSON field is a one-line flavorful class pitch for any genre (sci-fi, horror, modern, Victorian, etc.); it must reflect the player's concept prompt
 - keep mechanics balanced and playable at level 1
 - no overpowered kits
-- prefer clear, flavorful ability and gear names
+- prefer clear, flavorful ability and gear names that fit the TABLE SETTING when campaign_context is provided (no laser rifles in pure Victorian drama unless the premise allows tech; no "arcane" naming if the table is grounded realism unless the concept is mystical)
 - visual_tags should help image consistency across scenes
 
 Balance requirements:
@@ -159,6 +176,17 @@ Balance requirements:
   const userPrompt = JSON.stringify({
     concept: params.concept,
     role_preference: params.rolePreference ?? null,
+    campaign_context: hasPremise
+      ? {
+          adventure_prompt: premise?.adventure_prompt?.trim().slice(0, 4000) ?? null,
+          adventure_tags: premise?.adventure_tags?.length
+            ? premise.adventure_tags.map((t) => t.trim().slice(0, 48)).filter(Boolean)
+            : null,
+          world_bible_excerpt:
+            premise?.world_bible?.trim().slice(0, 3500) ?? null,
+          art_direction: premise?.art_direction?.trim().slice(0, 500) ?? null,
+        }
+      : null,
     output_rules: {
       source: "custom",
       abilities_count: 3,

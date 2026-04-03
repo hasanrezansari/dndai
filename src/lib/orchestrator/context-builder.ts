@@ -45,6 +45,11 @@ export interface TurnContext {
     campaignTitle: string | null;
     adventurePrompt: string | null;
     currentRound: number;
+    campaignMode: string;
+    moduleKey: string | null;
+    adventureTags: string[] | null;
+    artDirection: string | null;
+    worldBible: string | null;
   };
   player: { id: string; seatIndex: number; isHost: boolean };
   character: {
@@ -275,6 +280,9 @@ export async function buildTurnContext({
         : [],
     }));
 
+  const tagRaw = sessionRow.adventure_tags;
+  const adventureTags = Array.isArray(tagRaw) ? tagRaw.map(String) : null;
+
   return {
     session: {
       mode: sessionRow.mode,
@@ -282,6 +290,11 @@ export async function buildTurnContext({
       campaignTitle: sessionRow.campaign_title,
       adventurePrompt: sessionRow.adventure_prompt,
       currentRound: sessionRow.current_round,
+      campaignMode: sessionRow.campaign_mode,
+      moduleKey: sessionRow.module_key,
+      adventureTags,
+      artDirection: sessionRow.art_direction,
+      worldBible: sessionRow.world_bible,
     },
     player: {
       id: playerRow.id,

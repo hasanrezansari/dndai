@@ -10,12 +10,12 @@ export const maxDuration = 60;
 import { apiError, handleApiError } from "@/lib/api/errors";
 import { requireUser, unauthorizedResponse } from "@/lib/auth/guards";
 import { getAIProvider } from "@/lib/ai";
+import { isPlayRomanaModuleKey } from "@/lib/ai/narrative-session-profile";
 import { CampaignSeedOutputSchema, type CampaignSeedOutput } from "@/lib/schemas/ai-io";
 import { runOrchestrationStep } from "@/lib/orchestrator/step-runner";
 import { COPY } from "@/lib/copy/ashveil";
 import { db } from "@/lib/db";
 import { ROMA_SEEDS } from "@/lib/rome/seeder";
-import type { RomaModuleKey } from "@/lib/rome/modules";
 import {
   characters,
   narrativeEvents,
@@ -39,11 +39,11 @@ const BodySchema = z.object({
 
 const OPENINGS = [
   (chars: string, theme: string) =>
-    `The wind carries the scent of ash and iron as ${chars} gather at the threshold of the unknown. ${theme ? `Whispers speak of ${theme} —` : "Ancient forces stir —"} a darkness that has festered beneath the surface for far too long. Torches gutter in an unnatural breeze. The path ahead is uncertain, the shadows deep, but the call of adventure is undeniable. Steel your nerves. Your legend begins now.`,
+    `${chars} gather as the story finds its opening beat. ${theme ? `The thread of ${theme} pulls you in —` : "Possibility hangs in the air —"} every choice from here will shape what comes next. The table holds its breath; the world leans in to listen.`,
   (chars: string, theme: string) =>
-    `A heavy fog clings to the cobblestones as ${chars} arrive at the crossroads of fate. ${theme ? `The promise of ${theme} hangs in the air,` : "Something ancient and hungry waits,"} patient as stone, old as the mountains themselves. The tavern behind you grows distant. Ahead, only darkness and the faint echo of something stirring. Draw your weapons. Light your torches. The world will remember what happens next.`,
+    `The scene opens on ${chars}. ${theme ? `${theme} colors the moment —` : "Something worth noticing stirs —"} not yet resolved, not yet named, but real enough to chase. You are here; what you do with that is the game.`,
   (chars: string, theme: string) =>
-    `Thunder rolls across a bruised sky as ${chars} stand before the gates of destiny. ${theme ? `Tales of ${theme} have drawn you here,` : "An unseen force has drawn you together,"} each carrying your own scars, your own reasons. The road behind is gone — there is only forward now. Somewhere in the deep dark, something waits. It has been waiting for a very long time. Your story begins.`,
+    `${chars} step into the first page together. ${theme ? `Whispers of ${theme} echo at the edges —` : "The path ahead is unwritten —"} tension and curiosity share the same breath. Your chronicle begins now.`,
 ];
 
 function buildTemplateFallback(charNames: string, adventurePrompt: string): string {
@@ -51,25 +51,25 @@ function buildTemplateFallback(charNames: string, adventurePrompt: string): stri
   return fn(charNames || "the adventurers", adventurePrompt);
 }
 
-const CAMPAIGN_SEEDER_SYSTEM = `You are the Campaign Seeder for Ashveil, a dark fantasy tabletop RPG. Generate a complete campaign setup from a theme or prompt.
-
-Output JSON with ALL these fields:
+const CAMPAIGN_SEEDER_JSON_SPEC = `Output JSON with ALL these fields:
 - "campaign_title": evocative 3-6 word title
 - "world_summary": 2-3 sentence world description
 - "opening_mission": what the party must do first (1-2 sentences)
 - "objective": clear quest objective (1 sentence)
 - "first_scene": { "title": "location name", "description": "80-120 word cinematic opening narration", "sensory_tags": ["sight", "sound", "smell"] }
 - "initial_npcs": array of 1-3 NPCs each with { "name", "role", "attitude", "hook" (optional 1-sentence plot hook) }
-- "initial_threat": 1-sentence description of the primary danger
-- "tone": overall mood (e.g. "grim and desperate", "mysterious and foreboding")
+- "initial_threat": 1-sentence description of the main tension or unknown (not only monsters—it may be social, political, environmental, or relational)
+- "tone": overall mood matching the requested genre
 - "style_policy": narrative style guidance for future narration (1-2 sentences)
-- "visual_bible_seed": { "palette": "color description", "motifs": "recurring visual elements", "architecture": "building style" }
+- "visual_bible_seed": { "palette": "color description", "motifs": "recurring visual elements", "architecture": "building style" }`;
 
-Make it dark fantasy. Keep the opening scene atmospheric and evocative, not action-packed.`;
+const OPEN_CAMPAIGN_SEEDER_SYSTEM = `You are the Campaign Seeder for a collaborative multiplayer tabletop RPG. Generate a complete campaign setup from a theme or prompt.
 
-function isRomaModuleKey(key: string): key is RomaModuleKey {
-  return Object.prototype.hasOwnProperty.call(ROMA_SEEDS, key);
-}
+${CAMPAIGN_SEEDER_JSON_SPEC}
+
+Rules:
+- Honor adventure_theme, world_bible (if provided), and adventure_tags: match genre, tone, and setting. Do not default to medieval dark fantasy unless the theme clearly implies it.
+- Keep the opening scene suited to the theme (atmospheric when appropriate; lighter or faster-paced when the theme calls for it).`;
 
 function buildSeederSystemPrompt(params: {
   campaignMode: string;
@@ -78,12 +78,23 @@ function buildSeederSystemPrompt(params: {
   if (
     params.campaignMode === "module" &&
     params.moduleKey &&
-    isRomaModuleKey(params.moduleKey)
+    isPlayRomanaModuleKey(params.moduleKey)
   ) {
     const seed = ROMA_SEEDS[params.moduleKey];
-    return `You are the Campaign Seeder for PlayRomana, a curated Roman adventure experience.\n\n${CAMPAIGN_SEEDER_SYSTEM}\n\nAdditional constraints for this module:\n- Setting: Ancient Rome\n- Style policy: ${seed.stylePolicyAddon}\n- Visual bible: palette=${seed.visualBibleSeed.palette}; motifs=${seed.visualBibleSeed.motifs}; architecture=${seed.visualBibleSeed.architecture}\n\nDo NOT mention modern times. Do NOT use modern slang.\nIf you include any supernatural elements, keep them rare, grounded, and framed as cult ritual or superstition unless explicitly required.`;
+    return `You are the Campaign Seeder for PlayRomana, a curated Ancient Rome tabletop experience.
+
+${CAMPAIGN_SEEDER_JSON_SPEC}
+
+Additional constraints for this module:
+- Setting: Ancient Rome
+- Style policy: ${seed.stylePolicyAddon}
+- Visual bible: palette=${seed.visualBibleSeed.palette}; motifs=${seed.visualBibleSeed.motifs}; architecture=${seed.visualBibleSeed.architecture}
+
+Do NOT mention modern times. Do NOT use modern slang.
+If you include any supernatural elements, keep them rare, grounded, and framed as cult ritual or superstition unless explicitly required.
+Keep the opening scene atmospheric and evocative, not action-packed.`;
   }
-  return CAMPAIGN_SEEDER_SYSTEM;
+  return OPEN_CAMPAIGN_SEEDER_SYSTEM;
 }
 
 const FallbackOpeningSchema = z.object({
@@ -195,12 +206,12 @@ export async function POST(
 
     const adventurePrompt =
       activeSession?.adventure_prompt?.trim() ||
-      "a mysterious dark fantasy adventure";
+      "an open-ended collaborative adventure";
     const moduleKey = activeSession?.module_key?.trim() || null;
     const effectiveAdventurePrompt =
       activeSession?.campaign_mode === "module" &&
       moduleKey &&
-      isRomaModuleKey(moduleKey)
+      isPlayRomanaModuleKey(moduleKey)
         ? ROMA_SEEDS[moduleKey].theme
         : adventurePrompt;
 
@@ -209,8 +220,13 @@ export async function POST(
 
     try {
       const provider = getAIProvider();
+      const tagRaw = activeSession?.adventure_tags;
+      const adventureTags = Array.isArray(tagRaw) ? tagRaw.map(String) : [];
       const seedUserPrompt = JSON.stringify({
         adventure_theme: effectiveAdventurePrompt,
+        world_bible: activeSession?.world_bible?.trim() ?? "",
+        adventure_tags: adventureTags,
+        art_direction: activeSession?.art_direction?.trim() ?? "",
         characters: charNames,
         player_count: allPlayers.length,
         mode: activeSession?.mode,
@@ -305,7 +321,7 @@ export async function POST(
           turnId: null,
           provider,
           model: "light",
-          systemPrompt: `You are the Dungeon Master of Ashveil, a dark fantasy RPG. Generate a cinematic opening scene. 80-120 words. Output JSON: { "scene_text": "...", "campaign_title": "..." }`,
+          systemPrompt: `You are the facilitator for a collaborative tabletop RPG. Match genre and tone to adventure_theme. Generate a cinematic opening scene. 80-120 words. Output JSON: { "scene_text": "...", "campaign_title": "..." }`,
           userPrompt: JSON.stringify({ adventure_theme: adventurePrompt, characters: charNames }),
           schema: FallbackOpeningSchema,
           maxTokens: 500,

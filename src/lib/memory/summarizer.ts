@@ -10,7 +10,7 @@ import type { RollingSummaryContent } from "./types";
 
 const SUMMARIZE_CADENCE = 4;
 
-const SUMMARIZER_SYSTEM = `You are the memory summarizer for Ashveil, a dark fantasy RPG. Compress recent narrative events into a structured summary that preserves key facts.
+const SUMMARIZER_SYSTEM = `You are the memory summarizer for a collaborative tabletop RPG session. Compress recent narrative events into a structured summary that preserves key facts.
 
 Output JSON:
 - "summary_type": always "rolling"

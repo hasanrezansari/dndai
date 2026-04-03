@@ -11,7 +11,10 @@ const CreateSessionBodySchema = z.object({
   mode: SessionModeSchema,
   campaignMode: CampaignModeSchema,
   maxPlayers: z.number().int().min(1).max(6),
-  adventurePrompt: z.string().optional(),
+  adventurePrompt: z.string().max(8000).optional(),
+  adventureTags: z.array(z.string().max(64)).max(24).optional(),
+  artDirection: z.string().max(2000).optional(),
+  worldBible: z.string().max(32000).optional(),
   moduleKey: z.string().optional(),
 });
 
@@ -31,6 +34,9 @@ export async function POST(request: NextRequest) {
       maxPlayers: parsed.data.maxPlayers,
       hostUserId,
       adventurePrompt: parsed.data.adventurePrompt,
+      adventureTags: parsed.data.adventureTags,
+      artDirection: parsed.data.artDirection,
+      worldBible: parsed.data.worldBible,
       moduleKey: parsed.data.moduleKey,
     });
     const session = await getSession(sessionId);

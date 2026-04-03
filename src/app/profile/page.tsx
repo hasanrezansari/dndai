@@ -12,6 +12,7 @@ import { useToast } from "@/components/ui/toast";
 import { HeroKitPreview } from "@/components/character/hero-kit-preview";
 import { PillSelect } from "@/components/ui/pill-select";
 import { runGuestGoogleUpgradeFlow } from "@/lib/auth/guest-google-upgrade-client";
+import { CHARACTER_RACE_MAX_LEN } from "@/lib/rules/character";
 import {
   ClassProfileSchema,
   type ClassProfile,
@@ -1570,6 +1571,7 @@ export default function ProfilePage() {
                   <input
                     value={heroRace}
                     onChange={(e) => setHeroRace(e.target.value)}
+                    maxLength={CHARACTER_RACE_MAX_LEN}
                     className="mt-2 w-full min-h-[44px] rounded-[var(--radius-card)] bg-[var(--color-deep-void)] border border-[rgba(255,255,255,0.08)] px-4 text-[var(--color-silver-muted)] text-sm focus:outline-none focus:border-[rgba(212,175,55,0.25)]"
                   />
                 </div>

@@ -85,7 +85,7 @@ function buildDeterministicFallback(
   });
 }
 
-const RULES_SYSTEM = `You are the rules interpreter for Ashveil, a dark fantasy tabletop RPG. Given a parsed action intent and character stats, determine the mechanical resolution.
+const RULES_SYSTEM = `You are the rules interpreter for a collaborative tabletop RPG. Given a parsed action intent and character stats, determine the mechanical resolution.
 
 Output JSON:
 - "legal": boolean — whether the action is mechanically possible

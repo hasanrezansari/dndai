@@ -53,6 +53,12 @@ export interface GameSessionView {
   finalChapterPublished?: boolean;
   /** Room code for TV watch flow; omitted in read-only display API responses. */
   joinCode?: string;
+  adventurePrompt?: string | null;
+  /** Optional lobby tone chips for AI context. */
+  adventureTags?: string[];
+  artDirection?: string | null;
+  /** Long-form premise / world bible from host. */
+  worldBible?: string | null;
 }
 
 export interface QuestProgressView {
@@ -91,7 +97,12 @@ export interface GamePlayerView {
   isDm: boolean;
   character?: {
     name: string;
+    /** Raw DB class column (may be preset key or legacy display slug). */
     class: string;
+    /** Player-facing label (custom display_name or preset label). */
+    displayClass: string;
+    /** Preset mechanical key for icons/rules (warrior, mage, …). */
+    mechanicalClass: string;
     race: string;
     level: number;
     hp: number;

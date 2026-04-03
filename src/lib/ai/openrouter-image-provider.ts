@@ -135,6 +135,8 @@ async function requestOpenRouterImage(params: {
 export async function generateSceneImageOpenRouter(params: {
   prompt: string;
   negativePrompt?: string;
+  /** When omitted, uses a genre-neutral default (no hardcoded dark fantasy). */
+  systemPrompt?: string;
 }): Promise<{ base64: string }> {
   const apiKey = process.env.OPENROUTER_API_KEY;
   if (!apiKey) {
@@ -165,7 +167,8 @@ export async function generateSceneImageOpenRouter(params: {
         userContent,
         aspectRatio: "16:9",
         systemPrompt:
-          "You are a fantasy illustrator. Generate a single wide scene image in a consistent dark-fantasy oil-painting style with muted earth tones, amber torchlight, and deep shadows. Keep character designs and environment consistent across scenes. No text, no UI, no watermarks.",
+          params.systemPrompt ??
+          "You are a scene illustrator. Generate a single wide cinematic image matching the user's described genre. No text, no UI, no watermarks.",
       });
     } catch (e) {
       lastErr = e instanceof Error ? e : new Error(String(e));
@@ -183,6 +186,7 @@ export async function generateSceneImageOpenRouter(params: {
 export async function generatePortraitImageOpenRouter(params: {
   prompt: string;
   negativePrompt?: string;
+  systemPrompt?: string;
 }): Promise<{ base64: string }> {
   const apiKey = process.env.OPENROUTER_API_KEY;
   if (!apiKey) {
@@ -213,7 +217,8 @@ export async function generatePortraitImageOpenRouter(params: {
         userContent,
         aspectRatio: "1:1",
         systemPrompt:
-          "You are a fantasy character portrait illustrator. Generate a single square portrait of one character, framed from chest-up. Dark-fantasy painterly style, high detail. No text, no UI, no watermarks. Clean background with subtle atmosphere. Keep the character centered and readable on mobile.",
+          params.systemPrompt ??
+          "You are a portrait illustrator. Generate a single square chest-up portrait matching the described character. No text, no UI, no watermarks.",
       });
     } catch (e) {
       lastErr = e instanceof Error ? e : new Error(String(e));

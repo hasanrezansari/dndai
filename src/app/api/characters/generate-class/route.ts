@@ -10,6 +10,11 @@ import { generateCustomClassProfileFromAI } from "@/server/services/custom-class
 const GenerateClassBodySchema = z.object({
   concept: z.string().trim().min(3).max(180),
   rolePreference: ClassProfileRoleSchema.optional(),
+  /** Table premise so abilities/gear fit the campaign (optional). */
+  adventure_prompt: z.string().trim().max(8000).optional(),
+  adventure_tags: z.array(z.string().trim().max(48)).max(24).optional(),
+  world_bible: z.string().trim().max(12000).optional(),
+  art_direction: z.string().trim().max(500).optional(),
 });
 
 export async function POST(request: NextRequest) {
@@ -29,6 +34,12 @@ export async function POST(request: NextRequest) {
     const profile = await generateCustomClassProfileFromAI({
       concept: parsed.data.concept,
       rolePreference: parsed.data.rolePreference,
+      sessionPremise: {
+        adventure_prompt: parsed.data.adventure_prompt,
+        adventure_tags: parsed.data.adventure_tags,
+        world_bible: parsed.data.world_bible,
+        art_direction: parsed.data.art_direction,
+      },
     });
 
     return NextResponse.json({ classProfile: profile }, { status: 200 });

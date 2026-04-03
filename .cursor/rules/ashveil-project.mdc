@@ -6,7 +6,9 @@ alwaysApply: true
 # Ashveil — Master Project Rules
 
 ## What This Is
-Mobile-first multiplayer AI-powered tabletop RPG. 2-6 players, shared canonical state, AI or Human DM, turn-based combat/exploration/social, real-time sync via Pusher. Dark fantasy "Liquid Obsidian" aesthetic.
+Mobile-first multiplayer AI-powered tabletop RPG. 2-6 players, shared canonical state, AI or Human DM, turn-based combat/exploration/social, real-time sync via Pusher. **Open-genre** campaigns (host-led premise, tags, world bible); UI uses the moody **Liquid Obsidian** design system, which is not a genre lock.
+
+**Typography:** The Tailwind class `.text-fantasy` is **only a font-family token** (Noto Serif). It does **not** imply fantasy setting, narrative defaults, or image style — leave the class name as-is.
 
 ## Stack (exact versions matter)
 - Next.js **16.2.1** (App Router) — WARNING: this is NOT Next.js 14 or 15. Read `node_modules/next/dist/docs/` before using any Next.js API. `after()` imported from `next/server`, not `next/after`.

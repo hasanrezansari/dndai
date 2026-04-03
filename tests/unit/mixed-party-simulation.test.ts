@@ -6,8 +6,20 @@ vi.mock("@/lib/orchestrator/trace", () => ({
 
 import type { AIProvider } from "@/lib/ai";
 import { MockProvider } from "@/lib/ai/mock-provider";
+import { buildFacilitatorRoleLine } from "@/lib/ai/narrative-session-profile";
 import { parseIntent } from "@/lib/orchestrator/workers/intent-parser";
-import { generateNarration } from "@/lib/orchestrator/workers/narrator";
+import { buildNarratorSystemPrompt, generateNarration } from "@/lib/orchestrator/workers/narrator";
+
+const TEST_NARRATOR_SYSTEM = buildNarratorSystemPrompt(
+  buildFacilitatorRoleLine({
+    campaign_mode: "user_prompt",
+    module_key: null,
+    adventure_prompt: null,
+    adventure_tags: null,
+    art_direction: null,
+    world_bible: null,
+  }),
+);
 import { interpretRules } from "@/lib/orchestrator/workers/rules-interpreter";
 import { checkVisualDelta } from "@/lib/orchestrator/workers/visual-delta";
 import { ActionIntentSchema, RulesInterpreterOutputSchema } from "@/lib/schemas/ai-io";
@@ -73,6 +85,7 @@ describe("mixed-party simulation", () => {
         characterVisualTags: ["neon rain", "chrome edges"],
         recentNarrative: "The team is pinned in an alley.",
         sceneContext: "A cyberpunk alley under storm and holographic signs.",
+        facilitatorSystemPrompt: TEST_NARRATOR_SYSTEM,
         provider,
       });
       expect(narration.data.scene_text.length).toBeGreaterThan(40);
@@ -191,6 +204,7 @@ describe("mixed-party simulation", () => {
       characterVisualTags: ["mono-katana", "chrome plating"],
       recentNarrative: "The alley floods with blue static.",
       sceneContext: "A rain-slick cyberpunk alley.",
+      facilitatorSystemPrompt: TEST_NARRATOR_SYSTEM,
       provider: probeProvider,
     });
 

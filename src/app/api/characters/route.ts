@@ -9,7 +9,7 @@ import {
 } from "@/lib/auth/guards";
 import { isCustomClassesEnabled } from "@/lib/config/features";
 import { CharacterStatsSchema, ClassProfileSchema } from "@/lib/schemas/domain";
-import { CLASSES, RACES } from "@/lib/rules/character";
+import { CLASSES, normalizeCharacterRace } from "@/lib/rules/character";
 import { broadcastToSession } from "@/lib/socket/server";
 import {
   CharacterAlreadyExistsError,
@@ -18,14 +18,12 @@ import {
 } from "@/server/services/character-service";
 
 const classSet = new Set<string>(CLASSES.map((c) => c.value));
-const raceSet = new Set<string>(RACES.map((r) => r.value));
-
 const CreateBodySchema = z.object({
   playerId: z.string().uuid(),
   sessionId: z.string().uuid(),
   name: z.string().trim().min(1).max(48),
   characterClass: z.string().trim().min(1).max(40),
-  race: z.string(),
+  race: z.string().max(160),
   stats: CharacterStatsSchema,
   pronouns: z.string().max(20).optional(),
   traits: z.array(z.string().max(40)).max(5).optional(),
@@ -62,7 +60,7 @@ export async function POST(request: NextRequest) {
       return apiError("Forbidden", 403);
     }
     const cls = characterClass.trim().toLowerCase();
-    const rc = race.trim().toLowerCase();
+    const raceNorm = normalizeCharacterRace(race);
     const isPresetClass = classSet.has(cls);
     if (!isPresetClass) {
       if (!isCustomClassesEnabled()) {
@@ -72,8 +70,8 @@ export async function POST(request: NextRequest) {
         return apiError("Invalid class", 400);
       }
     }
-    if (!raceSet.has(rc)) {
-      return apiError("Invalid race", 400);
+    if (!raceNorm.ok) {
+      return apiError(raceNorm.error, 400);
     }
     for (const v of Object.values(stats)) {
       if (v < 3 || v > 18) {
@@ -85,7 +83,7 @@ export async function POST(request: NextRequest) {
       sessionId,
       name,
       characterClass: cls,
-      race: rc,
+      race: raceNorm.value,
       stats,
       pronouns,
       traits,

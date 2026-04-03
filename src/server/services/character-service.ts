@@ -1,7 +1,7 @@
 import { and, eq } from "drizzle-orm";
 
 import { db } from "@/lib/db";
-import { characters, players } from "@/lib/db/schema";
+import { characters, players, sessions } from "@/lib/db/schema";
 import {
   type Character,
   type CharacterStats,
@@ -12,9 +12,10 @@ import {
   calculateHP,
   calculateMana,
   getStartingAbilities,
-  getStartingEquipment,
+  normalizeCharacterRace,
   rollStats,
 } from "@/lib/rules/character";
+import { getStartingEquipmentForPremise } from "@/lib/rules/gear-presets";
 
 export class PlayerNotFoundForCharacterError extends Error {
   constructor() {
@@ -146,6 +147,16 @@ export async function createCharacter(params: {
     classProfile: params.classProfile,
   });
 
+  const [sessRow] = await db
+    .select({
+      adventure_prompt: sessions.adventure_prompt,
+      adventure_tags: sessions.adventure_tags,
+      world_bible: sessions.world_bible,
+    })
+    .from(sessions)
+    .where(eq(sessions.id, params.sessionId))
+    .limit(1);
+
   const conMod = modifier(params.stats.con);
   const dexMod = modifier(params.stats.dex);
   const spellMod =
@@ -158,10 +169,19 @@ export async function createCharacter(params: {
   const { mana, maxMana } = calculateMana(mechanicalClass, spellMod);
   const inventory =
     profileStartingEquipment(params.classProfile) ??
-    getStartingEquipment(mechanicalClass);
+    getStartingEquipmentForPremise(mechanicalClass, {
+      adventure_prompt: sessRow?.adventure_prompt,
+      adventure_tags: sessRow?.adventure_tags ?? null,
+      world_bible: sessRow?.world_bible,
+    });
   const abilities =
     profileStartingAbilities(params.classProfile) ??
     getStartingAbilities(mechanicalClass);
+
+  const raceNorm = normalizeCharacterRace(params.race);
+  if (!raceNorm.ok) {
+    throw new Error(raceNorm.error);
+  }
 
   const [created] = await db
     .insert(characters)
@@ -169,7 +189,7 @@ export async function createCharacter(params: {
       player_id: params.playerId,
       name: params.name.trim(),
       class: normalizedClass,
-      race: params.race.trim().toLowerCase(),
+      race: raceNorm.value,
       level: 1,
       stats: params.stats,
       hp,

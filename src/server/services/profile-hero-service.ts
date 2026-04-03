@@ -4,6 +4,7 @@ import { db } from "@/lib/db";
 import { profileHeroes, userProfileSettings } from "@/lib/db/schema";
 import { CharacterStatsSchema, ClassProfileSchema } from "@/lib/schemas/domain";
 import type { CharacterStats, ClassProfile } from "@/lib/schemas/domain";
+import { normalizeCharacterRace } from "@/lib/rules/character";
 import { createCharacter } from "@/server/services/character-service";
 
 export const FREE_PROFILE_HERO_SLOTS = 1 as const;
@@ -169,13 +170,18 @@ export async function upsertSingleProfileHero(params: {
     throw new ProfileHeroSlotLimitError();
   }
 
+  const raceNorm = normalizeCharacterRace(params.race);
+  if (!raceNorm.ok) {
+    throw new Error(raceNorm.error);
+  }
+
   const [created] = await db
     .insert(profileHeroes)
     .values({
       user_id: params.userId,
       name: params.name.trim(),
       hero_class: params.heroClass.trim().toLowerCase(),
-      race: params.race.trim().toLowerCase(),
+      race: raceNorm.value,
       stats_template: params.statsTemplate ?? {},
       abilities_template: Array.isArray(params.abilitiesTemplate) ? params.abilitiesTemplate : [],
       visual_profile: params.visualProfile ?? {},

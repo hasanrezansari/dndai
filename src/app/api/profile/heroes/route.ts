@@ -3,6 +3,7 @@ import { z } from "zod";
 
 import { apiError, handleApiError } from "@/lib/api/errors";
 import { requireUser, unauthorizedResponse } from "@/lib/auth/guards";
+import { CHARACTER_RACE_MAX_LEN, normalizeCharacterRace } from "@/lib/rules/character";
 import { CharacterStatsSchema } from "@/lib/schemas/domain";
 import {
   getOrCreateProfileSettings,
@@ -15,7 +16,7 @@ import {
 const UpsertHeroSchema = z.object({
   name: z.string().trim().min(1).max(48),
   heroClass: z.string().trim().min(1).max(40),
-  race: z.string().trim().min(1).max(24),
+  race: z.string().trim().min(1).max(CHARACTER_RACE_MAX_LEN + 8),
   statsTemplate: CharacterStatsSchema.nullable().optional(),
   abilitiesTemplate: z.array(z.unknown()).optional(),
   visualProfile: z.record(z.string(), z.unknown()).optional(),
@@ -59,12 +60,17 @@ export async function POST(request: NextRequest) {
       await setPublicProfileEnabled(user.id, parsed.data.publicProfileEnabled);
     }
 
+    const raceNorm = normalizeCharacterRace(parsed.data.race);
+    if (!raceNorm.ok) {
+      return apiError(raceNorm.error, 400);
+    }
+
     try {
       const hero = await upsertSingleProfileHero({
         userId: user.id,
         name: parsed.data.name,
         heroClass: parsed.data.heroClass,
-        race: parsed.data.race,
+        race: raceNorm.value,
         statsTemplate: parsed.data.statsTemplate ?? null,
         abilitiesTemplate: parsed.data.abilitiesTemplate ?? [],
         visualProfile: parsed.data.visualProfile ?? {},
