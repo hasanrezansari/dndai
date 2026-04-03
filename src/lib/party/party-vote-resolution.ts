@@ -262,10 +262,14 @@ export function buildNextPartyConfigAfterVote(params: {
     vp[winner] = (vp[winner] ?? 0) + 1;
   }
   const winnerText = winner ? (textSrc[winner]?.text ?? "").trim() : "";
+  /** Prefer merged AI beat so 2p auto-vote → next submit still shows the table story (not only the winning line). */
+  const mergedTrim = cfg.merged_beat?.trim() ?? "";
   const carry =
-    winnerText.length > 0
-      ? winnerText.slice(0, 1200)
-      : (cfg.carry_forward ?? null);
+    mergedTrim.length > 0
+      ? mergedTrim.slice(0, 1200)
+      : winnerText.length > 0
+        ? winnerText.slice(0, 1200)
+        : (cfg.carry_forward ?? null);
 
   const needReveal = shouldPartyRevealAfterVote(cfg);
   const isLastRound = cfg.round_index >= cfg.total_rounds;

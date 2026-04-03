@@ -83,6 +83,21 @@ describe("fillPartyAutoVotes", () => {
 });
 
 describe("buildNextPartyConfigAfterVote", () => {
+  it("uses winning line as carry when merged_beat is absent", () => {
+    const cfg = baseCfg({ merged_beat: null });
+    const next = buildNextPartyConfigAfterVote({
+      cfg,
+      votes: { a: "b", b: "b" },
+      submissionPlayerIds: ["a", "b"],
+      isoDeadlineFromNow: iso(60),
+      submitDeadlineSec: 60,
+      voteDeadlineSec: 120,
+      participantIdsForVpTie: ["a", "b"],
+      sessionId: "00000000-0000-4000-8000-000000000001",
+    });
+    expect(next.carry_forward).toBe("line b");
+  });
+
   it("advances to submit with carry and VP", () => {
     const cfg = baseCfg();
     const next = buildNextPartyConfigAfterVote({
@@ -98,7 +113,7 @@ describe("buildNextPartyConfigAfterVote", () => {
     expect(next.party_phase).toBe("submit");
     expect(next.round_index).toBe(2);
     expect(next.vp_totals?.b).toBe(1);
-    expect(next.carry_forward).toBe("line b");
+    expect(next.carry_forward).toBe("merged");
     expect(next.merged_beat).toBeNull();
   });
 
