@@ -54,12 +54,16 @@ export async function POST(
         mode: sessions.mode,
         status: sessions.status,
         currentRound: sessions.current_round,
+        game_kind: sessions.game_kind,
       })
       .from(sessions)
       .where(eq(sessions.id, sessionId))
       .limit(1);
 
     if (!sessionRow) return apiError("Not found", 404);
+    if (sessionRow.game_kind === "party") {
+      return apiError("Campaign vote does not apply to party mode", 409);
+    }
     if (sessionRow.status !== "active") {
       return apiError("Session is not active", 409);
     }

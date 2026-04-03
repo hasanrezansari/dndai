@@ -15,6 +15,7 @@ import { ModeCardsSkeleton } from "@/components/ui/loading-skeleton";
 import { PillSelect } from "@/components/ui/pill-select";
 import type { CampaignMode, SessionMode } from "@/lib/schemas/enums";
 import { COPY } from "@/lib/copy/ashveil";
+import { DEFAULT_PARTY_TOTAL_ROUNDS } from "@/lib/party/party-templates";
 import { LOBBY_TONE_TAG_OPTIONS } from "@/lib/session/tone-tag-options";
 
 const CAMPAIGN_OPTIONS: { value: CampaignMode; label: string }[] = [
@@ -24,6 +25,8 @@ const CAMPAIGN_OPTIONS: { value: CampaignMode; label: string }[] = [
 ];
 
 const PARTY_SIZES = [1, 2, 3, 4, 5, 6] as const;
+
+const PARTY_ROUND_OPTIONS = [3, 4, 5, 6, 7, 8, 9, 10, 12] as const;
 
 export default function Home() {
   const brand = getBuildTimeBrand();
@@ -37,6 +40,9 @@ export default function Home() {
   const [worldBible, setWorldBible] = useState("");
   const [artDirection, setArtDirection] = useState("");
   const [toneTags, setToneTags] = useState<string[]>([]);
+  const [partyRoom, setPartyRoom] = useState(false);
+  const [partyRounds, setPartyRounds] = useState(DEFAULT_PARTY_TOTAL_ROUNDS);
+  const [partyInstigator, setPartyInstigator] = useState(false);
   const [joinOpen, setJoinOpen] = useState(false);
   const [joinCode, setJoinCode] = useState("");
   const [joinError, setJoinError] = useState<string | null>(null);
@@ -84,6 +90,8 @@ export default function Home() {
     forceCampaignMode?: CampaignMode;
     forceModuleKey?: string;
     forceMaxPlayers?: number;
+    /** Play Romana: one-tap party room with Rome-flavored template. */
+    forcePartyPlayRomana?: boolean;
   }) {
     const effectiveMode = options.forceMode ?? mode;
     if (!effectiveMode || createLoading) return;
@@ -99,12 +107,47 @@ export default function Home() {
         artDirection?: string;
         adventureTags?: string[];
         moduleKey?: string;
+        gameKind?: "party";
+        partyTotalRounds?: number;
+        templateKey?: string;
+        partyInstigatorEnabled?: boolean;
+        acquisitionSource?: string;
       } = {
         mode: effectiveMode,
         campaignMode: options.forceCampaignMode ?? campaignMode,
         maxPlayers: options.forceMaxPlayers ?? maxPlayers,
       };
-      if ((options.forceCampaignMode ?? campaignMode) === "user_prompt") {
+      if (options.forcePartyPlayRomana) {
+        body.mode = "ai_dm";
+        body.campaignMode = "user_prompt";
+        body.maxPlayers = options.forceMaxPlayers ?? 6;
+        body.gameKind = "party";
+        body.partyTotalRounds = 6;
+        body.templateKey = "playromana_party_v1";
+        body.adventurePrompt =
+          "Ancient Rome — a fast social party game at the table (forum, household, or bath).";
+        body.adventureTags = ["social"];
+        body.acquisitionSource = "play_romana_party_home";
+      } else if (partyRoom) {
+        body.gameKind = "party";
+        body.partyTotalRounds = partyRounds;
+        if (partyInstigator) {
+          body.partyInstigatorEnabled = true;
+        }
+        body.acquisitionSource = "falvos_party_home";
+        if (adventurePrompt.trim()) {
+          body.adventurePrompt = adventurePrompt.trim();
+        }
+        if (worldBible.trim()) {
+          body.worldBible = worldBible.trim();
+        }
+        if (artDirection.trim()) {
+          body.artDirection = artDirection.trim();
+        }
+        if (toneTags.length > 0) {
+          body.adventureTags = toneTags;
+        }
+      } else if ((options.forceCampaignMode ?? campaignMode) === "user_prompt") {
         if (adventurePrompt.trim()) {
           body.adventurePrompt = adventurePrompt.trim();
         }
@@ -118,7 +161,11 @@ export default function Home() {
           body.adventureTags = toneTags;
         }
       }
-      if ((options.forceCampaignMode ?? campaignMode) === "module") {
+      if (
+        !options.forcePartyPlayRomana &&
+        !partyRoom &&
+        (options.forceCampaignMode ?? campaignMode) === "module"
+      ) {
         body.moduleKey = options.forceModuleKey ?? "module_remix_default";
       }
       const res = await fetch("/api/sessions", {
@@ -283,25 +330,72 @@ export default function Home() {
                         ))}
                       </div>
                     </div>
-                    <GoldButton
-                      type="button"
-                      size="md"
-                      className="shrink-0 min-h-[44px] px-4"
-                      disabled={createLoading}
-                      onClick={() =>
-                        void handleCreateWithOptions({
-                          forceMode: "ai_dm",
-                          forceCampaignMode: "module",
-                          forceModuleKey: m.key,
-                          forceMaxPlayers: 1,
-                        })
-                      }
-                    >
-                      {createLoading ? "Opening…" : "Start"}
-                    </GoldButton>
+                    <div className="flex flex-col gap-2 shrink-0 min-w-[140px]">
+                      <GoldButton
+                        type="button"
+                        size="md"
+                        className="min-h-[44px] px-3"
+                        disabled={createLoading}
+                        onClick={() =>
+                          void handleCreateWithOptions({
+                            forceMode: "ai_dm",
+                            forceCampaignMode: "module",
+                            forceModuleKey: m.key,
+                            forceMaxPlayers: 1,
+                          })
+                        }
+                      >
+                        {createLoading ? "Opening…" : "Quick play"}
+                      </GoldButton>
+                      <GhostButton
+                        type="button"
+                        size="md"
+                        className="min-h-[40px] px-3 text-[10px] uppercase tracking-[0.12em]"
+                        disabled={createLoading}
+                        onClick={() =>
+                          void handleCreateWithOptions({
+                            forceMode: "ai_dm",
+                            forceCampaignMode: "module",
+                            forceModuleKey: m.key,
+                            forceMaxPlayers: 4,
+                          })
+                        }
+                      >
+                        Play with friends
+                      </GhostButton>
+                    </div>
                   </div>
                 </div>
               ))}
+            </div>
+
+            <div className="rounded-[var(--radius-card)] p-5 bg-[var(--surface-high)] border border-[rgba(77,70,53,0.25)]">
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <h3 className="text-fantasy text-lg font-bold text-[var(--color-silver-muted)] tracking-tight">
+                    Party game (Jackbox-style)
+                  </h3>
+                  <p className="text-xs text-[var(--color-silver-dim)] leading-relaxed mt-1">
+                    Same lobby and codes as campaigns — submit lines, merged beat,
+                    vote for your favorite. Uses the Rome-flavored party template.
+                  </p>
+                </div>
+                <GoldButton
+                  type="button"
+                  size="md"
+                  className="shrink-0 min-h-[44px] px-4"
+                  disabled={createLoading}
+                  onClick={() =>
+                    void handleCreateWithOptions({
+                      forceMode: "ai_dm",
+                      forcePartyPlayRomana: true,
+                      forceMaxPlayers: 6,
+                    })
+                  }
+                >
+                  {createLoading ? "Opening…" : "Start party room"}
+                </GoldButton>
+              </div>
             </div>
 
             {createError ? (
@@ -602,7 +696,10 @@ export default function Home() {
           {/* AI DM Card */}
           <button
             type="button"
-            onClick={() => setMode("ai_dm")}
+            onClick={() => {
+              setPartyRoom(false);
+              setMode("ai_dm");
+            }}
             className="text-left w-full min-h-[44px] transition-all duration-200 active:scale-[0.98] focus:outline-none"
           >
             <div
@@ -656,7 +753,10 @@ export default function Home() {
           {/* Human DM Card */}
           <button
             type="button"
-            onClick={() => setMode("human_dm")}
+            onClick={() => {
+              setPartyRoom(false);
+              setMode("human_dm");
+            }}
             className="text-left w-full min-h-[44px] transition-all duration-200 active:scale-[0.98] focus:outline-none"
           >
             <div
@@ -704,26 +804,85 @@ export default function Home() {
               </div>
             </div>
           </button>
+
+          {/* Party game card (Jackbox-style; `game_kind: party` — not campaign quest) */}
+          <button
+            type="button"
+            onClick={() => {
+              setPartyRoom(true);
+              setMode("ai_dm");
+            }}
+            className="text-left w-full min-h-[44px] transition-all duration-200 active:scale-[0.98] focus:outline-none"
+          >
+            <div
+              className={`relative h-44 rounded-[var(--radius-card)] p-6 flex flex-col justify-end overflow-hidden transition-all duration-300 ${
+                partyRoom
+                  ? "bg-[var(--surface-high)] selected-glow metallic-edge"
+                  : "bg-[var(--color-midnight)] border border-[rgba(77,70,53,0.2)] opacity-70 hover:opacity-100 hover:bg-[var(--surface-container)]"
+              }`}
+            >
+              <div className="relative z-10 flex items-start justify-between gap-3 mb-auto">
+                <div className="min-h-[24px] px-2 rounded-[var(--radius-chip)] border border-white/10 bg-black/20 text-[9px] font-black uppercase tracking-[0.2em] text-[var(--outline)] flex items-center gap-1.5">
+                  <span className="material-symbols-outlined text-[14px]">
+                    groups
+                  </span>
+                  Party
+                </div>
+                <div className="h-10 w-10 rounded-[var(--radius-avatar)] border border-white/10 bg-black/20 grid place-items-center text-[var(--outline)]">
+                  <span className="material-symbols-outlined text-base">
+                    celebration
+                  </span>
+                </div>
+              </div>
+              <div className="pointer-events-none absolute inset-0 opacity-70">
+                <div className="absolute inset-0 bg-gradient-to-br from-[rgba(123,45,142,0.22)] via-transparent to-[rgba(242,202,80,0.12)]" />
+                <div className="absolute inset-0 bg-gradient-to-t from-[var(--color-obsidian)] via-[var(--color-obsidian)]/30 to-transparent" />
+              </div>
+              {partyRoom && (
+                <div className="relative flex items-center gap-2 mb-1">
+                  <span
+                    className="material-symbols-outlined text-[var(--color-gold-rare)] text-sm"
+                    style={{ fontVariationSettings: "'FILL' 1" }}
+                  >
+                    auto_awesome
+                  </span>
+                  <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-[var(--color-gold-rare)]">
+                    Active Selection
+                  </span>
+                </div>
+              )}
+              <div className="relative">
+                <h3 className="text-fantasy font-bold text-xl text-[var(--color-silver-muted)]">
+                  {COPY.landing.partyCardTitle}
+                </h3>
+                <p className="text-xs text-[var(--color-silver-dim)] leading-relaxed mt-1">
+                  {COPY.landing.partyCardBody}
+                </p>
+              </div>
+            </div>
+          </button>
         </section>
 
         {/* Configuration */}
         {mode ? (
           <section className="space-y-8 animate-fade-in">
             {/* Campaign Pills */}
-            <div>
-              <label className="block text-[10px] font-bold uppercase tracking-[0.2em] text-[var(--outline)] mb-4">
-                {COPY.landing.originLabel}
-              </label>
-              <PillSelect
-                options={CAMPAIGN_OPTIONS}
-                value={campaignMode}
-                onChange={setCampaignMode}
-                size="md"
-              />
-            </div>
+            {!partyRoom ? (
+              <div>
+                <label className="block text-[10px] font-bold uppercase tracking-[0.2em] text-[var(--outline)] mb-4">
+                  {COPY.landing.originLabel}
+                </label>
+                <PillSelect
+                  options={CAMPAIGN_OPTIONS}
+                  value={campaignMode}
+                  onChange={setCampaignMode}
+                  size="md"
+                />
+              </div>
+            ) : null}
 
             {/* Adventure Prompt */}
-            {campaignMode === "user_prompt" ? (
+            {partyRoom || campaignMode === "user_prompt" ? (
               <div>
                 <label
                   htmlFor="adventure-prompt"
@@ -741,7 +900,9 @@ export default function Home() {
                   className="w-full h-36 bg-[var(--color-deep-void)] p-5 rounded-[var(--radius-card)] border border-[rgba(77,70,53,0.2)] focus:border-[var(--color-gold-rare)]/50 focus:ring-0 text-[var(--color-silver-muted)] font-serif italic text-base leading-relaxed placeholder:text-[var(--outline)]/40 resize-none transition-all"
                 />
                 <p className="text-[10px] text-[var(--outline)] mt-2 uppercase tracking-[0.12em]">
-                  {COPY.landing.toneTagsHint}
+                  {partyRoom
+                    ? COPY.landing.partySeedHint
+                    : COPY.landing.toneTagsHint}
                 </p>
                 <div className="flex flex-wrap gap-2 mt-2">
                   {LOBBY_TONE_TAG_OPTIONS.map((t) => {
@@ -796,6 +957,46 @@ export default function Home() {
                   maxLength={2000}
                   className="w-full h-12 bg-[var(--color-deep-void)] px-4 rounded-[var(--radius-card)] border border-[rgba(77,70,53,0.2)] focus:border-[var(--color-gold-rare)]/50 focus:ring-0 text-[var(--color-silver-muted)] text-sm placeholder:text-[var(--outline)]/40"
                 />
+              </div>
+            ) : null}
+
+            {partyRoom ? (
+              <div>
+                <label className="block text-[10px] font-bold uppercase tracking-[0.2em] text-[var(--outline)] mb-4">
+                  {COPY.landing.partyRoundsLabel}
+                </label>
+                <div className="flex flex-wrap gap-2">
+                  {PARTY_ROUND_OPTIONS.map((n) => (
+                    <button
+                      key={n}
+                      type="button"
+                      onClick={() => setPartyRounds(n)}
+                      className={`min-h-[40px] min-w-[44px] rounded-[var(--radius-card)] border px-3 text-sm font-bold transition-colors ${
+                        partyRounds === n
+                          ? "border-[var(--color-gold-rare)] bg-[var(--color-gold-rare)]/15 text-[var(--color-gold-rare)]"
+                          : "border-[rgba(77,70,53,0.35)] text-[var(--color-silver-dim)] hover:border-[var(--color-gold-rare)]/40"
+                      }`}
+                    >
+                      {n}
+                    </button>
+                  ))}
+                </div>
+                <div className="mt-4 flex items-start gap-3">
+                  <input
+                    id="party-instigator"
+                    type="checkbox"
+                    className="mt-1 h-4 w-4 shrink-0 rounded border border-white/20 bg-black/30 accent-[var(--color-gold-rare)]"
+                    checked={partyInstigator}
+                    onChange={(e) => setPartyInstigator(e.target.checked)}
+                  />
+                  <label
+                    htmlFor="party-instigator"
+                    className="cursor-pointer text-xs leading-relaxed text-[var(--color-silver-dim)]"
+                  >
+                    Anonymous AI wild-card line in each merge (instigator). Votes
+                    stay on real players only.
+                  </label>
+                </div>
               </div>
             ) : null}
 

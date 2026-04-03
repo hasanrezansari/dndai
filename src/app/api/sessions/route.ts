@@ -4,7 +4,11 @@ import { z } from "zod";
 import { apiError, handleApiError } from "@/lib/api/errors";
 import { requireUser, unauthorizedResponse } from "@/lib/auth/guards";
 import { broadcastToSession } from "@/lib/socket/server";
-import { CampaignModeSchema, SessionModeSchema } from "@/lib/schemas/enums";
+import {
+  CampaignModeSchema,
+  GameKindSchema,
+  SessionModeSchema,
+} from "@/lib/schemas/enums";
 import { createSession, getSession } from "@/server/services/session-service";
 
 const CreateSessionBodySchema = z.object({
@@ -16,6 +20,12 @@ const CreateSessionBodySchema = z.object({
   artDirection: z.string().max(2000).optional(),
   worldBible: z.string().max(32000).optional(),
   moduleKey: z.string().optional(),
+  gameKind: GameKindSchema.optional(),
+  templateKey: z.string().min(1).max(128).optional(),
+  partyTotalRounds: z.number().int().min(1).max(24).optional(),
+  partyInstigatorEnabled: z.boolean().optional(),
+  /** Analytics: host funnel (e.g. play_romana_party_home). Does not affect gameplay. */
+  acquisitionSource: z.string().max(64).optional(),
 });
 
 export async function POST(request: NextRequest) {
@@ -38,6 +48,11 @@ export async function POST(request: NextRequest) {
       artDirection: parsed.data.artDirection,
       worldBible: parsed.data.worldBible,
       moduleKey: parsed.data.moduleKey,
+      gameKind: parsed.data.gameKind,
+      templateKey: parsed.data.templateKey,
+      partyTotalRounds: parsed.data.partyTotalRounds,
+      partyInstigatorEnabled: parsed.data.partyInstigatorEnabled,
+      acquisitionSource: parsed.data.acquisitionSource,
     });
     const session = await getSession(sessionId);
     const host = session.players.find((p) => p.is_host);

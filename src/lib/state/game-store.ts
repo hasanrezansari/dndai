@@ -1,6 +1,7 @@
 import { create } from "zustand";
 
 import type { CharacterStats } from "@/lib/schemas/domain";
+import type { PartyConfigClientView } from "@/lib/schemas/party";
 
 export type ActiveSheet = "character" | "party" | "journal";
 
@@ -59,6 +60,10 @@ export interface GameSessionView {
   artDirection?: string | null;
   /** Long-form premise / world bible from host. */
   worldBible?: string | null;
+  /** `campaign` (default RPG) or `party` (Jackbox-style). */
+  gameKind?: string;
+  /** Present when `gameKind === "party"`; sanitized server state. */
+  party?: PartyConfigClientView | null;
 }
 
 export interface QuestProgressView {

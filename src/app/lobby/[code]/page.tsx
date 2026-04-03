@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 
 import { PlayerSlot, type PlayerSlotPlayer } from "@/components/lobby/player-slot";
@@ -9,6 +9,9 @@ import { GhostButton } from "@/components/ui/ghost-button";
 import { SkeletonCard } from "@/components/ui/loading-skeleton";
 import { getPusherClient, getSessionChannel } from "@/lib/socket/client";
 import type { Player, Session } from "@/lib/schemas/domain";
+import { SessionStartedEventSchema } from "@/lib/schemas/events";
+import { getBuildTimeBrand } from "@/lib/brand";
+import { ROMA_MODULES } from "@/lib/rome/modules";
 import { LOBBY_TONE_TAG_OPTIONS } from "@/lib/session/tone-tag-options";
 
 type SessionWithPlayers = Session & { players: Player[] };
@@ -124,7 +127,20 @@ export default function LobbyPage() {
     const bump = () => {
       void refetchSession(sessionId);
     };
-    const onSessionStarted = () => {
+    const onSessionStarted = (raw: unknown) => {
+      const parsed = SessionStartedEventSchema.safeParse(raw);
+      if (!parsed.success) {
+        router.push(`/character/${sessionId}`);
+        return;
+      }
+      if (parsed.data.game_kind === "party") {
+        router.push(`/session/${sessionId}`);
+        return;
+      }
+      if (parsed.data.quick_play) {
+        router.push(`/session/${sessionId}`);
+        return;
+      }
       router.push(`/character/${sessionId}`);
     };
     channel.bind("player-joined", bump);
@@ -195,6 +211,26 @@ export default function LobbyPage() {
   const [draftTags, setDraftTags] = useState<string[]>([]);
   const [premiseSaving, setPremiseSaving] = useState(false);
   const [premiseError, setPremiseError] = useState<string | null>(null);
+  const [playromanaAutoLobbyBusy, setPlayromanaAutoLobbyBusy] = useState(false);
+  const [playromanaAutoLobbyError, setPlayromanaAutoLobbyError] = useState<
+    string | null
+  >(null);
+  const playromanaAutoStartRef = useRef(false);
+
+  const lobbyTeaser = useMemo(() => {
+    if (!session) {
+      return "Gather your party. The portal stirs beyond the veil.";
+    }
+    const fromPrompt = session.adventure_prompt?.trim();
+    const fromBible = session.world_bible?.trim().slice(0, 280);
+    if (fromPrompt) return fromPrompt;
+    if (fromBible) return fromBible;
+    if (getBuildTimeBrand() === "playromana" && session.module_key) {
+      const mod = ROMA_MODULES.find((x) => x.key === session.module_key);
+      if (mod) return mod.pitch;
+    }
+    return "Gather your party. The portal stirs beyond the veil.";
+  }, [session]);
 
   useEffect(() => {
     if (!session) return;
@@ -270,6 +306,14 @@ export default function LobbyPage() {
     }
   }
 
+  const playromanaQuickPlayEligible = Boolean(
+    session &&
+      getBuildTimeBrand() === "playromana" &&
+      session.game_kind === "campaign" &&
+      session.max_players === 1 &&
+      session.players.length === 1,
+  );
+
   async function handleStart() {
     if (!sessionId || !currentPlayerId || startLoading) return;
     setStartLoading(true);
@@ -277,11 +321,26 @@ export default function LobbyPage() {
       const res = await fetch(`/api/sessions/${sessionId}/start`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ playerId: currentPlayerId }),
+        body: JSON.stringify({
+          playerId: currentPlayerId,
+          ...(playromanaQuickPlayEligible ? { quickPlay: true } : {}),
+        }),
       });
-      const data = (await res.json().catch(() => ({}))) as { error?: string };
+      const data = (await res.json().catch(() => ({}))) as {
+        error?: string;
+        partyMode?: boolean;
+        quickPlay?: boolean;
+      };
       if (!res.ok) {
         window.alert(data.error ?? "Could not start");
+        return;
+      }
+      if (data.partyMode) {
+        router.push(`/session/${sessionId}`);
+        return;
+      }
+      if (data.quickPlay) {
+        router.push(`/session/${sessionId}`);
         return;
       }
       router.push(`/character/${sessionId}`);
@@ -289,6 +348,97 @@ export default function LobbyPage() {
       setStartLoading(false);
     }
   }
+
+  useEffect(() => {
+    if (getBuildTimeBrand() !== "playromana") return;
+    if (!sessionId || !session || !currentPlayerId) return;
+    if (session.game_kind !== "campaign") return;
+    if (session.status !== "lobby") return;
+    if (!isHost) return;
+    if (session.max_players !== 1) return;
+    if (session.players.length !== 1) return;
+    if (playromanaAutoStartRef.current) return;
+
+    playromanaAutoStartRef.current = true;
+    setPlayromanaAutoLobbyBusy(true);
+    setPlayromanaAutoLobbyError(null);
+
+    async function run() {
+      try {
+        const readyRes = await fetch(`/api/sessions/${sessionId}/ready`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ playerId: currentPlayerId }),
+        });
+        if (!readyRes.ok) {
+          playromanaAutoStartRef.current = false;
+          setPlayromanaAutoLobbyError(
+            "Could not ready up — try the buttons below.",
+          );
+          setPlayromanaAutoLobbyBusy(false);
+          return;
+        }
+        const readyData = (await readyRes.json()) as { isReady?: boolean };
+        const nextReady = Boolean(readyData.isReady);
+        setSession((prev) => {
+          if (!prev) return prev;
+          return {
+            ...prev,
+            players: prev.players.map((p) =>
+              p.id === currentPlayerId ? { ...p, is_ready: nextReady } : p,
+            ),
+          };
+        });
+
+        const startRes = await fetch(`/api/sessions/${sessionId}/start`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            playerId: currentPlayerId,
+            quickPlay: true,
+          }),
+        });
+        const startData = (await startRes.json().catch(() => ({}))) as {
+          error?: string;
+          partyMode?: boolean;
+          quickPlay?: boolean;
+        };
+        if (!startRes.ok) {
+          playromanaAutoStartRef.current = false;
+          setPlayromanaAutoLobbyError(
+            typeof startData.error === "string"
+              ? startData.error
+              : "Could not start — use Begin Adventure below.",
+          );
+          setPlayromanaAutoLobbyBusy(false);
+          return;
+        }
+        if (startData.partyMode) {
+          router.push(`/session/${sessionId}`);
+          return;
+        }
+        if (startData.quickPlay) {
+          router.push(`/session/${sessionId}`);
+          return;
+        }
+        router.push(`/character/${sessionId}`);
+      } catch {
+        playromanaAutoStartRef.current = false;
+        setPlayromanaAutoLobbyError(
+          "Something went wrong — try Ready / Begin below.",
+        );
+        setPlayromanaAutoLobbyBusy(false);
+      }
+    }
+
+    void run();
+  }, [
+    sessionId,
+    session,
+    currentPlayerId,
+    isHost,
+    router,
+  ]);
 
   async function handleShare() {
     if (!session?.join_code) return;
@@ -418,10 +568,6 @@ export default function LobbyPage() {
     (p) => p.is_ready && p.is_connected,
   ).length;
   const totalSeats = session.max_players;
-  const lobbyTeaser =
-    session.adventure_prompt?.trim() ||
-    session.world_bible?.trim().slice(0, 280) ||
-    "Gather your party. The portal stirs beyond the veil.";
 
   return (
     <main className="min-h-dvh flex flex-col px-6 pb-10 bg-[var(--color-obsidian)]">
@@ -462,6 +608,14 @@ export default function LobbyPage() {
           </div>
         </header>
 
+        {session.game_kind === "party" ? (
+          <p className="mb-4 rounded-[var(--radius-card)] border border-white/10 bg-black/25 px-3 py-2 text-xs leading-relaxed text-[var(--color-silver-dim)]">
+            Party mode: when the host begins, you&apos;ll open the party play
+            screen (not the hero builder). You can still make a full character if
+            you want it on your sheet — ready up when you&apos;re set.
+          </p>
+        ) : null}
+
         <section className="mb-6 overflow-hidden rounded-[var(--radius-card)] border border-[rgba(77,70,53,0.18)]">
           <div className="relative aspect-[16/10]">
             {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -495,7 +649,9 @@ export default function LobbyPage() {
           </div>
         </section>
 
-        {isHost && session.status === "lobby" ? (
+        {isHost &&
+        session.status === "lobby" &&
+        getBuildTimeBrand() !== "playromana" ? (
           <section className="mb-6 rounded-[var(--radius-card)] border border-[rgba(77,70,53,0.2)] bg-[var(--surface-high)]/40 p-4 space-y-3">
             <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-[var(--color-gold-rare)]">
               Tune the portal
@@ -597,12 +753,22 @@ export default function LobbyPage() {
 
         {/* Actions */}
         <footer className="mt-8 flex flex-col gap-3">
+          {playromanaAutoLobbyBusy ? (
+            <p className="text-center text-[10px] text-[var(--outline)] uppercase tracking-[0.15em]">
+              Opening your story…
+            </p>
+          ) : null}
+          {playromanaAutoLobbyError ? (
+            <p className="text-center text-xs text-[var(--color-failure)] leading-relaxed px-1">
+              {playromanaAutoLobbyError}
+            </p>
+          ) : null}
           {!iAmReady ? (
             <GoldButton
               type="button"
               size="lg"
               className="w-full min-h-[56px] flex items-center justify-center gap-3"
-              disabled={readyLoading}
+              disabled={readyLoading || playromanaAutoLobbyBusy}
               onClick={handleReady}
             >
               <span className="material-symbols-outlined text-lg">
@@ -615,7 +781,7 @@ export default function LobbyPage() {
               type="button"
               size="lg"
               className="w-full min-h-[56px] flex items-center justify-center gap-3 border-[var(--color-gold-rare)]/30 text-[var(--color-gold-rare)]"
-              disabled={readyLoading}
+              disabled={readyLoading || playromanaAutoLobbyBusy}
               onClick={handleReady}
             >
               <span
@@ -633,7 +799,7 @@ export default function LobbyPage() {
               type="button"
               size="lg"
               className="w-full min-h-[56px] flex items-center justify-center gap-3"
-              disabled={!canStart || startLoading}
+              disabled={!canStart || startLoading || playromanaAutoLobbyBusy}
               onClick={() => void handleStart()}
             >
               <span>{startLoading ? "Opening portal…" : "Begin Adventure"}</span>

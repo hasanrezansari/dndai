@@ -50,6 +50,8 @@ function SessionRoomDisplayContent() {
         : "";
 
   const session = useGameStore((s) => s.session);
+  const party = session?.party;
+  const isPartyDisplay = session?.gameKind === "party";
   const sceneTitle = useGameStore((s) => s.sceneTitle);
   const isThinking = useGameStore((s) => s.isThinking);
 
@@ -202,9 +204,13 @@ function SessionRoomDisplayContent() {
           currentPlayerName={null}
           scenePending={visible.scenePending}
           phase={null}
-          phaseLabel={null}
-          teaser={null}
-          showMetaChips={false}
+          phaseLabel={isPartyDisplay ? "Party" : null}
+          teaser={
+            isPartyDisplay && party
+              ? `${party.partyPhase} · round ${party.roundIndex}/${party.totalRounds}`
+              : null
+          }
+          showMetaChips={Boolean(isPartyDisplay)}
           showTapHint={false}
           showTurnWhenNoTeaser={false}
           roomDisplay
@@ -214,6 +220,7 @@ function SessionRoomDisplayContent() {
         <RoomDisplayNarration
           narrativeText={visible.narrativeText}
           isThinking={isThinking}
+          partyMode={isPartyDisplay}
         />
       </div>
     </div>

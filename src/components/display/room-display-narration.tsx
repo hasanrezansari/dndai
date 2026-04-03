@@ -9,6 +9,8 @@ import { NarrativeTypewriter } from "@/components/game/narrative-typewriter";
 export interface RoomDisplayNarrationProps {
   narrativeText: string | null;
   isThinking: boolean;
+  /** Larger type for party / TV readability. */
+  partyMode?: boolean;
 }
 
 /**
@@ -17,6 +19,7 @@ export interface RoomDisplayNarrationProps {
 export function RoomDisplayNarration({
   narrativeText,
   isThinking,
+  partyMode = false,
 }: RoomDisplayNarrationProps) {
   const [thinkingIdx, setThinkingIdx] = useState(0);
 
@@ -45,7 +48,7 @@ export function RoomDisplayNarration({
           auto_stories
         </span>
         <p className="text-[10px] font-black uppercase tracking-[0.22em] text-[var(--color-gold-rare)]">
-          The Narrator
+          {partyMode ? "Party merge" : "The Narrator"}
         </p>
       </div>
 
@@ -64,7 +67,13 @@ export function RoomDisplayNarration({
             </motion.p>
           </AnimatePresence>
         ) : (
-          <div className="text-fantasy text-base leading-relaxed text-[var(--color-silver-muted)] sm:text-lg md:text-xl md:leading-relaxed">
+          <div
+            className={
+              partyMode
+                ? "text-fantasy text-lg leading-relaxed text-[var(--color-silver-muted)] sm:text-xl md:text-2xl md:leading-relaxed"
+                : "text-fantasy text-base leading-relaxed text-[var(--color-silver-muted)] sm:text-lg md:text-xl md:leading-relaxed"
+            }
+          >
             <NarrativeTypewriter
               text={narrativeText?.trim() ?? ""}
               groupSize={3}

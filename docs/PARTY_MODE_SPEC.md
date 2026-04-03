@@ -4,6 +4,8 @@ This document describes the **full Jackbox-style party mode** discussed for Ashv
 
 **Related:** Cursor plan `party_mode_concept` (keep in sync with this file).
 
+**Implementation status (codebase, 2026):** Core loop is live — see **§ Implementation status (canonical)** below and [`OPEN_GENRE_IMPLEMENTATION_LOG.md`](OPEN_GENRE_IMPLEMENTATION_LOG.md) for file-level detail. Highlights: `game_kind: party`, submit/vote (+ **forgery_guess** / **reveal** when instigator + 2+ lines), server deadlines, **instigator** slots + `fp_totals`, **secret roles** via `party_secrets` + keyword objectives + `GET .../party/me`, template packs (`party-templates.ts`), `party-state-updated`, Play Romana **Start party room**, `/session/[id]` party UI + TV branch, end-screen CTA to campaign.
+
 ---
 
 ## Scope: what integrates into the existing game
@@ -177,7 +179,9 @@ This table is the **source of truth** before schema and API changes.
 
 ---
 
-## Documentation status (your checklist)
+## Documentation status
+
+For **what shipped vs backlog**, use **§ Implementation status (canonical)** above and [`OPEN_GENRE_IMPLEMENTATION_LOG.md`](OPEN_GENRE_IMPLEMENTATION_LOG.md).
 
 ### Alignment with recent open-genre work (Phases 12–16)
 
@@ -198,7 +202,7 @@ Tracked in the open-genre log: [`OPEN_GENRE_IMPLEMENTATION_LOG.md`](OPEN_GENRE_I
 | Dual-track BP + secret role counts + privacy | Yes |
 | Integration into existing Ashveil (same session stack, branch by mode) | Yes |
 | Play Romana + main entry | Yes |
-| **Instigator / forgery** (inject fake line, post-beat guess/vote, TV reveal rules, BP) | Yes (dedicated subsection) |
+| **Instigator / forgery** (inject fake line, post-beat guess/vote, TV reveal rules, BP) | Yes — implemented (see § Implementation status) |
 | Other wildcards | Listed only; no per-wildcard full spec (by design) |
 
 ---
@@ -275,62 +279,19 @@ Tracked in the open-genre log: [`OPEN_GENRE_IMPLEMENTATION_LOG.md`](OPEN_GENRE_I
 
 ---
 
-## Flat minor todos (all peers — no sub-tasks)
+## Implementation status (canonical)
 
-Use this as a **single-level** backlog: every line is its own task. Do **not** nest work items under these (avoids tool/UI hierarchy bugs).
+The historical flat checkbox backlog has been **retired**. Maintenance truth: **[`OPEN_GENRE_IMPLEMENTATION_LOG.md`](OPEN_GENRE_IMPLEMENTATION_LOG.md)** (closure roadmap + party MVP notes).
 
-- [ ] Add Drizzle migration: `sessions.game_kind` (e.g. `campaign` | `party`) with default `campaign`.
-- [ ] Add Drizzle migration: `sessions.party_config` `jsonb` nullable default null.
-- [ ] Run `npm run db:generate` / migrate locally; verify journal.
-- [ ] Add `GameKindSchema` (or equivalent) in [`src/lib/schemas/enums.ts`](../src/lib/schemas/enums.ts) and export type.
-- [ ] Extend session create Zod in [`src/app/api/sessions/route.ts`](../src/app/api/sessions/route.ts) for optional `gameKind` + `templateKey`.
-- [ ] Update [`session-service.ts`](../src/server/services/session-service.ts) `createSession` to persist `game_kind` + seed `party_config` when party.
-- [ ] Add [`src/lib/party/party-templates.ts`](../src/lib/party/party-templates.ts) (or similar) with one real `template_key` + milestones + `total_rounds`.
-- [ ] Add [`src/server/services/party-phase-service.ts`](../src/server/services/party-phase-service.ts): enum of phases + `advancePhase` + server clock source of truth.
-- [ ] Define `party_config` TypeScript type + Zod schema in [`src/lib/schemas/`](../src/lib/schemas/) (version field inside JSON for future migrations).
-- [ ] Implement `POST /api/sessions/[id]/party/submit` with auth, `isPlayerForUser`, phase guard `submit`.
-- [ ] Party submit body: `playerId`, `text` (max length match product spec); reject if not party session.
-- [ ] Party submit: store line in `party_config` keyed by `round_index` + `player_id`; idempotent overwrite same player same round.
-- [ ] Party submit: when all seated players submitted OR submit timer elapsed, transition phase to `merge_pending` (exact name in code).
-- [ ] Implement server-side submit timer (store `phase_deadline_iso` in `party_config` or derive from `started_at`).
-- [ ] Add [`src/lib/orchestrator/workers/party-merge.ts`](../src/lib/orchestrator/workers/party-merge.ts) + Zod output in [`ai-io.ts`](../src/lib/schemas/ai-io.ts).
-- [ ] `party-merge` uses `runOrchestrationStep` + fallback merged beat if AI fails.
-- [ ] Add `runPartyRoundPipeline` (or name) in [`pipeline.ts`](../src/lib/orchestrator/pipeline.ts) **without** calling intent/rules/dice/consequence chain.
-- [ ] Persist merged beat + optional short narration into `party_config` and/or `narrative_events` (pick one source of truth; document it).
-- [ ] Bump `sessions.state_version` when party state changes; broadcast `party-state-updated` (new event in [`events.ts`](../src/lib/schemas/events.ts)).
-- [ ] Implement `POST /api/sessions/[id]/party/vote` with phase guard `vote`.
-- [ ] Vote body: `playerId`, `targetSubmissionId` or `targetPlayerId` (match anonymous display model); reject self-vote.
-- [ ] Vote: record all votes; when all voted OR vote timer elapsed, compute VP delta, append to running totals in `party_config`.
-- [ ] Vote reveal: broadcast payload safe for TV (no secret roles).
-- [ ] Carry-forward: write normalized winning line into `party_config.carry_forward` for next round merge input.
-- [ ] Round end: increment `round_index` or set `ended`; if last round, phase `ended` + final leaderboard payload.
-- [ ] Instigator: if template `instigator_enabled`, call light model to generate forgery line before merge.
-- [ ] Instigator: assign each submission anonymous `slot_id` for UI; server stores `slot_id → player_id | forgery` map until reveal.
-- [ ] Instigator: add phase `forgery_guess` (or fold into vote) + `POST .../party/forgery-guess` + BP update rules from spec.
-- [ ] Instigator: reveal phase exposes which slot was forgery; clear map for next round.
-- [ ] Guard [`turn-service.ts`](../src/server/services/turn-service.ts) `submitAction`: if `game_kind === party`, return 409 or dedicated error (document client behavior).
-- [ ] Guard [`actions/route.ts`](../src/app/api/sessions/[id]/actions/route.ts): if party session, 409 with message to use party endpoints.
-- [ ] Guard [`quest-service.ts`](../src/server/services/quest-service.ts) entry points: no quest progression when `game_kind === party`.
-- [ ] Extend [`session-state-payload.ts`](../src/server/services/session-state-payload.ts) to include `gameKind` + sanitized `party_config` for clients.
-- [ ] Party payload: do not require `displayClass` / full character rows for seated players if party uses lite roster (align with Phase 15 shape in [`session-state-payload.ts`](../src/server/services/session-state-payload.ts)).
-- [ ] Party-merge worker user JSON: pass `adventure_tags`, `world_bible` slice, `art_direction` from session row (open-genre premise); omit or stub campaign-only fields (quest, HP) unless template asks.
-- [ ] Optional: reuse [`buildToneBiasFromAdventureTags`](../src/lib/ai/narrative-session-profile.ts) (or equivalent) in party-merge system prompt builder.
-- [ ] Party async scene image: call existing image pipeline with same `art_direction` / tag hints as campaign ([`image-worker.ts`](../src/lib/orchestrator/image-worker.ts)).
-- [ ] Update [`GameSessionView`](../src/lib/schemas/domain.ts) / fixtures if needed for new fields.
-- [ ] Client: branch [`session/[id]/page.tsx`](../src/app/session/[id]/page.tsx) or add [`party/[id]/page.tsx`](../src/app/party/[id]/page.tsx) — pick one strategy and stick to it.
-- [ ] Client: subscribe to Pusher party events in [`use-session-channel.ts`](../src/lib/socket/use-session-channel.ts) (or parallel hook).
-- [ ] Client: Zustand [`game-store.ts`](../src/lib/state/game-store.ts) fields for `partyPhase`, `roundIndex`, `submissionsPreview` (minimal).
-- [ ] UI: submit phase — textarea + disabled state after lock + countdown.
-- [ ] UI: vote phase — list anonymous options + submit vote once.
-- [ ] UI: reveal phase — show merged beat + optional typewriter + winner highlight.
-- [ ] UI: end screen — VP table + CTA “Start full campaign” → existing create session flow.
-- [ ] Lobby: party create from home — skip full character sheet or use lite persona only (define in copy + API).
-- [ ] Play Romana: default `template_key` when creating party from featured entry (env or hardcoded map).
-- [ ] TV: extend [`tv/page.tsx`](../src/app/tv/page.tsx) or display route to consume party public events + large type.
-- [ ] Add `docs/PARTY_MODE_LANDING.md` or `/party` page copy + `metadata` / Open Graph (optional product task).
-- [ ] Vitest: `party-phase-service` transition table (happy path + timeout).
-- [ ] Vitest: vote tally — no self-vote, tie behavior per template stub.
-- [ ] Vitest: Instigator map reveal — forgery slot not leaked in pre-reveal payload shape (schema test).
-- [ ] Manual QA script: 2-browser lobby → full round → vote → second round carry-forward string present in merge request payload (log or dev panel).
-
-**Rule:** If a task feels big, **split it into more sibling lines** here—never add indented sub-bullets under a checkbox.
+| Area | Status | Notes |
+|------|--------|--------|
+| DB: `game_kind`, `party_config`, `acquisition_source`, `party_secrets` | **Done** | Migrations under `drizzle/`; campaign rows use `game_kind: campaign`. |
+| Party phase machine + submit / merge / vote / ended | **Done** | [`party-phase-service.ts`](../src/server/services/party-phase-service.ts), [`party.ts`](../src/lib/schemas/party.ts) |
+| Instigator: slots, `forgery_guess`, `reveal`, `fp_totals` | **Done** | [`party-merge-runner.ts`](../src/lib/orchestrator/party-merge-runner.ts), [`party/forgery-guess`](../src/app/api/sessions/[id]/party/forgery-guess/route.ts) |
+| Secret roles + keyword objectives + `party/me` | **Done** | [`party-secret-service.ts`](../src/server/services/party-secret-service.ts), [`party-templates.ts`](../src/lib/party/party-templates.ts) `getPartySecretTemplatePack` |
+| Guards: party vs campaign (`actions`, `turn-service`, quests) | **Done** | Party cannot use RPG action pipeline. |
+| Client + TV | **Done** | [`session/[id]/page.tsx`](../src/app/session/[id]/page.tsx), [`party-play-panel.tsx`](../src/components/game/party-play-panel.tsx), [`session/[id]/display`](../src/app/session/[id]/display/page.tsx) |
+| Tests | **Done** | `tests/unit/party-*.test.ts`, `party-config-payload`, `party-secret-*` |
+| Analytics / SQL | **Done** | [`ANALYTICS_SESSIONS_QUERIES.md`](ANALYTICS_SESSIONS_QUERIES.md), optional [`GET /api/internal/session-metrics`](../src/app/api/internal/session-metrics/route.ts) |
+| Dedicated `/party` marketing route | **Out of scope** | Optional product surface (Phase 21 in open-genre log). |
+| Wildcards beyond instigator (swap, censor, etc.) | **Out of scope** | Listed earlier in this spec as ideas only. |

@@ -64,12 +64,6 @@ async function buildCanonicalState(sessionId: string): Promise<string> {
         customClassesEnabled && parsedProfile.success
           ? parsedProfile.data.display_name
           : `${c.race} ${c.class}`;
-      const mechanicalClass =
-        customClassesEnabled &&
-          typeof vp.mechanical_class === "string" &&
-          vp.mechanical_class.trim().length > 0
-          ? vp.mechanical_class.trim().toLowerCase()
-          : c.class;
       charParts.push(
         `${c.name} (${classLabel}, HP ${c.hp}/${c.max_hp}, Mana ${c.mana}/${c.max_mana}${conditions})`,
       );

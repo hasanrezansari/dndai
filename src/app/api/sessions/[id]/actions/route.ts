@@ -23,6 +23,7 @@ import { finalizeSessionEnd } from "@/server/services/quest-service";
 import {
   advanceTurn,
   NotYourTurnError,
+  PartySessionRpgActionError,
   resolveCurrentProcessingTurn,
   resolveAwaitingDmTurn,
   releaseTurnLock,
@@ -351,6 +352,9 @@ export async function POST(
     }
     if (e instanceof TurnBeingProcessedError) {
       return apiError("Turn is being processed", 409);
+    }
+    if (e instanceof PartySessionRpgActionError) {
+      return apiError(e.message, 409);
     }
     return handleApiError(e);
   }

@@ -36,8 +36,17 @@ export type SessionPremiseUpdatedEvent = output<
 export const SessionStartedEventSchema = z.object({
   campaign_title: z.string(),
   opening_scene: z.string(),
+  /** When `party`, clients should open the session play surface instead of character create. */
+  game_kind: z.enum(["campaign", "party"]).optional(),
+  /** Solo PlayRomana quick play: pregen hero exists — open session, not character builder. */
+  quick_play: z.boolean().optional(),
 });
 export type SessionStartedEvent = output<typeof SessionStartedEventSchema>;
+
+export const PartyStateUpdatedEventSchema = z.object({
+  state_version: z.number().int().min(0),
+});
+export type PartyStateUpdatedEvent = output<typeof PartyStateUpdatedEventSchema>;
 
 export const TurnStartedEventSchema = z.object({
   turn_id: z.string().uuid(),

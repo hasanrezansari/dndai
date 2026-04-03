@@ -5,6 +5,7 @@ import {
   AdvantageStateSchema,
   CampaignModeSchema,
   DiceTypeSchema,
+  GameKindSchema,
   GamePhaseSchema,
   ImageJobStatusSchema,
   ImageStatusSchema,
@@ -38,6 +39,11 @@ export const SessionSchema = z.object({
   world_bible: z.string().nullable(),
   module_key: z.string().nullable(),
   campaign_title: z.string().nullable(),
+  game_kind: GameKindSchema,
+  /** Host acquisition funnel; analytics only. */
+  acquisition_source: z.string().max(64).nullable().optional(),
+  party_config: z.record(z.string(), z.unknown()).nullable().optional(),
+  party_secrets: z.record(z.string(), z.unknown()).nullable().optional(),
   created_at: iso,
   updated_at: iso,
 });

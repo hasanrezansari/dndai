@@ -31,6 +31,7 @@ import { TutorialOverlay } from "@/components/game/tutorial-overlay";
 import { ChronicleFeed } from "@/components/feed/chronicle-feed";
 import { FeedList } from "@/components/feed/feed-list";
 import { BeatStrip } from "@/components/game/beat-strip";
+import { PartyPlayPanel } from "@/components/game/party-play-panel";
 import { SessionViewModeToggle } from "@/components/game/session-view-mode-toggle";
 import { useGuidedTurnUi } from "@/hooks/use-guided-turn-ui";
 import { useSessionUiMode } from "@/hooks/use-session-ui-mode";
@@ -559,6 +560,38 @@ export default function SessionGameplayPage() {
         >
           Retry
         </button>
+      </div>
+    );
+  }
+
+  if (session?.gameKind === "party" && session.status === "active") {
+    if (!session.party) {
+      return (
+        <div className="flex min-h-dvh flex-col items-center justify-center gap-3 bg-[var(--color-obsidian)] px-6">
+          <ConnectionStatus />
+          <p className="text-sm text-[var(--color-silver-muted)]">
+            Party state unavailable — try refresh.
+          </p>
+          <GhostButton type="button" onClick={() => window.location.reload()}>
+            Refresh
+          </GhostButton>
+        </div>
+      );
+    }
+    return (
+      <div className="relative flex min-h-dvh flex-col bg-[var(--color-obsidian)]">
+        <ConnectionStatus />
+        <PartyPlayPanel
+          sessionId={sessionId}
+          currentPlayerId={currentPlayerId}
+          party={session.party}
+          players={players}
+        />
+        <div className="mt-auto border-t border-white/10 p-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
+          <GhostButton type="button" onClick={handleLeaveSession}>
+            Leave session
+          </GhostButton>
+        </div>
       </div>
     );
   }

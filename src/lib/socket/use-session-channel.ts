@@ -9,6 +9,7 @@ import {
   DiceRollingEventSchema,
   DmNoticeEventSchema,
   NarrationUpdateEventSchema,
+  PartyStateUpdatedEventSchema,
   PlayerDisconnectedEventSchema,
   PlayerJoinedEventSchema,
   PlayerReadyEventSchema,
@@ -400,6 +401,18 @@ export function useSessionChannel(
       })();
     };
 
+    const onPartyStateUpdated = (raw: unknown) => {
+      const parsed = PartyStateUpdatedEventSchema.safeParse(raw);
+      if (!parsed.success) return;
+      void (async () => {
+        await applyPatchFromServerState();
+        useGameStore.getState().updateSessionField(
+          "stateVersion",
+          parsed.data.state_version,
+        );
+      })();
+    };
+
     const onStatChange = (raw: unknown) => {
       const parsed = StatChangeEventSchema.safeParse(raw);
       if (!parsed.success) return;
@@ -603,6 +616,7 @@ export function useSessionChannel(
       channel.bind("dice-result", onDiceResult);
       channel.bind("narration-update", onNarrationUpdate);
       channel.bind("state-update", onStateUpdate);
+      channel.bind("party-state-updated", onPartyStateUpdated);
       channel.bind("stat-change", onStatChange);
       channel.bind("scene-image-pending", onSceneImagePending);
       channel.bind("scene-image-ready", onSceneImageReady);
@@ -668,6 +682,7 @@ export function useSessionChannel(
         channel.unbind("dice-result", onDiceResult);
         channel.unbind("narration-update", onNarrationUpdate);
         channel.unbind("state-update", onStateUpdate);
+        channel.unbind("party-state-updated", onPartyStateUpdated);
         channel.unbind("stat-change", onStatChange);
         channel.unbind("scene-image-pending", onSceneImagePending);
         channel.unbind("scene-image-ready", onSceneImageReady);

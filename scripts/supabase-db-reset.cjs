@@ -1,8 +1,11 @@
 /**
- * Destructive: drops `public` (all app tables + __drizzle_migrations), then recreates it.
+ * Destructive: drops `public` (all app tables) and `drizzle` (Drizzle migration journal),
+ * then recreates `public`. If we only dropped `public`, a failed migrate could leave
+ * rows in `drizzle.__drizzle_migrations` while DDL rolled back — next migrate would skip
+ * early migrations and break.
  * Supabase: keeps `auth`, `storage`, etc. Use DIRECT_URL (session) not the pooler.
  *
- * Run: RESET_DATABASE=1 pnpm db:reset
+ * Run: RESET_DATABASE=1 npm run db:reset
  */
 
 const { Client } = require("pg");
@@ -28,7 +31,8 @@ async function main() {
   const client = new Client({ connectionString: url });
   await client.connect();
   try {
-    console.log("Dropping schema public (all data + Drizzle history)…");
+    console.log("Dropping schemas drizzle + public (full reset)…");
+    await client.query("DROP SCHEMA IF EXISTS drizzle CASCADE;");
     await client.query("DROP SCHEMA IF EXISTS public CASCADE;");
     await client.query("CREATE SCHEMA public;");
     // Supabase API roles (safe if role names differ on vanilla Postgres)
@@ -48,7 +52,7 @@ async function main() {
   }
 
   console.log("Running drizzle-kit migrate…");
-  const r = spawnSync("pnpm", ["exec", "drizzle-kit", "migrate"], {
+  const r = spawnSync("npx", ["drizzle-kit", "migrate"], {
     stdio: "inherit",
     cwd: require("node:path").join(__dirname, ".."),
     env: process.env,

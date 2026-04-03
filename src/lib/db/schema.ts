@@ -218,6 +218,17 @@ export const sessions = pgTable(
     visual_bible_seed: jsonb("visual_bible_seed")
       .$type<Record<string, unknown>>()
       .default(sql`'{}'::jsonb`),
+    /** `campaign` = default RPG loop; `party` = Jackbox-style (separate APIs / phase machine). */
+    game_kind: text("game_kind").notNull().default("campaign"),
+    /** Versioned party state; null when `game_kind` is campaign. */
+    party_config: jsonb("party_config").$type<Record<string, unknown>>(),
+    /**
+     * Party secret roles + objective progress; server-only until game end summary.
+     * Not used when `game_kind` is campaign.
+     */
+    party_secrets: jsonb("party_secrets").$type<Record<string, unknown>>(),
+    /** Optional create funnel label for analytics (never drives gameplay). */
+    acquisition_source: text("acquisition_source"),
     created_at: timestamp("created_at", { withTimezone: true })
       .notNull()
       .defaultNow(),

@@ -16,6 +16,10 @@ import {
   turns,
 } from "@/lib/db/schema";
 import { resolveCharacterDisplayFields } from "@/lib/characters/display-class";
+import {
+  PartyConfigV1Schema,
+  partyConfigForSessionPayload,
+} from "@/lib/schemas/party";
 import { CharacterStatsSchema } from "@/lib/schemas/domain";
 import { mapNpcRowToCombatantView } from "@/lib/state/npc-combatant-mapper";
 import type {
@@ -39,6 +43,7 @@ const DEFAULT_STATS = {
 
 function mapSession(row: typeof sessions.$inferSelect): GameSessionView {
   const tags = row.adventure_tags;
+  const gameKind = row.game_kind ?? "campaign";
   return {
     status: row.status,
     mode: row.mode,
@@ -56,6 +61,13 @@ function mapSession(row: typeof sessions.$inferSelect): GameSessionView {
     adventureTags: Array.isArray(tags) ? tags.map(String) : undefined,
     artDirection: row.art_direction,
     worldBible: row.world_bible,
+    gameKind,
+    party:
+      gameKind === "party"
+        ? partyConfigForSessionPayload(row.party_config, {
+            partySecretsRaw: row.party_secrets ?? undefined,
+          })
+        : null,
   };
 }
 
@@ -416,21 +428,61 @@ export async function loadSessionStatePayload(
   });
 
   const latestNarrative = narrativeRows[0];
-  const narrativeText = latestNarrative?.ev.scene_text ?? null;
+  let narrativeText = latestNarrative?.ev.scene_text ?? null;
 
   const rawSceneImage = latestScene?.image_url ?? null;
-  const sceneImage =
+  let sceneImage =
     rawSceneImage?.startsWith("data:") && latestScene
       ? `/api/sessions/${sessionId}/scene-image/${latestScene.id}`
       : rawSceneImage;
   const sceneStatusPending =
     latestScene?.image_status === "pending" ||
     latestScene?.image_status === "generating";
-  const scenePending = Boolean(rawSceneImage) ? false : sceneStatusPending;
-  const sceneTitle =
+  let scenePending = Boolean(rawSceneImage) ? false : sceneStatusPending;
+
+  if (sessionRow.game_kind === "party") {
+    const p = PartyConfigV1Schema.safeParse(sessionRow.party_config);
+    if (p.success) {
+      const pc = p.data;
+      if (
+        (pc.party_phase === "vote" ||
+          pc.party_phase === "forgery_guess" ||
+          pc.party_phase === "reveal") &&
+        pc.merged_beat?.trim()
+      ) {
+        narrativeText = pc.merged_beat.trim();
+      } else if (pc.party_phase === "submit" && pc.carry_forward?.trim()) {
+        narrativeText = pc.carry_forward.trim();
+      } else if (pc.party_phase === "ended") {
+        narrativeText =
+          pc.merged_beat?.trim() ||
+          pc.carry_forward?.trim() ||
+          narrativeText;
+      }
+      const art = pc.scene_image_url?.trim();
+      if (art) {
+        sceneImage = art;
+        scenePending = false;
+      } else if (
+        (pc.party_phase === "vote" ||
+          pc.party_phase === "forgery_guess" ||
+          pc.party_phase === "reveal") &&
+        pc.merged_beat?.trim()
+      ) {
+        scenePending = true;
+      }
+    }
+  }
+  let sceneTitle =
     sessionRow.campaign_title?.trim() ||
     latestScene?.summary.split("\n")[0]?.trim() ||
     null;
+  if (sessionRow.game_kind === "party") {
+    const pr = PartyConfigV1Schema.safeParse(sessionRow.party_config);
+    if (pr.success) {
+      sceneTitle = `Party · Round ${pr.data.round_index} / ${pr.data.total_rounds}`;
+    }
+  }
 
   const [dmAwaitingRow] = await db
     .select({
@@ -497,7 +549,10 @@ export async function loadSessionStatePayload(
     .orderBy(desc(narrativeEvents.created_at))
     .limit(1);
 
-  const quest = await getQuestState(sessionId);
+  const quest =
+    sessionRow.game_kind === "party"
+      ? null
+      : await getQuestState(sessionId);
   const mappedSession = mapSession(sessionRow);
   mappedSession.finalChapterPublished = Boolean(finalChapterRow);
 

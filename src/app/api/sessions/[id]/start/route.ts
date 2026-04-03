@@ -24,17 +24,22 @@ import {
   sessions,
 } from "@/lib/db/schema";
 import { runImagePipeline } from "@/lib/orchestrator/image-worker";
+import { broadcastPartyStateRefresh } from "@/lib/party/party-socket";
 import { broadcastToSession } from "@/lib/socket/server";
+import { createPlayRomanaQuickCharacter } from "@/server/services/character-service";
 import {
   canStartSession,
   SessionNotFoundError,
   startSession,
 } from "@/server/services/session-service";
+import { activatePartySessionFromLobby } from "@/server/services/party-phase-service";
 import { initializeQuestState } from "@/server/services/quest-service";
 import { createFirstTurn } from "@/server/services/turn-service";
 
 const BodySchema = z.object({
   playerId: z.string().uuid(),
+  /** Solo PlayRomana module: create a preset hero and skip character builder. */
+  quickPlay: z.boolean().optional(),
 });
 
 const OPENINGS = [
@@ -155,6 +160,42 @@ export async function POST(
       return apiError("Session already started", 409);
     }
 
+    if (parsed.data.quickPlay) {
+      if (sessionRow.game_kind !== "campaign") {
+        return apiError("Quick play is only for campaign sessions", 400);
+      }
+      if (
+        sessionRow.campaign_mode !== "module" ||
+        !sessionRow.module_key ||
+        !isPlayRomanaModuleKey(sessionRow.module_key)
+      ) {
+        return apiError("Quick play is only for PlayRomana story modules", 400);
+      }
+      if (sessionRow.max_players !== 1) {
+        return apiError("Quick play requires a solo table", 400);
+      }
+      const lobbyPlayers = await db
+        .select({ id: players.id, character_id: players.character_id })
+        .from(players)
+        .where(eq(players.session_id, sessionId));
+      if (lobbyPlayers.length !== 1) {
+        return apiError(
+          "Quick play requires exactly one player in the lobby",
+          400,
+        );
+      }
+      const sole = lobbyPlayers[0]!;
+      if (sole.id !== hostPlayer.id) {
+        return apiError("Forbidden", 403);
+      }
+      if (!sole.character_id) {
+        await createPlayRomanaQuickCharacter({
+          playerId: hostPlayer.id,
+          sessionId,
+        });
+      }
+    }
+
     if (!(await canStartSession(sessionId))) {
       return apiError("Not all players are ready", 409);
     }
@@ -162,6 +203,30 @@ export async function POST(
     const started = await startSession(sessionId);
     if (!started) {
       return apiError("Could not start session", 409);
+    }
+
+    if (sessionRow.game_kind === "party") {
+      await activatePartySessionFromLobby(sessionId);
+      try {
+        const [fresh] = await db
+          .select({ state_version: sessions.state_version })
+          .from(sessions)
+          .where(eq(sessions.id, sessionId))
+          .limit(1);
+        const v = fresh?.state_version ?? 0;
+        await broadcastPartyStateRefresh(sessionId, v);
+        await broadcastToSession(sessionId, "session-started", {
+          campaign_title: "Party room",
+          opening_scene: "Submit your lines for round 1.",
+          game_kind: "party",
+        });
+      } catch (err) {
+        console.error(err);
+      }
+      return NextResponse.json(
+        { ok: true, partyMode: true, sessionId },
+        { status: 200 },
+      );
     }
 
     const firstTurnId = await createFirstTurn(sessionId);
@@ -411,12 +476,17 @@ export async function POST(
       await broadcastToSession(sessionId, "session-started", {
         campaign_title: campaignTitle,
         opening_scene: openingScene,
+        game_kind: "campaign",
+        quick_play: Boolean(parsed.data.quickPlay),
       });
     } catch (err) {
       console.error(err);
     }
 
-    return NextResponse.json({ ok: true });
+    return NextResponse.json({
+      ok: true,
+      quickPlay: Boolean(parsed.data.quickPlay),
+    });
   } catch (e) {
     if (e instanceof SessionNotFoundError) {
       return apiError("Not found", 404);

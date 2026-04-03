@@ -106,6 +106,39 @@ function mapCharacterRow(row: typeof characters.$inferSelect): Character {
   };
 }
 
+const PLAY_ROMANA_QUICK_NAMES = [
+  "Marcus",
+  "Lucia",
+  "Gaius",
+  "Julia",
+  "Titus",
+  "Aelia",
+] as const;
+
+/**
+ * PlayRomana solo “Quick play”: one preset hero so the player can enter the session
+ * without the character builder. Roman module sessions only; called from start route.
+ */
+export async function createPlayRomanaQuickCharacter(params: {
+  playerId: string;
+  sessionId: string;
+}): Promise<{ characterId: string }> {
+  const stats = await rollNewStats();
+  const name =
+    PLAY_ROMANA_QUICK_NAMES[
+      Math.floor(Math.random() * PLAY_ROMANA_QUICK_NAMES.length)
+    ]!;
+  return createCharacter({
+    playerId: params.playerId,
+    sessionId: params.sessionId,
+    name,
+    characterClass: "warrior",
+    race: "human",
+    stats,
+    backstory: "A traveler in Rome — you can refine this later.",
+  });
+}
+
 export async function rollNewStats(): Promise<CharacterStats> {
   return rollStats();
 }

@@ -9,7 +9,12 @@ import {
   normalizeJoinCodeForLookup,
 } from "@/lib/join-code";
 import type { Player, Session } from "@/lib/schemas/domain";
-import type { CampaignMode, SessionMode } from "@/lib/schemas/enums";
+import type { CampaignMode, GameKind, SessionMode } from "@/lib/schemas/enums";
+import {
+  DEFAULT_PARTY_TOTAL_ROUNDS,
+  getDefaultPartyTemplateKeyForBrand,
+} from "@/lib/party/party-templates";
+import { createInitialPartyConfig } from "@/lib/schemas/party";
 
 function generateJoinCode(): string {
   let code = "";
@@ -111,8 +116,27 @@ export async function createSession(params: {
   artDirection?: string;
   worldBible?: string;
   moduleKey?: string;
+  /** Default `campaign`. `party` seeds `party_config` v1 in lobby. */
+  gameKind?: GameKind;
+  templateKey?: string;
+  partyTotalRounds?: number;
+  /** When true, merge adds an AI “anonymous interjection” line (instigator). */
+  partyInstigatorEnabled?: boolean;
+  /** Analytics only; stored on session row, never used by turn/quest/narration. */
+  acquisitionSource?: string;
 }): Promise<{ sessionId: string; joinCode: string }> {
   const joinCode = await allocateUniqueJoinCode();
+  const gameKind: GameKind = params.gameKind ?? "campaign";
+  const partyConfig =
+    gameKind === "party"
+      ? createInitialPartyConfig(
+          params.templateKey?.trim() || getDefaultPartyTemplateKeyForBrand(),
+          params.partyTotalRounds ?? DEFAULT_PARTY_TOTAL_ROUNDS,
+          {
+            instigatorEnabled: Boolean(params.partyInstigatorEnabled),
+          },
+        )
+      : null;
   const [session] = await db
     .insert(sessions)
     .values({
@@ -129,6 +153,9 @@ export async function createSession(params: {
       art_direction: params.artDirection?.trim() || null,
       world_bible: params.worldBible?.trim() || null,
       module_key: params.moduleKey ?? null,
+      game_kind: gameKind,
+      party_config: partyConfig,
+      acquisition_source: params.acquisitionSource?.trim() || null,
     })
     .returning();
   if (!session) {

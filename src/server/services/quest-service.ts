@@ -381,6 +381,15 @@ export async function initializeQuestState(params: {
   subObjectives?: string[];
   round: number;
 }): Promise<QuestState> {
+  const [gk] = await db
+    .select({ game_kind: sessions.game_kind })
+    .from(sessions)
+    .where(eq(sessions.id, params.sessionId))
+    .limit(1);
+  if (gk?.game_kind === "party") {
+    return defaultQuestState(params.objective);
+  }
+
   const existing = await getQuestState(params.sessionId);
   if (existing) return existing;
   const state = defaultQuestState(params.objective);

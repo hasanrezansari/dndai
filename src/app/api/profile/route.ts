@@ -17,7 +17,6 @@ const UpdateProfileSchema = z.object({
         if (!v) return false;
         if (v.startsWith("data:image/")) return true;
         try {
-          // eslint-disable-next-line no-new
           new URL(v);
           return true;
         } catch {

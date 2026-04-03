@@ -147,3 +147,9 @@ export const MemorySummaryOutputSchema = z.object({
   content: z.record(z.string(), z.unknown()),
 });
 export type MemorySummaryOutput = output<typeof MemorySummaryOutputSchema>;
+
+/** Party mode: combine player lines into one canonical beat (structural, not joke-first). */
+export const PartyMergeOutputSchema = z.object({
+  merged_beat: z.string().min(20).max(2200),
+});
+export type PartyMergeOutput = output<typeof PartyMergeOutputSchema>;

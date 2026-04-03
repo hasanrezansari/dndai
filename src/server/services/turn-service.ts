@@ -34,6 +34,16 @@ export class TurnBeingProcessedError extends Error {
   }
 }
 
+/** Party sessions use `/party/*` APIs — not the RPG `actions` pipeline. */
+export class PartySessionRpgActionError extends Error {
+  constructor() {
+    super(
+      "This session is in Party mode. Use party endpoints when they are available.",
+    );
+    this.name = "PartySessionRpgActionError";
+  }
+}
+
 function turnLockKey(sessionId: string): string {
   return `turn:lock:${sessionId}`;
 }
@@ -274,10 +284,13 @@ export async function submitAction(params: {
   rawInput: string;
 }): Promise<{ actionId: string; turnId: string }> {
   const [sessionModeRow] = await db
-    .select({ mode: sessions.mode })
+    .select({ mode: sessions.mode, game_kind: sessions.game_kind })
     .from(sessions)
     .where(eq(sessions.id, params.sessionId))
     .limit(1);
+  if (sessionModeRow?.game_kind === "party") {
+    throw new PartySessionRpgActionError();
+  }
   const [actorRow] = await db
     .select({ is_dm: players.is_dm })
     .from(players)

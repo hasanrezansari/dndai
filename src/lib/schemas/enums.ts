@@ -4,6 +4,10 @@ import type { output } from "zod";
 export const SessionModeSchema = z.enum(["ai_dm", "human_dm"]);
 export type SessionMode = output<typeof SessionModeSchema>;
 
+/** Parallel to `sessions.mode` (ai/human DM). Party = Jackbox-style rooms; campaign = default RPG loop. */
+export const GameKindSchema = z.enum(["campaign", "party"]);
+export type GameKind = output<typeof GameKindSchema>;
+
 export const CampaignModeSchema = z.enum(["user_prompt", "random", "module"]);
 export type CampaignMode = output<typeof CampaignModeSchema>;
 

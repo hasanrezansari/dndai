@@ -41,6 +41,12 @@ export const COPY = {
     humanCardTitle: "Human host",
     humanCardBody:
       "A person at the table drives the story; Falvos keeps characters, votes, and state in sync.",
+    partyCardTitle: "Party game",
+    partyCardBody:
+      "Jackbox-style room: everyone submits a line each round, the AI merges them, then you vote for your favorite — separate from campaign quests.",
+    partyRoundsLabel: "Rounds",
+    partySeedHint:
+      "Optional story seed and tone tags still shape the merge prompts.",
     originLabel: "Starting point",
     narrativeSeedLabel: "Story seed",
     toneTagsHint:
