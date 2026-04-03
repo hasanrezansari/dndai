@@ -2,7 +2,7 @@
 
 import { useSession } from "next-auth/react";
 import { useParams, useRouter } from "next/navigation";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { ConnectionStatus } from "@/components/ui/connection-status";
 import { GhostButton } from "@/components/ui/ghost-button";
@@ -164,7 +164,12 @@ export default function SessionGameplayPage() {
   const [voteBusy, setVoteBusy] = useState(false);
   const [chapterBusy, setChapterBusy] = useState(false);
   const [sceneTransitionTrigger, setSceneTransitionTrigger] = useState(false);
-  const [prevSceneTitle, setPrevSceneTitle] = useState<string | null>(null);
+  /** First beat vs later location changes (copy on the intro overlay). */
+  const [sceneTransitionKind, setSceneTransitionKind] = useState<
+    "opening" | "location"
+  >("location");
+  /** Last scene title we saw — ref avoids a second effect syncing state that cancelled the dismiss timer. */
+  const prevSceneTitleRef = useRef<string | null>(null);
   const [chronicleOpen, setChronicleOpen] = useState(false);
   const [displayLinkHint, setDisplayLinkHint] = useState<string | null>(null);
   const [sceneDetailOpen, setSceneDetailOpen] = useState(false);
@@ -278,18 +283,38 @@ export default function SessionGameplayPage() {
   }, [currentPlayerId, players, setIsDm]);
 
   useEffect(() => {
-    if (!sceneTitle || sceneTitle === prevSceneTitle) return;
-    if (prevSceneTitle !== null) {
-      setSceneTransitionTrigger(true);
-      const timer = setTimeout(() => setSceneTransitionTrigger(false), 3000);
-      return () => clearTimeout(timer);
-    }
-    setPrevSceneTitle(sceneTitle);
-  }, [sceneTitle, prevSceneTitle]);
+    prevSceneTitleRef.current = null;
+  }, [sessionId]);
 
   useEffect(() => {
-    if (sceneTitle) setPrevSceneTitle(sceneTitle);
-  }, [sceneTitle]);
+    if (!sceneTitle || !sessionId) return;
+    const prev = prevSceneTitleRef.current;
+    if (sceneTitle === prev) return;
+
+    const isResume =
+      typeof window !== "undefined" &&
+      window.sessionStorage.getItem(`ashveil.sceneIntro.v1.${sessionId}`) ===
+        "1";
+
+    /** Skip the full-screen “opening” once per browser tab for this session (resume from Adventures / reload). */
+    if (prev === null && isResume) {
+      prevSceneTitleRef.current = sceneTitle;
+      return;
+    }
+
+    if (prev === null && typeof window !== "undefined") {
+      window.sessionStorage.setItem(`ashveil.sceneIntro.v1.${sessionId}`, "1");
+    }
+
+    setSceneTransitionKind(prev === null ? "opening" : "location");
+    setSceneTransitionTrigger(true);
+    prevSceneTitleRef.current = sceneTitle;
+    const timer = setTimeout(() => setSceneTransitionTrigger(false), 5000);
+    return () => {
+      clearTimeout(timer);
+      setSceneTransitionTrigger(false);
+    };
+  }, [sceneTitle, sessionId]);
 
   const currentTurnPlayerId = session?.currentPlayerId ?? null;
   const isMyTurn =
@@ -614,6 +639,8 @@ export default function SessionGameplayPage() {
         imageUrl={sceneImage}
         locationTitle={sceneTitle}
         trigger={sceneTransitionTrigger}
+        kind={sceneTransitionKind}
+        onDismiss={() => setSceneTransitionTrigger(false)}
       />
       <ConnectionStatus />
       <TutorialOverlay
