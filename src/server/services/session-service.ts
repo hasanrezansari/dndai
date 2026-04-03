@@ -3,7 +3,7 @@ import { randomInt } from "node:crypto";
 import { and, count, eq, max, sql } from "drizzle-orm";
 
 import { db } from "@/lib/db";
-import { authUsers, players, sessions } from "@/lib/db/schema";
+import { authUsers, characters, players, sessions } from "@/lib/db/schema";
 import {
   JOIN_CODE_ALPHABET,
   normalizeJoinCodeForLookup,
@@ -14,6 +14,7 @@ import {
   DEFAULT_PARTY_TOTAL_ROUNDS,
   getDefaultPartyTemplateKeyForBrand,
 } from "@/lib/party/party-templates";
+import { resolvePlayerDisplayName } from "@/lib/session/player-display-name";
 import {
   createInitialPartyConfig,
   PartyConfigV1Schema,
@@ -51,11 +52,11 @@ function mapSessionRow(row: typeof sessions.$inferSelect): Session {
 
 function mapPlayerRow(
   row: typeof players.$inferSelect,
-  name?: string | null,
+  resolvedDisplayName: string | null,
 ): Player {
   return {
     ...row,
-    name: name ?? null,
+    name: resolvedDisplayName,
     joined_at: row.joined_at.toISOString(),
   } as Player;
 }
@@ -246,13 +247,25 @@ export async function getSession(
     .select({
       player: players,
       userName: authUsers.name,
+      userEmail: authUsers.email,
+      characterName: characters.name,
     })
     .from(players)
     .leftJoin(authUsers, eq(authUsers.id, players.user_id))
+    .leftJoin(characters, eq(characters.player_id, players.id))
     .where(eq(players.session_id, sessionId));
   return {
     ...mapSessionRow(sessionRow),
-    players: playerRows.map((r) => mapPlayerRow(r.player, r.userName)),
+    players: playerRows.map((r) =>
+      mapPlayerRow(
+        r.player,
+        resolvePlayerDisplayName({
+          characterName: r.characterName,
+          userName: r.userName,
+          userEmail: r.userEmail,
+        }),
+      ),
+    ),
   };
 }
 

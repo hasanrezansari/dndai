@@ -31,6 +31,7 @@ import type {
   StatEffect,
 } from "@/lib/state/game-store";
 import { buildPartySessionNarrativeText } from "@/lib/party/party-opening-narrative";
+import { resolvePlayerDisplayName } from "@/lib/session/player-display-name";
 import { getQuestState } from "@/server/services/quest-service";
 
 const DEFAULT_STATS = {
@@ -219,6 +220,7 @@ export async function loadSessionStatePayload(
       player: players,
       character: characters,
       userName: authUsers.name,
+      userEmail: authUsers.email,
     })
     .from(players)
     .leftJoin(characters, eq(characters.player_id, players.id))
@@ -226,7 +228,17 @@ export async function loadSessionStatePayload(
     .where(eq(players.session_id, sessionId));
 
   const mappedPlayers = playerRows
-    .map((r) => mapPlayerRow(r.player, r.character, r.userName))
+    .map((r) =>
+      mapPlayerRow(
+        r.player,
+        r.character,
+        resolvePlayerDisplayName({
+          characterName: r.character?.name,
+          userName: r.userName,
+          userEmail: r.userEmail,
+        }),
+      ),
+    )
     .sort((a, b) => a.seatIndex - b.seatIndex);
 
   const narrativeRows = await db
