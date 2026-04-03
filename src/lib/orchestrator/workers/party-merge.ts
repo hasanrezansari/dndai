@@ -57,7 +57,7 @@ export async function runPartyMergeWorker(params: {
     schema: PartyMergeOutputSchema,
     maxTokens: 900,
     temperature: 0.65,
-    timeoutMs: 45_000,
+    timeoutMs: 90_000,
     fallback: () => ({
       merged_beat:
         typeof params.userPayload.lines === "string"

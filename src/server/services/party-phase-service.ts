@@ -651,14 +651,18 @@ export async function tryPartyMergeWhenReady(sessionId: string): Promise<void> {
 
     const version = await persistPartyConfigOptimistic(sessionId, row, nextConfig);
     if (version != null) {
-      const { schedulePartyRoundSceneImage } = await import(
-        "@/lib/orchestrator/party-image-schedule"
-      );
-      void schedulePartyRoundSceneImage({
-        sessionId,
-        mergedBeat,
-        roundIndex: cfg.round_index,
-      });
+      if (nextConfig.party_phase === "submit") {
+        void hydratePartyRoundSceneBeat(sessionId);
+      } else {
+        const { schedulePartyRoundSceneImage } = await import(
+          "@/lib/orchestrator/party-image-schedule"
+        );
+        void schedulePartyRoundSceneImage({
+          sessionId,
+          mergedBeat,
+          roundIndex: nextConfig.round_index,
+        });
+      }
     }
     return;
   }
@@ -693,14 +697,18 @@ export async function tryPartyMergeWhenReady(sessionId: string): Promise<void> {
     });
     const version = await persistPartyConfigOptimistic(sessionId, row, nextConfig);
     if (version != null) {
-      const { schedulePartyRoundSceneImage } = await import(
-        "@/lib/orchestrator/party-image-schedule"
-      );
-      void schedulePartyRoundSceneImage({
-        sessionId,
-        mergedBeat,
-        roundIndex: cfg.round_index,
-      });
+      if (nextConfig.party_phase === "submit") {
+        void hydratePartyRoundSceneBeat(sessionId);
+      } else {
+        const { schedulePartyRoundSceneImage } = await import(
+          "@/lib/orchestrator/party-image-schedule"
+        );
+        void schedulePartyRoundSceneImage({
+          sessionId,
+          mergedBeat,
+          roundIndex: nextConfig.round_index,
+        });
+      }
     }
     return;
   }
@@ -755,7 +763,7 @@ export async function tryPartyMergeWhenReady(sessionId: string): Promise<void> {
   void schedulePartyRoundSceneImage({
     sessionId,
     mergedBeat,
-    roundIndex: cfg.round_index,
+    roundIndex: nextConfig.round_index,
   });
 }
 

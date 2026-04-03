@@ -114,7 +114,7 @@ export function PartyPlayPanel({
       void fetch(`/api/sessions/${sessionId}/party/phase-tick`, {
         method: "POST",
       });
-    }, 20000);
+    }, 10_000);
     return () => window.clearInterval(id);
   }, [sessionId, party.partyPhase, party.phaseDeadlineIso]);
 
