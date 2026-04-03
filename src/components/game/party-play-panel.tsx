@@ -1,11 +1,12 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { PartySessionCard } from "@/components/game/party-session-card";
 import { GhostButton } from "@/components/ui/ghost-button";
 import { GoldButton } from "@/components/ui/gold-button";
+import { useToast } from "@/components/ui/toast";
 import { isPartyBlockShownInScene } from "@/lib/party/party-ui-dedupe";
 import type { PartyConfigClientView } from "@/lib/schemas/party";
 import type { GamePlayerView } from "@/lib/state/game-store";
@@ -62,11 +63,41 @@ export function PartyPlayPanel({
   players,
   sceneNarrativeForDedupe = null,
 }: Props) {
+  const { toast } = useToast();
   const [line, setLine] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [forgeryGuessSent, setForgeryGuessSent] = useState(false);
   const [partyMe, setPartyMe] = useState<PartyMeView | null>(null);
+  const prevMyVpRef = useRef<number | null>(null);
+
+  const myVp =
+    currentPlayerId != null
+      ? (party.vpTotals?.[currentPlayerId] ?? 0)
+      : undefined;
+
+  useEffect(() => {
+    if (currentPlayerId == null || myVp === undefined) {
+      prevMyVpRef.current = null;
+      return;
+    }
+    const ph = party.partyPhase;
+    if (ph === "lobby" || ph === "ended") {
+      prevMyVpRef.current = myVp;
+      return;
+    }
+    const prev = prevMyVpRef.current;
+    prevMyVpRef.current = myVp;
+    if (prev === null) return;
+    if (myVp > prev) {
+      toast(
+        myVp === 1
+          ? "The crowd picked your line — +1 VP"
+          : `The crowd picked your line — ${myVp} VP total`,
+        "success",
+      );
+    }
+  }, [currentPlayerId, myVp, party.partyPhase, toast]);
 
   useEffect(() => {
     if (party.partyPhase !== "forgery_guess") {
@@ -169,6 +200,20 @@ export function PartyPlayPanel({
       phase === "finale_tie_vote") &&
     Boolean(party.crowdVoteSlotIds?.length) &&
     votableAnonymousSlots.length > 0;
+
+  const crowdScoreRows = useMemo(() => {
+    const vp = party.vpTotals ?? {};
+    const fp = party.fpTotals ?? {};
+    return players
+      .filter((p) => !p.isDm)
+      .map((p) => ({
+        id: p.id,
+        n: vp[p.id] ?? 0,
+        fp: fp[p.id] ?? 0,
+        label: labelForPlayer(players, p.id),
+      }))
+      .sort((a, b) => b.n - a.n || a.label.localeCompare(b.label));
+  }, [players, party.vpTotals, party.fpTotals]);
 
   const vpRows = useMemo(() => {
     const t = party.vpTotals ?? {};
@@ -439,6 +484,55 @@ export function PartyPlayPanel({
           </div>
         )}
       </PartySessionCard>
+
+      {phase !== "lobby" ? (
+        <PartySessionCard title="Crowd score" variant="muted" contentClassName="space-y-2">
+          <p className="text-[10px] leading-relaxed text-[var(--color-outline)]">
+            Winning the crowd vote each round earns <span className="text-[var(--color-silver-dim)]">+1 VP</span>
+            {party.instigatorEnabled
+              ? ". Spotting the fake line adds instigator points."
+              : "."}
+          </p>
+          {crowdScoreRows.length === 0 ? (
+            <p className="text-xs text-[var(--color-silver-dim)]">No players yet.</p>
+          ) : (
+            <ul className="flex flex-col gap-1.5">
+              {crowdScoreRows.map((row) => (
+                <li
+                  key={row.id}
+                  className={`flex items-center justify-between gap-2 rounded-[var(--radius-chip)] border px-2.5 py-2 text-xs ${
+                    row.id === currentPlayerId
+                      ? "border-[var(--color-gold-rare)]/45 bg-[var(--color-gold-rare)]/10"
+                      : "border-white/10 bg-black/25"
+                  }`}
+                >
+                  <span className="min-w-0 truncate font-medium text-[var(--color-silver-muted)]">
+                    {row.label}
+                    {row.id === currentPlayerId ? (
+                      <span className="ml-1 text-[10px] font-normal text-[var(--color-outline)]">
+                        (you)
+                      </span>
+                    ) : null}
+                  </span>
+                  <div className="flex shrink-0 items-center gap-2">
+                    {party.instigatorEnabled && row.fp > 0 ? (
+                      <span
+                        className="text-[10px] tabular-nums text-[var(--color-outline)]"
+                        title="Instigator — spotted the fake"
+                      >
+                        🎯 {row.fp}
+                      </span>
+                    ) : null}
+                    <span className="tabular-nums font-semibold text-[var(--color-gold)]">
+                      {row.n} VP
+                    </span>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
+        </PartySessionCard>
+      ) : null}
 
       {party.instigatorEnabled ? (
         <PartySessionCard title="Mode" variant="muted" className="!py-2.5">
