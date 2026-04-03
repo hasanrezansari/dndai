@@ -189,6 +189,71 @@ export default function Home() {
         typeof (data as { joinCode: unknown }).joinCode === "string"
           ? (data as { joinCode: string }).joinCode
           : null;
+      const sessionIdOut =
+        typeof data === "object" &&
+        data !== null &&
+        "sessionId" in data &&
+        typeof (data as { sessionId: unknown }).sessionId === "string"
+          ? (data as { sessionId: string }).sessionId
+          : null;
+
+      const userId = authSession?.user?.id;
+
+      /** PlayRomana solo module Quick play: ready + start here so we skip the lobby flash. */
+      const inlinePlayRomanaQuick =
+        brand === "playromana" &&
+        typeof options.forceModuleKey === "string" &&
+        options.forceModuleKey.length > 0 &&
+        options.forceMaxPlayers === 1 &&
+        !options.forcePartyPlayRomana &&
+        !partyRoom &&
+        Boolean(sessionIdOut && joinCodeOut && userId);
+
+      if (inlinePlayRomanaQuick && sessionIdOut && joinCodeOut && userId) {
+        const sessRes = await fetch(`/api/sessions/${sessionIdOut}`);
+        if (!sessRes.ok) {
+          router.push(`/lobby/${joinCodeOut}`);
+          return;
+        }
+        const full = (await sessRes.json()) as {
+          players: Array<{ id: string; user_id: string }>;
+        };
+        const me = full.players.find((p) => p.user_id === userId);
+        if (!me) {
+          router.push(`/lobby/${joinCodeOut}`);
+          return;
+        }
+        const readyRes = await fetch(`/api/sessions/${sessionIdOut}/ready`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ playerId: me.id }),
+        });
+        if (!readyRes.ok) {
+          setCreateError("Could not ready — opening lobby.");
+          router.push(`/lobby/${joinCodeOut}`);
+          return;
+        }
+        const startRes = await fetch(`/api/sessions/${sessionIdOut}/start`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ playerId: me.id, quickPlay: true }),
+        });
+        const startJson = (await startRes.json().catch(() => ({}))) as {
+          error?: string;
+        };
+        if (!startRes.ok) {
+          setCreateError(
+            typeof startJson.error === "string"
+              ? startJson.error
+              : "Could not start — opening lobby.",
+          );
+          router.push(`/lobby/${joinCodeOut}`);
+          return;
+        }
+        router.replace(`/session/${sessionIdOut}`);
+        return;
+      }
+
       if (joinCodeOut) {
         router.push(`/lobby/${joinCodeOut}`);
       }
@@ -253,7 +318,24 @@ export default function Home() {
 
   if (brand === "playromana") {
     return (
-      <main className="min-h-dvh flex flex-col items-center px-6 pb-8 bg-[var(--color-obsidian)]">
+      <main
+        className="relative min-h-dvh flex flex-col items-center px-6 pb-8 bg-[var(--color-obsidian)]"
+        aria-busy={createLoading}
+      >
+        {createLoading ? (
+          <div
+            className="fixed inset-0 z-[100] flex flex-col items-center justify-center bg-[var(--color-obsidian)]/96 px-6 backdrop-blur-[2px]"
+            role="status"
+            aria-live="polite"
+          >
+            <p className="text-fantasy text-lg font-semibold text-[var(--color-gold-rare)] text-center tracking-wide">
+              Entering your story…
+            </p>
+            <p className="text-xs text-[var(--color-silver-dim)] mt-3 text-center max-w-[280px] leading-relaxed">
+              Setting up your table. This usually takes a few seconds.
+            </p>
+          </div>
+        ) : null}
         <div className="flex flex-col gap-[var(--void-gap-lg)] w-full max-w-md pt-10">
           <header className="text-center flex flex-col gap-2">
             <h1 className="text-fantasy text-4xl font-black text-[var(--color-gold-rare)] tracking-tight uppercase">
