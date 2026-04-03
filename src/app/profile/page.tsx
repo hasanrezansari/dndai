@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { signOut, useSession } from "next-auth/react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 
 import { GoogleSignInButton } from "@/components/auth/google-sign-in-button";
@@ -22,6 +23,16 @@ import {
 const ABILITY_BUDGET_CAP = 10;
 const GEAR_BUDGET_CAP = 7;
 const STAT_BIAS_CAP = 5;
+
+type ProfileWorldSubmission = {
+  id: string;
+  slug: string;
+  title: string;
+  status: string;
+  ugcReviewStatus: string;
+  submittedForReviewAt: string | null;
+  rejectionReason: string | null;
+};
 
 const STAT_ORDER: { key: keyof CharacterStats; label: string }[] = [
   { key: "str", label: "STR" },
@@ -108,6 +119,8 @@ export default function ProfilePage() {
   >([]);
   const [guestLinkBusy, setGuestLinkBusy] = useState(false);
   const [guestLinkError, setGuestLinkError] = useState<string | null>(null);
+  const [worldSubs, setWorldSubs] = useState<ProfileWorldSubmission[]>([]);
+  const [worldSubsLoading, setWorldSubsLoading] = useState(false);
 
   const isGuestSession = useMemo(() => {
     const email = session?.user?.email;
@@ -197,6 +210,57 @@ export default function ProfilePage() {
       cancelled = true;
     };
   }, [status, router, session?.user?.name]);
+
+  useEffect(() => {
+    if (status !== "authenticated" || isGuestSession) return;
+    let cancelled = false;
+    async function loadSubs() {
+      setWorldSubsLoading(true);
+      try {
+        const res = await fetch("/api/worlds/my-submissions");
+        const data: unknown = await res.json().catch(() => ({}));
+        if (!res.ok || cancelled) return;
+        const raw = (data as { submissions?: unknown }).submissions;
+        const list = Array.isArray(raw) ? raw : [];
+        if (cancelled) return;
+        const parsed: ProfileWorldSubmission[] = list
+          .map((item) => {
+            if (typeof item !== "object" || item === null) return null;
+            const o = item as Record<string, unknown>;
+            if (
+              typeof o.id !== "string" ||
+              typeof o.slug !== "string" ||
+              typeof o.title !== "string" ||
+              typeof o.status !== "string" ||
+              typeof o.ugcReviewStatus !== "string"
+            ) {
+              return null;
+            }
+            return {
+              id: o.id,
+              slug: o.slug,
+              title: o.title,
+              status: o.status,
+              ugcReviewStatus: o.ugcReviewStatus,
+              submittedForReviewAt:
+                typeof o.submittedForReviewAt === "string"
+                  ? o.submittedForReviewAt
+                  : null,
+              rejectionReason:
+                typeof o.rejectionReason === "string" ? o.rejectionReason : null,
+            };
+          })
+          .filter((x): x is ProfileWorldSubmission => x !== null);
+        setWorldSubs(parsed);
+      } finally {
+        if (!cancelled) setWorldSubsLoading(false);
+      }
+    }
+    void loadSubs();
+    return () => {
+      cancelled = true;
+    };
+  }, [status, isGuestSession]);
 
   useEffect(() => {
     if (status === "loading") return;
@@ -794,6 +858,83 @@ export default function ProfilePage() {
             </div>
           )}
         </GlassCard>
+
+        {!isGuestSession ? (
+          <GlassCard className="p-4 border-[rgba(212,175,55,0.12)]">
+            <div className="flex items-start justify-between gap-3 flex-wrap">
+              <div className="min-w-0">
+                <p className="text-[10px] uppercase tracking-[0.16em] text-[var(--outline)]">
+                  Story catalog
+                </p>
+                <p className="text-sm text-[var(--color-silver-muted)] mt-1 font-bold">
+                  Worlds you submitted
+                </p>
+                <p className="text-[11px] text-[var(--color-silver-dim)] mt-1 leading-relaxed">
+                  Community worlds are reviewed before they appear on{" "}
+                  <Link
+                    href="/worlds"
+                    className="text-[var(--color-gold-rare)] underline underline-offset-4"
+                  >
+                    /worlds
+                  </Link>
+                  .
+                </p>
+              </div>
+              <Link
+                href="/worlds/submit"
+                className="shrink-0 min-h-[40px] px-3 inline-flex items-center rounded-[var(--radius-button)] border border-[rgba(212,175,55,0.35)] text-[10px] font-bold uppercase tracking-[0.12em] text-[var(--color-gold-rare)] hover:bg-[rgba(212,175,55,0.08)] transition-colors"
+              >
+                New submission
+              </Link>
+            </div>
+            {worldSubsLoading ? (
+              <p className="text-xs text-[var(--outline)] mt-3">Loading…</p>
+            ) : worldSubs.length === 0 ? (
+              <p className="text-xs text-[var(--color-silver-dim)] mt-3">
+                No submissions yet.
+              </p>
+            ) : (
+              <ul className="mt-3 space-y-2 list-none m-0 p-0">
+                {worldSubs.map((w) => (
+                  <li
+                    key={w.id}
+                    className="rounded-[var(--radius-card)] border border-[rgba(77,70,53,0.2)] bg-[var(--color-deep-void)]/60 px-3 py-2"
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0">
+                        <p className="text-sm font-bold text-[var(--color-silver-muted)] truncate">
+                          {w.title}
+                        </p>
+                        <p className="text-[10px] text-[var(--outline)] mt-0.5">
+                          {w.ugcReviewStatus === "pending"
+                            ? "Awaiting review"
+                            : w.ugcReviewStatus === "rejected"
+                              ? "Not approved"
+                              : w.status === "published"
+                                ? "Live on /worlds"
+                                : w.status}
+                        </p>
+                        {w.rejectionReason ? (
+                          <p className="text-[11px] text-[var(--color-silver-dim)] mt-1 leading-relaxed">
+                            {w.rejectionReason}
+                          </p>
+                        ) : null}
+                      </div>
+                      {w.status === "published" ? (
+                        <Link
+                          href={`/worlds/${w.slug}`}
+                          className="shrink-0 text-[10px] uppercase tracking-[0.12em] text-[var(--color-gold-rare)]"
+                        >
+                          Open
+                        </Link>
+                      ) : null}
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </GlassCard>
+        ) : null}
 
         <GlassCard className="p-6">
           <div className="flex items-center gap-4">

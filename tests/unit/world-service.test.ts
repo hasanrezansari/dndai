@@ -12,6 +12,7 @@ const gladiatorRow = {
   slug: "roma-gladiator-uprising",
   title: "Gladiator Uprising",
   subtitle: "Pitch line",
+  card_teaser: "Short teaser.",
   description: "Long theme line for catalog.",
   status: "published",
   sort_order: 0,
@@ -25,6 +26,12 @@ const gladiatorRow = {
   published_revision: 2,
   is_featured: true,
   fork_count: 7,
+  cover_image_url: "https://images.unsplash.com/photo-1552832230-c0197dd311b7?w=400",
+  cover_image_alt: "Colosseum",
+  created_by_user_id: null,
+  submitted_for_review_at: null,
+  ugc_review_status: "none",
+  rejection_reason: null,
   created_at: new Date("2026-01-01T00:00:00.000Z"),
   updated_at: new Date("2026-01-01T00:00:00.000Z"),
 } as const satisfies WorldRow;
@@ -35,6 +42,7 @@ describe("world-service snapshot + create params", () => {
     expect(snap.worldId).toBe(gladiatorRow.id);
     expect(snap.slug).toBe("roma-gladiator-uprising");
     expect(snap.published_revision).toBe(2);
+    expect(snap.cover_image_url).toContain("unsplash");
     expect(snap).toHaveProperty("roma_seed");
     const seed = (snap as { roma_seed?: { theme?: string } }).roma_seed;
     expect(seed?.theme).toContain("Ancient Rome");
@@ -72,5 +80,7 @@ describe("world-service snapshot + create params", () => {
     expect(dto.forkCount).toBe(7);
     expect(dto.likeCount).toBe(12);
     expect(dto.liked).toBe(true);
+    expect(dto.coverImageUrl).toContain("unsplash");
+    expect(dto.cardTeaser).toBe("Short teaser.");
   });
 });

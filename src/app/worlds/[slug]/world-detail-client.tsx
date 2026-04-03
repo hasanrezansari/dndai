@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
@@ -12,11 +13,14 @@ export type WorldDetailClientProps = {
   slug: string;
   title: string;
   subtitle: string | null;
+  cardTeaser: string | null;
   description: string | null;
   tags: string[];
   isFeatured: boolean;
   forkCount: number;
   likeCount: number;
+  coverImageUrl: string | null;
+  coverImageAlt: string | null;
   /** Server-known like state when user was signed in during RSC render. */
   likedInitial?: boolean;
 };
@@ -134,7 +138,21 @@ export function WorldDetailClient(props: WorldDetailClientProps) {
         </Link>
       </header>
 
-      <main className="flex-1 max-w-lg mx-auto px-4 pt-8 space-y-6 w-full">
+      <main className="flex-1 max-w-lg mx-auto px-4 pt-6 space-y-6 w-full">
+        {props.coverImageUrl ? (
+          <div className="relative aspect-[2/1] w-full overflow-hidden rounded-[var(--radius-card)] border border-[rgba(77,70,53,0.25)] bg-[var(--color-deep-void)] -mx-0">
+            <Image
+              src={props.coverImageUrl}
+              alt={props.coverImageAlt || props.title}
+              fill
+              className="object-cover"
+              sizes="(max-width: 512px) 100vw, 512px"
+              priority
+            />
+            <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-[var(--color-obsidian)] via-transparent to-transparent" />
+          </div>
+        ) : null}
+
         <div>
           <div className="flex flex-wrap items-center gap-2">
             <h1 className="text-fantasy text-3xl font-black text-[var(--color-gold-rare)] tracking-tight">
@@ -146,9 +164,9 @@ export function WorldDetailClient(props: WorldDetailClientProps) {
               </span>
             ) : null}
           </div>
-          {props.subtitle ? (
+          {(props.cardTeaser || props.subtitle) ? (
             <p className="text-sm text-[var(--color-silver-dim)] mt-3 leading-relaxed">
-              {props.subtitle}
+              {props.cardTeaser || props.subtitle}
             </p>
           ) : null}
           <p className="text-[11px] text-[var(--outline)] mt-3 flex flex-wrap gap-x-3 gap-y-1">
@@ -158,9 +176,23 @@ export function WorldDetailClient(props: WorldDetailClientProps) {
         </div>
 
         {props.description ? (
-          <p className="text-sm text-[var(--color-silver-muted)] leading-relaxed whitespace-pre-wrap">
-            {props.description}
-          </p>
+          props.description.length > 360 ? (
+            <details className="group rounded-[var(--radius-card)] border border-[rgba(77,70,53,0.2)] bg-[var(--color-midnight)]/60 p-4 open:bg-[var(--surface-high)]/30">
+              <summary className="cursor-pointer text-xs font-bold uppercase tracking-[0.16em] text-[var(--color-gold-rare)] list-none flex items-center justify-between gap-2">
+                <span>Full premise</span>
+                <span className="material-symbols-outlined text-base text-[var(--outline)] group-open:rotate-180 transition-transform">
+                  expand_more
+                </span>
+              </summary>
+              <p className="text-sm text-[var(--color-silver-muted)] leading-relaxed whitespace-pre-wrap mt-3 pt-3 border-t border-[rgba(77,70,53,0.15)]">
+                {props.description}
+              </p>
+            </details>
+          ) : (
+            <p className="text-sm text-[var(--color-silver-muted)] leading-relaxed whitespace-pre-wrap">
+              {props.description}
+            </p>
+          )
         ) : null}
 
         {props.tags.length > 0 ? (

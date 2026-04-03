@@ -218,6 +218,28 @@ export const worlds = pgTable(
     is_featured: boolean("is_featured").notNull().default(false),
     /** Successful world forks (gallery + API); analytics only. */
     fork_count: integer("fork_count").notNull().default(0),
+    /** HTTPS poster / wide thumbnail for gallery cards (nullable = placeholder UI). */
+    cover_image_url: text("cover_image_url"),
+    cover_image_alt: text("cover_image_alt"),
+    /** One-line card hook under title when different from subtitle. */
+    card_teaser: text("card_teaser"),
+    /** UGC: submitter (null = staff-seeded catalog row). */
+    created_by_user_id: text("created_by_user_id").references(
+      () => authUsers.id,
+      { onDelete: "set null" },
+    ),
+    /** When the author sent this row for moderation (null = not submitted / canonical). */
+    submitted_for_review_at: timestamp("submitted_for_review_at", {
+      withTimezone: true,
+    }),
+    /**
+     * `none` — curated seed or published UGC after approval.
+     * `pending` — in moderation queue (always `status = draft`).
+     * `rejected` — moderator declined (`status` stays draft).
+     */
+    ugc_review_status: text("ugc_review_status").notNull().default("none"),
+    /** Short message shown to submitter when rejected (optional). */
+    rejection_reason: text("rejection_reason"),
     created_at: timestamp("created_at", { withTimezone: true })
       .notNull()
       .defaultNow(),
@@ -225,7 +247,11 @@ export const worlds = pgTable(
       .notNull()
       .defaultNow(),
   },
-  (t) => [index("worlds_status_idx").on(t.status)],
+  (t) => [
+    index("worlds_status_idx").on(t.status),
+    index("worlds_created_by_user_id_idx").on(t.created_by_user_id),
+    index("worlds_ugc_review_status_idx").on(t.ugc_review_status),
+  ],
 );
 
 /** Logged-in user like on a catalog world (public gallery signal only). */

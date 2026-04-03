@@ -726,6 +726,27 @@ export default function Home() {
               {COPY.landing.lead}
             </p>
 
+            <div className="mt-4 w-full flex flex-col gap-2 max-w-[280px] mx-auto">
+              <Link
+                href="/worlds"
+                className="min-h-[44px] w-full inline-flex items-center justify-center rounded-[var(--radius-button)] bg-gradient-to-b from-[var(--color-gold-rare)] to-[var(--color-gold-support)] text-[var(--color-obsidian)] font-bold uppercase tracking-[0.12em] text-xs shadow-[inset_0_1px_0_rgba(255,255,255,0.2),0_4px_12px_rgba(242,202,80,0.25)] hover:brightness-110 active:scale-[0.98] transition-all"
+              >
+                Browse story worlds
+              </Link>
+              <GhostButton
+                type="button"
+                size="md"
+                className="min-h-[40px] w-full text-[10px] uppercase tracking-[0.12em]"
+                onClick={() => {
+                  setJoinOpen(true);
+                  setJoinError(null);
+                  setJoinShakeKey(0);
+                }}
+              >
+                Join with code
+              </GhostButton>
+            </div>
+
             <div className="mt-3 flex items-center justify-center gap-2 flex-wrap">
               <Link
                 href="/profile"

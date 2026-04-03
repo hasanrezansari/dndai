@@ -57,11 +57,14 @@ export default async function WorldDetailPage(props: PageProps) {
       slug={dto.slug}
       title={dto.title}
       subtitle={dto.subtitle}
+      cardTeaser={dto.cardTeaser}
       description={dto.description}
       tags={dto.tags}
       isFeatured={dto.isFeatured}
       forkCount={dto.forkCount}
       likeCount={dto.likeCount}
+      coverImageUrl={dto.coverImageUrl}
+      coverImageAlt={dto.coverImageAlt}
       likedInitial={dto.liked}
     />
   );

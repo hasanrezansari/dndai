@@ -1,51 +1,73 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
 
-import { GlassCard } from "@/components/ui/glass-card";
+import { WorldLaneRail } from "@/components/worlds/world-lane-rail";
+import type { WorldGalleryCardModel } from "@/components/worlds/world-gallery-card";
+import { WorldGalleryCard } from "@/components/worlds/world-gallery-card";
 import { GoldButton } from "@/components/ui/gold-button";
 import { GhostButton } from "@/components/ui/ghost-button";
+import { GlassCard } from "@/components/ui/glass-card";
+import { ROMA_MODULES } from "@/lib/rome/modules";
 import { FEATURED_WORLD_SLUG } from "@/lib/worlds/featured-slug";
 
-type WorldCard = {
-  slug: string;
-  title: string;
-  subtitle: string | null;
-  sortOrder: number;
-  isFeatured: boolean;
-  forkCount: number;
-  likeCount: number;
-};
+const ROMA_SLUG_SET = new Set(
+  ROMA_MODULES.map((m) => m.key.replace(/_/g, "-")),
+);
 
-function parseWorldsPayload(data: unknown): WorldCard[] {
-  if (
-    typeof data !== "object" ||
-    data === null ||
-    !("worlds" in data) ||
-    !Array.isArray((data as { worlds: unknown }).worlds)
-  ) {
-    return [];
+type WorldLane = { id: string; title: string; worlds: WorldGalleryCardModel[] };
+
+function parseWorld(raw: unknown): WorldGalleryCardModel | null {
+  if (typeof raw !== "object" || raw === null) return null;
+  const o = raw as Record<string, unknown>;
+  if (typeof o.slug !== "string" || typeof o.title !== "string") return null;
+  const tags = Array.isArray(o.tags)
+    ? o.tags.map((t) => String(t)).filter(Boolean)
+    : [];
+  return {
+    slug: o.slug,
+    title: o.title,
+    subtitle: typeof o.subtitle === "string" ? o.subtitle : null,
+    cardTeaser: typeof o.cardTeaser === "string" ? o.cardTeaser : null,
+    forkCount: typeof o.forkCount === "number" ? o.forkCount : 0,
+    likeCount: typeof o.likeCount === "number" ? o.likeCount : 0,
+    tags,
+    coverImageUrl: typeof o.coverImageUrl === "string" ? o.coverImageUrl : null,
+    coverImageAlt: typeof o.coverImageAlt === "string" ? o.coverImageAlt : null,
+    isFeatured: o.isFeatured === true,
+  };
+}
+
+function parseGalleryPayload(data: unknown): {
+  worlds: WorldGalleryCardModel[];
+  lanes: WorldLane[];
+} {
+  if (typeof data !== "object" || data === null || !("worlds" in data)) {
+    return { worlds: [], lanes: [] };
   }
-  const raw = (data as { worlds: unknown[] }).worlds;
-  return raw
-    .map((w) => {
-      if (typeof w !== "object" || w === null) return null;
-      const o = w as Record<string, unknown>;
-      if (typeof o.slug !== "string" || typeof o.title !== "string") return null;
-      return {
-        slug: o.slug,
-        title: o.title,
-        subtitle: typeof o.subtitle === "string" ? o.subtitle : null,
-        sortOrder: typeof o.sortOrder === "number" ? o.sortOrder : 0,
-        isFeatured: o.isFeatured === true,
-        forkCount: typeof o.forkCount === "number" ? o.forkCount : 0,
-        likeCount: typeof o.likeCount === "number" ? o.likeCount : 0,
-      };
-    })
-    .filter((x): x is WorldCard => x !== null);
+  const wRaw = (data as { worlds: unknown }).worlds;
+  const worlds = Array.isArray(wRaw)
+    ? wRaw.map(parseWorld).filter((x): x is WorldGalleryCardModel => x !== null)
+    : [];
+  const lRaw = (data as { lanes?: unknown }).lanes;
+  const lanes: WorldLane[] = [];
+  if (Array.isArray(lRaw)) {
+    for (const lane of lRaw) {
+      if (typeof lane !== "object" || lane === null) continue;
+      const L = lane as Record<string, unknown>;
+      if (typeof L.id !== "string" || typeof L.title !== "string") continue;
+      const lw = L.worlds;
+      const laneWorlds = Array.isArray(lw)
+        ? lw.map(parseWorld).filter((x): x is WorldGalleryCardModel => x !== null)
+        : [];
+      lanes.push({ id: L.id, title: L.title, worlds: laneWorlds });
+    }
+  }
+  return { worlds, lanes };
 }
 
 export function WorldsGalleryClient() {
@@ -53,7 +75,9 @@ export function WorldsGalleryClient() {
   const { status } = useSession();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [worlds, setWorlds] = useState<WorldCard[]>([]);
+  const [worlds, setWorlds] = useState<WorldGalleryCardModel[]>([]);
+  const [lanes, setLanes] = useState<WorldLane[]>([]);
+  const [gridFilter, setGridFilter] = useState<"all" | "rome">("all");
   const [joinOpen, setJoinOpen] = useState(false);
   const [joinCode, setJoinCode] = useState("");
   const [joinBusy, setJoinBusy] = useState(false);
@@ -69,7 +93,9 @@ export function WorldsGalleryClient() {
         setError("Could not load worlds");
         return;
       }
-      setWorlds(parseWorldsPayload(data));
+      const parsed = parseGalleryPayload(data);
+      setWorlds(parsed.worlds);
+      setLanes(parsed.lanes);
     } catch {
       setError("Network error");
     } finally {
@@ -81,17 +107,18 @@ export function WorldsGalleryClient() {
     void load();
   }, [load]);
 
-  const { hero, rest } = useMemo(() => {
+  const { heroWorld, gridWorlds } = useMemo(() => {
     const heroWorld =
       worlds.find((w) => w.isFeatured) ??
       worlds.find((w) => w.slug === FEATURED_WORLD_SLUG) ??
-      worlds[0];
-    if (!heroWorld) return { hero: null as WorldCard | null, rest: [] as WorldCard[] };
-    return {
-      hero: heroWorld,
-      rest: worlds.filter((w) => w.slug !== heroWorld.slug),
-    };
-  }, [worlds]);
+      worlds[0] ??
+      null;
+    const filtered =
+      gridFilter === "rome"
+        ? worlds.filter((w) => ROMA_SLUG_SET.has(w.slug))
+        : worlds;
+    return { heroWorld, gridWorlds: filtered };
+  }, [worlds, gridFilter]);
 
   async function onJoinSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -200,8 +227,18 @@ export function WorldsGalleryClient() {
             Story worlds
           </h1>
           <p className="text-sm text-[var(--color-silver-dim)] leading-relaxed">
-            Pick a published setting, start a lobby, invite friends — same flow as home
-            create.
+            Browse settings like a streaming catalog — each world opens a detail page
+            where you can start a lobby.
+          </p>
+          <p className="text-[11px] text-[var(--outline)] leading-relaxed">
+            Creators with a Google account can{" "}
+            <Link
+              href="/worlds/submit"
+              className="text-[var(--color-gold-rare)] underline underline-offset-4"
+            >
+              submit a world
+            </Link>{" "}
+            for review (not shown publicly until approved).
           </p>
         </section>
 
@@ -229,7 +266,7 @@ export function WorldsGalleryClient() {
           <p className="text-xs text-[var(--color-silver-dim)]">Loading worlds…</p>
         ) : null}
 
-        {!loading && hero ? (
+        {!loading && heroWorld ? (
           <section className="space-y-3">
             <div className="flex items-center gap-2">
               <span className="w-1 h-4 bg-[var(--color-gold-rare)]/80 rounded-full" />
@@ -237,54 +274,94 @@ export function WorldsGalleryClient() {
                 Featured
               </h2>
             </div>
-            <Link href={`/worlds/${hero.slug}`} className="block group">
-              <GlassCard className="p-5 border border-[rgba(77,70,53,0.28)] bg-[var(--surface-container)]/40 transition-colors group-hover:border-[var(--color-gold-rare)]/30">
-                <h3 className="text-fantasy text-xl font-bold text-[var(--color-silver-muted)]">
-                  {hero.title}
-                </h3>
-                {hero.subtitle ? (
-                  <p className="text-sm text-[var(--color-silver-dim)] mt-2 leading-relaxed">
-                    {hero.subtitle}
-                  </p>
-                ) : null}
-                <p className="text-[10px] text-[var(--outline)] mt-3">
-                  {hero.forkCount} starts · {hero.likeCount} likes
-                </p>
-                <p className="text-[10px] uppercase tracking-[0.18em] text-[var(--color-gold-rare)] mt-2">
-                  Open world →
-                </p>
+            <Link href={`/worlds/${heroWorld.slug}`} className="block group">
+              <GlassCard className="overflow-hidden p-0 border border-[rgba(77,70,53,0.28)] bg-[var(--surface-container)]/40 transition-colors group-hover:border-[var(--color-gold-rare)]/30">
+                <div className="relative aspect-[21/9] w-full bg-[var(--color-deep-void)]">
+                  {heroWorld.coverImageUrl ? (
+                    <Image
+                      src={heroWorld.coverImageUrl}
+                      alt={heroWorld.coverImageAlt || heroWorld.title}
+                      fill
+                      className="object-cover"
+                      sizes="(max-width: 768px) 100vw, 720px"
+                      priority
+                    />
+                  ) : (
+                    <div className="absolute inset-0 bg-gradient-to-br from-[rgba(212,175,55,0.15)] to-[var(--color-obsidian)] flex items-center justify-center">
+                      <span className="text-fantasy text-5xl font-black text-[var(--color-gold-rare)]/25">
+                        {heroWorld.title.slice(0, 1)}
+                      </span>
+                    </div>
+                  )}
+                  <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-[var(--color-obsidian)] via-[var(--color-obsidian)]/40 to-transparent" />
+                  <div className="absolute bottom-0 left-0 right-0 p-5 space-y-2">
+                    <h3 className="text-fantasy text-2xl font-bold text-[var(--color-silver-muted)]">
+                      {heroWorld.title}
+                    </h3>
+                    {(heroWorld.cardTeaser || heroWorld.subtitle) ? (
+                      <p className="text-sm text-[var(--color-silver-dim)] leading-relaxed line-clamp-2">
+                        {heroWorld.cardTeaser || heroWorld.subtitle}
+                      </p>
+                    ) : null}
+                    <p className="text-[10px] text-[var(--outline)]">
+                      {heroWorld.forkCount} starts · {heroWorld.likeCount} likes · Open world →
+                    </p>
+                  </div>
+                </div>
               </GlassCard>
             </Link>
           </section>
         ) : null}
 
-        {rest.length > 0 ? (
+        {!loading && lanes.map((lane) => (
+          <WorldLaneRail key={lane.id} title={lane.title} worlds={lane.worlds} />
+        ))}
+
+        {!loading && worlds.length > 0 ? (
           <section className="space-y-3">
-            <div className="flex items-center gap-2">
-              <span className="w-1 h-4 bg-[var(--color-gold-rare)]/80 rounded-full" />
-              <h2 className="text-[10px] font-black uppercase tracking-[0.2em] text-[var(--outline)]">
-                All worlds
-              </h2>
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div className="flex items-center gap-2">
+                <span className="w-1 h-4 bg-[var(--color-gold-rare)]/80 rounded-full" />
+                <h2 className="text-[10px] font-black uppercase tracking-[0.2em] text-[var(--outline)]">
+                  All worlds
+                </h2>
+              </div>
+              <div className="flex gap-1 p-0.5 rounded-[var(--radius-chip)] bg-[var(--color-deep-void)] border border-[rgba(77,70,53,0.2)]">
+                <button
+                  type="button"
+                  onClick={() => setGridFilter("all")}
+                  className={`px-2.5 py-1 rounded-[var(--radius-chip)] text-[9px] font-black uppercase tracking-[0.14em] transition-colors ${
+                    gridFilter === "all"
+                      ? "bg-[var(--color-gold-rare)]/20 text-[var(--color-gold-rare)]"
+                      : "text-[var(--outline)] hover:text-[var(--color-silver-dim)]"
+                  }`}
+                >
+                  All
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setGridFilter("rome")}
+                  className={`px-2.5 py-1 rounded-[var(--radius-chip)] text-[9px] font-black uppercase tracking-[0.14em] transition-colors ${
+                    gridFilter === "rome"
+                      ? "bg-[var(--color-gold-rare)]/20 text-[var(--color-gold-rare)]"
+                      : "text-[var(--outline)] hover:text-[var(--color-silver-dim)]"
+                  }`}
+                >
+                  Rome
+                </button>
+              </div>
             </div>
-            <div className="grid gap-3 sm:grid-cols-2">
-              {rest.map((w) => (
-                <Link key={w.slug} href={`/worlds/${w.slug}`} className="block group">
-                  <GlassCard className="h-full p-4 border border-[rgba(77,70,53,0.2)] bg-[var(--color-midnight)]/80 min-h-[120px] transition-colors group-hover:border-[var(--color-gold-rare)]/28">
-                    <h3 className="text-fantasy text-base font-bold text-[var(--color-silver-muted)]">
-                      {w.title}
-                    </h3>
-                    {w.subtitle ? (
-                      <p className="text-xs text-[var(--color-silver-dim)] mt-2 line-clamp-3">
-                        {w.subtitle}
-                      </p>
-                    ) : null}
-                    <p className="text-[10px] text-[var(--outline)] mt-2">
-                      {w.forkCount} starts · {w.likeCount} likes
-                    </p>
-                  </GlassCard>
-                </Link>
-              ))}
-            </div>
+            {gridWorlds.length === 0 ? (
+              <p className="text-xs text-[var(--color-silver-dim)]">
+                No worlds in this filter.
+              </p>
+            ) : (
+              <div className="grid gap-4 sm:grid-cols-2">
+                {gridWorlds.map((w) => (
+                  <WorldGalleryCard key={w.slug} world={w} variant="grid" />
+                ))}
+              </div>
+            )}
           </section>
         ) : null}
 

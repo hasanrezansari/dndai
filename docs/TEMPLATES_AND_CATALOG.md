@@ -262,6 +262,7 @@ Use the checklist below as a **high-level** mirror of that doc (not library hygi
 
 - [ ] **Schema:** `worlds` / `catalog_items` (or equivalent) + revisions; `sessions` gains `world_id`, `world_revision`, `world_snapshot` (JSON) set at fork.
 - [ ] **API:** Public list (published worlds); authenticated fork; optional admin publish/unpublish.
+- [ ] **Deferred — UGC moderation UI:** Community submissions use internal Bearer APIs today (`GET /api/internal/world-submissions`, `POST /api/internal/world-submissions/[id]` with `ASHVEIL_INTERNAL_METRICS=1`). **In-app reviewer / admin console** — later (same gates or stronger RBAC).
 - [ ] **Landing / home:** Netflix-style layout for playdndai.com main game; featured row + lanes; mobile-first horizontal scroll where needed.
 - [ ] **Fork:** Immutable snapshot on create; tests for unpublish + active session.
 - [ ] **Metrics (phase 2):** play counts, likes, category rankings — event pipeline from fork / complete / rate.

@@ -1,6 +1,6 @@
 /**
  * Phase 2: upsert published `worlds` rows from `ROMA_MODULES` + `ROMA_SEEDS`.
- * Idempotent on `slug`. Requires `DATABASE_URL` and migrations through `0014` (`worlds` + metrics).
+ * Idempotent on `slug`. Requires `DATABASE_URL` and migrations through `0015` (cover columns).
  *
  * @see docs/WORLDS_CATALOG_IMPLEMENTATION_PHASES.md — Phase 2
  */
@@ -10,6 +10,7 @@ import { worlds } from "@/lib/db/schema";
 import { ROMA_MODULES } from "@/lib/rome/modules";
 import { ROMA_SEEDS } from "@/lib/rome/seeder";
 import { FEATURED_WORLD_MODULE_KEY } from "@/lib/worlds/featured-slug";
+import { ROMA_GALLERY_COVERS } from "@/lib/worlds/roma-gallery-covers";
 
 loadEnvConfig(process.cwd());
 
@@ -23,6 +24,7 @@ async function main() {
     const mod = ROMA_MODULES[i];
     if (!mod) continue;
     const seed = ROMA_SEEDS[mod.key];
+    const cover = ROMA_GALLERY_COVERS[mod.key];
     const slug = moduleKeyToSlug(mod.key);
     const snapshot_definition: Record<string, unknown> = {
       theme: seed.theme,
@@ -39,7 +41,10 @@ async function main() {
         slug,
         title: mod.title,
         subtitle: mod.pitch,
+        card_teaser: mod.pitch,
         description: seed.theme,
+        cover_image_url: cover.url,
+        cover_image_alt: cover.alt,
         status: "published",
         sort_order: i,
         module_key: mod.key,
@@ -56,7 +61,10 @@ async function main() {
         set: {
           title: mod.title,
           subtitle: mod.pitch,
+          card_teaser: mod.pitch,
           description: seed.theme,
+          cover_image_url: cover.url,
+          cover_image_alt: cover.alt,
           status: "published",
           sort_order: i,
           module_key: mod.key,

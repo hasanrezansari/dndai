@@ -9,6 +9,7 @@ import { ApiError } from "@/lib/api/errors";
 import { isPlayRomanaModuleKey } from "@/lib/ai/narrative-session-profile";
 import { db } from "@/lib/db";
 import { worldLikes, worlds } from "@/lib/db/schema";
+import { ROMA_MODULES } from "@/lib/rome/modules";
 import { ROMA_SEEDS } from "@/lib/rome/seeder";
 import { CampaignModeSchema } from "@/lib/schemas/enums";
 import type { CampaignMode, SessionMode } from "@/lib/schemas/enums";
@@ -20,16 +21,26 @@ export type WorldCardDto = {
   slug: string;
   title: string;
   subtitle: string | null;
+  /** Short hook on cards; falls back to subtitle in UI when null. */
+  cardTeaser: string | null;
   sortOrder: number;
   isFeatured: boolean;
   forkCount: number;
   likeCount: number;
+  tags: string[];
+  coverImageUrl: string | null;
+  coverImageAlt: string | null;
+};
+
+export type WorldLaneDto = {
+  id: string;
+  title: string;
+  worlds: WorldCardDto[];
 };
 
 export type WorldDetailDto = WorldCardDto & {
   description: string | null;
   moduleKey: string | null;
-  tags: string[];
   /** Present when the request had a signed-in user. */
   liked?: boolean;
 };
@@ -78,7 +89,10 @@ export function buildImmutableWorldSnapshot(row: WorldRow): Record<string, unkno
     slug: row.slug,
     title: row.title,
     subtitle: row.subtitle,
+    card_teaser: row.card_teaser,
     description: row.description,
+    cover_image_url: row.cover_image_url,
+    cover_image_alt: row.cover_image_alt,
     module_key: row.module_key,
     campaign_mode_default: row.campaign_mode_default,
     published_revision: row.published_revision,
@@ -159,6 +173,69 @@ async function countLikesByWorldIds(worldIds: string[]): Promise<Map<string, num
   return map;
 }
 
+const ROMA_SLUG_SET = new Set(
+  ROMA_MODULES.map((m) => m.key.replace(/_/g, "-")),
+);
+
+function rowToWorldCardDto(
+  row: WorldRow,
+  likeMap: Map<string, number>,
+): WorldCardDto {
+  return {
+    slug: row.slug,
+    title: row.title,
+    subtitle: row.subtitle,
+    cardTeaser: row.card_teaser,
+    sortOrder: row.sort_order,
+    isFeatured: row.is_featured,
+    forkCount: row.fork_count,
+    likeCount: likeMap.get(row.id) ?? 0,
+    tags: snapshotTags(row),
+    coverImageUrl: row.cover_image_url,
+    coverImageAlt: row.cover_image_alt,
+  };
+}
+
+function buildStaticLanes(cards: WorldCardDto[]): WorldLaneDto[] {
+  const featured = cards.filter((c) => c.isFeatured);
+  const staffWorlds =
+    featured.length > 0 ? featured : cards.slice(0, Math.min(3, cards.length));
+  const rome = cards.filter((c) => ROMA_SLUG_SET.has(c.slug));
+  const popular = [...cards]
+    .sort((a, b) => b.forkCount - a.forkCount)
+    .slice(0, 6);
+  const lanes: WorldLaneDto[] = [];
+  if (staffWorlds.length > 0) {
+    lanes.push({ id: "staff", title: "Staff picks", worlds: staffWorlds });
+  }
+  if (rome.length > 0) {
+    lanes.push({ id: "rome", title: "Ancient Rome", worlds: rome });
+  }
+  if (popular.length > 0) {
+    lanes.push({ id: "popular", title: "Popular now", worlds: popular });
+  }
+  return lanes;
+}
+
+async function loadPublishedWorldRows(): Promise<WorldRow[]> {
+  return db
+    .select()
+    .from(worlds)
+    .where(eq(worlds.status, "published"))
+    .orderBy(desc(worlds.is_featured), asc(worlds.sort_order), asc(worlds.title));
+}
+
+/** Gallery API: full card list plus curated horizontal lanes. */
+export async function getPublishedWorldsGalleryData(): Promise<{
+  worlds: WorldCardDto[];
+  lanes: WorldLaneDto[];
+}> {
+  const rows = await loadPublishedWorldRows();
+  const likeMap = await countLikesByWorldIds(rows.map((r) => r.id));
+  const cards = rows.map((r) => rowToWorldCardDto(r, likeMap));
+  return { worlds: cards, lanes: buildStaticLanes(cards) };
+}
+
 export async function getWorldLikeCount(worldId: string): Promise<number> {
   const [row] = await db
     .select({ n: sql<number>`count(*)::int` })
@@ -221,31 +298,8 @@ async function incrementWorldForkCount(worldId: string): Promise<void> {
 }
 
 export async function listPublishedWorlds(): Promise<WorldCardDto[]> {
-  const rows = await db
-    .select({
-      id: worlds.id,
-      slug: worlds.slug,
-      title: worlds.title,
-      subtitle: worlds.subtitle,
-      sort_order: worlds.sort_order,
-      is_featured: worlds.is_featured,
-      fork_count: worlds.fork_count,
-    })
-    .from(worlds)
-    .where(eq(worlds.status, "published"))
-    .orderBy(desc(worlds.is_featured), asc(worlds.sort_order), asc(worlds.title));
-
-  const likeMap = await countLikesByWorldIds(rows.map((r) => r.id));
-
-  return rows.map((r) => ({
-    slug: r.slug,
-    title: r.title,
-    subtitle: r.subtitle,
-    sortOrder: r.sort_order,
-    isFeatured: r.is_featured,
-    forkCount: r.fork_count,
-    likeCount: likeMap.get(r.id) ?? 0,
-  }));
+  const { worlds: cards } = await getPublishedWorldsGalleryData();
+  return cards;
 }
 
 export async function getPublishedWorldBySlug(
@@ -284,18 +338,15 @@ export function worldRowToDetailDto(
   row: WorldRow,
   extras?: { likeCount?: number; liked?: boolean },
 ): WorldDetailDto {
+  const likeCount = extras?.likeCount ?? 0;
+  const likeMap = new Map<string, number>([[row.id, likeCount]]);
+  const base = rowToWorldCardDto(row, likeMap);
   return {
-    slug: row.slug,
-    title: row.title,
-    subtitle: row.subtitle,
-    sortOrder: row.sort_order,
-    isFeatured: row.is_featured,
-    forkCount: row.fork_count,
-    likeCount: extras?.likeCount ?? 0,
+    ...base,
+    likeCount,
     liked: extras?.liked,
     description: row.description,
     moduleKey: row.module_key,
-    tags: snapshotTags(row),
   };
 }
 
@@ -372,6 +423,8 @@ export async function listWorldsMetricsRows(): Promise<
     isFeatured: boolean;
     forkCount: number;
     likeCount: number;
+    ugcReviewStatus: string;
+    isUserSubmitted: boolean;
   }>
 > {
   const wRows = await db
@@ -382,6 +435,8 @@ export async function listWorldsMetricsRows(): Promise<
       status: worlds.status,
       is_featured: worlds.is_featured,
       fork_count: worlds.fork_count,
+      ugc_review_status: worlds.ugc_review_status,
+      created_by_user_id: worlds.created_by_user_id,
     })
     .from(worlds)
     .orderBy(asc(worlds.sort_order), asc(worlds.title));
@@ -395,5 +450,7 @@ export async function listWorldsMetricsRows(): Promise<
     isFeatured: r.is_featured,
     forkCount: r.fork_count,
     likeCount: likeMap.get(r.id) ?? 0,
+    ugcReviewStatus: r.ugc_review_status,
+    isUserSubmitted: r.created_by_user_id != null,
   }));
 }
