@@ -58,7 +58,7 @@
   --radius-avatar: 4px;
   --radius-pill: 9999px;
 
-  /* CTA shadow — referenced by GoldButton; overridden on WhatIfPlay skin */
+  /* CTA shadow — referenced by GoldButton; overridden on main app skin */
   --shadow-cta-glow: 0 4px 12px rgba(242, 202, 80, 0.3);
 
   --border-ui: rgba(77, 70, 53, 0.2);
@@ -67,36 +67,47 @@
 }
 
 /*
- * WhatIfPlay (main app / Falvos build only).
+ * Main app skin (build key still "falvos" in brand.ts).
  * PlayRomana uses html[data-app-skin="playromana"] and inherits :root tokens above.
  */
 html[data-app-skin="whatifplay"] {
-  --color-obsidian: #0c0a14;
-  --color-midnight: #12101c;
-  --color-deep-void: #08060e;
+  /* Slightly lifted bases for readability (still midnight, not gray) */
+  --color-obsidian: #12101e;
+  --color-midnight: #1a1728;
+  --color-deep-void: #0f0d18;
 
-  --color-gold-rare: #e8a84a;
-  --color-gold-support: #c76e2a;
+  --color-gold-rare: #ebb062;
+  --color-gold-support: #d2783a;
 
-  --surface-container: #161326;
-  --surface-high: #1e1c2e;
-  --surface-highest: #262238;
-  --surface-bright: #2e2c42;
-  --outline-variant: rgba(167, 139, 250, 0.22);
-  --outline: rgba(196, 181, 253, 0.45);
+  --surface-container: #1e1b32;
+  --surface-high: #28253e;
+  --surface-highest: #322e4a;
+  --surface-bright: #3a3654;
+  /* Stronger label / hint contrast on dark UI */
+  --outline-variant: rgba(186, 172, 232, 0.5);
+  --outline: rgba(220, 210, 248, 0.82);
 
   --atmosphere-exploration: #1e3a5f;
   --atmosphere-combat: #8b2c1a;
   --atmosphere-mystery: #5b21b6;
   --atmosphere-social: #b45309;
 
-  --color-silver-muted: #e8e4f0;
-  --color-silver-dim: #a8a0b8;
+  --color-silver-muted: #f2eef9;
+  --color-silver-dim: #c9c0dc;
 
-  --glass-bg: rgba(18, 16, 38, 0.72);
-  --glass-bg-heavy: rgba(12, 10, 22, 0.9);
-  --glass-edge-glow: 0 0 24px rgba(34, 211, 238, 0.08);
-  --glass-inner-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  /* Semantic text (optional; use for long body / captions) */
+  --text-secondary: #e4def4;
+  --text-tertiary: #b2a8c8;
+
+  /* Sparingly: links, focus hints, atmosphere — not primary CTAs */
+  --accent-cyan: #5eead4;
+  --accent-cyan-muted: rgba(94, 234, 212, 0.5);
+
+  --glass-bg: rgba(26, 24, 46, 0.82);
+  --glass-bg-heavy: rgba(18, 16, 34, 0.93);
+  --glass-edge-glow: 0 0 28px rgba(45, 212, 191, 0.1),
+    0 0 56px rgba(124, 58, 237, 0.07);
+  --glass-inner-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.09);
 
   --radius-card: 14px;
   --radius-button: 12px;
@@ -105,9 +116,48 @@ html[data-app-skin="whatifplay"] {
 
   --shadow-cta-glow: 0 4px 18px rgba(232, 168, 74, 0.38);
 
-  --border-ui: color-mix(in srgb, var(--outline) 22%, transparent);
-  --border-ui-strong: color-mix(in srgb, var(--outline) 38%, transparent);
-  --border-divide: color-mix(in srgb, var(--outline) 14%, transparent);
+  --border-ui: color-mix(in srgb, var(--outline) 26%, transparent);
+  --border-ui-strong: color-mix(in srgb, var(--outline) 42%, transparent);
+  --border-divide: color-mix(in srgb, var(--outline) 18%, transparent);
+}
+
+/* Main app: deeper stacked glass + gold selection aligned to tokens */
+html[data-app-skin="whatifplay"] .glass {
+  box-shadow: var(--glass-inner-shadow), 0 16px 48px rgba(0, 0, 0, 0.38);
+}
+
+html[data-app-skin="whatifplay"] .glass-heavy {
+  box-shadow: var(--glass-inner-shadow), 0 20px 56px rgba(0, 0, 0, 0.45);
+}
+
+html[data-app-skin="whatifplay"] .metallic-edge {
+  border-color: color-mix(in srgb, var(--color-gold-rare) 45%, var(--border-ui-strong));
+}
+
+html[data-app-skin="whatifplay"] .selected-glow {
+  box-shadow: 0 0 28px color-mix(in srgb, var(--color-gold-rare) 28%, transparent),
+    inset 0 0 14px color-mix(in srgb, var(--color-gold-rare) 12%, transparent);
+  border-color: var(--color-gold-rare);
+}
+
+/* Full-page atmosphere for home (applied only on main app home in React) */
+html[data-app-skin="whatifplay"] .home-atmosphere-layer {
+  background: radial-gradient(
+      ellipse 120% 90% at 50% -15%,
+      color-mix(in srgb, var(--atmosphere-mystery) 32%, transparent) 0%,
+      transparent 58%
+    ),
+    radial-gradient(
+      ellipse 85% 70% at 95% 25%,
+      color-mix(in srgb, var(--atmosphere-exploration) 26%, transparent) 0%,
+      transparent 52%
+    ),
+    radial-gradient(
+      ellipse 75% 55% at 5% 75%,
+      rgba(45, 212, 191, 0.07) 0%,
+      transparent 48%
+    ),
+    var(--color-obsidian);
 }
 
 @theme inline {

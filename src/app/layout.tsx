@@ -34,7 +34,7 @@ export const metadata: Metadata = {
   description:
     metaBrand === "playromana"
       ? "Curated Roman adventures. Start instantly, invite friends, and let the world respond."
-      : "WhatIfPlay — multiplayer storytelling in any genre. AI or human narrator, shared heroes, turns, and scene art in one link.",
+      : "WhatIf — multiplayer storytelling in any genre. AI or human narrator, shared heroes, turns, and scene art in one link.",
   metadataBase: new URL(
     process.env.NEXTAUTH_URL ?? "https://playdndai.com",
   ),

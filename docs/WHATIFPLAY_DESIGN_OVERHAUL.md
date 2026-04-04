@@ -30,7 +30,7 @@ Hard rules — DO NOT VIOLATE:
 - Do not rename internal state variables or API payload keys unless you can prove zero behavioral change; prefer label/copy changes only.
 
 Brand and copy (main app / Falvos build only):
-- Platform name: WhatIfPlay (replace Falvos on main build surfaces only; see §3).
+- Platform name: **WhatIf** (replace Falvos on main build surfaces only; see §3). Public site domain may be **whatifplay.com**; do not use “WhatIfPlay” as the product wordmark.
 - Do not use RezPez as host or presenter (forbidden framing).
 - Do not force every story/session title to start with “What if”; use “what if” on marketing/discovery surfaces only.
 
@@ -247,8 +247,8 @@ API tree: `src/app/api/**` — **read-only for this project** unless an emergenc
 
 | Avoid (main app product shell) | Preferred direction |
 |--------------------------------|---------------------|
-| Ashveil / obsidian-core lore branding | WhatIfPlay |
-| Falvos (display name on main build) | WhatIfPlay |
+| Ashveil / obsidian-core lore branding | WhatIf |
+| Falvos (display name on main build) | WhatIf |
 | “AI Dungeon Master” / “Human Dungeon Master” (tone) | AI Narrator / Human Narrator |
 | “Select Master Presence” | Choose how to play / Who runs this table? |
 | “The Narrative Seed” (if used as label) | Story prompt |
@@ -266,7 +266,7 @@ API tree: `src/app/api/**` — **read-only for this project** unless an emergenc
 
 ## 10. Forbidden / allowed (brand)
 
-**Required (main app visible UI):** Platform name WhatIfPlay.
+**Required (main app visible UI):** Platform name **WhatIf** (domain **whatifplay.com** is URLs only, not the on-screen product name).
 
 **Forbidden:**
 
@@ -368,7 +368,7 @@ When Phase 0 is complete, implementation may proceed phase-by-phase with §12 as
 
 ## 18. Phase 9 — Changed / unchanged / risks (agent log, 2026-04-04)
 
-**Changed (user-visible / styling):** Scoped tokens under `html[data-app-skin="whatifplay"]`, shared `--border-ui*`, main-app copy via `brand.ts` / `copy/ashveil.ts`, home / lobby / character / session shell / worlds / profile / adventures / feed / party UI / auth gate presentation (including OAuth banner, guest name field, GlassCard borders, Google handoff spinner copy). **Session play:** clearer vertical layers (scene `header`, status strip, `section` for feed, sticky `footer` for composer + safe-area). **Wire copy (display-only defaults):** tutorial opening no longer says “Falvos”; final-chapter fallback title `"Your story"` instead of `"Ashveil Chronicle"`. **Domain cutover:** JSDoc on `site-url.ts` / `main-app-public.ts` and `.env.example` lines for `whatifplay.com`.
+**Changed (user-visible / styling):** Scoped tokens under `html[data-app-skin="whatifplay"]`, shared `--border-ui*`, main-app copy via `brand.ts` / `copy/ashveil.ts`, home / lobby / character / session shell / worlds / profile / adventures / feed / party UI / auth gate presentation (including OAuth banner, guest name field, GlassCard borders, Google handoff spinner copy). **Session play:** clearer vertical layers (scene `header`, status strip, `section` for feed, sticky `footer` for composer + safe-area). **Wire copy (display-only defaults):** tutorial opening no longer says “Falvos”; final-chapter fallback title `"Your story"` instead of `"Ashveil Chronicle"`. **Domain cutover:** JSDoc on `site-url.ts` / `main-app-public.ts` and `.env.example` lines for `whatifplay.com`. **Product name:** user-facing **WhatIf** (domain **whatifplay.com** is not the wordmark). **Readability / home IA:** brighter text tokens, full-page atmosphere, mode cards directly under hero, “How it works” + lead copy in a `<details>` block.
 
 **Intentionally unchanged:** All `fetch` URLs, methods, JSON bodies, Pusher payloads, Zustand semantics, PlayRomana-specific UI branches and copy, internal identifiers (`@ashveil.guest`, template keys). Default public origins remain `playdndai.com` until env is updated. OpenRouter `X-Title` headers may still say Ashveil (optional rename).
 

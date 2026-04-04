@@ -12,7 +12,7 @@ export function getBrandName(brand: AppBrand): string {
       return "PlayRomana";
     case "falvos":
     default:
-      return "WhatIfPlay";
+      return "WhatIf";
   }
 }
 

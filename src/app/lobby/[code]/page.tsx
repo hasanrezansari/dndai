@@ -648,7 +648,7 @@ export default function LobbyPage() {
               alt={
                 getBuildTimeBrand() === "playromana"
                   ? "PlayRomana adventure key art"
-                  : "WhatIfPlay story key art"
+                  : "WhatIf story key art"
               }
               className="absolute inset-0 h-full w-full object-cover"
               loading="eager"

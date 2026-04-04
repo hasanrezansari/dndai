@@ -45,7 +45,7 @@ export const COPY = {
       "Narration, scene images, and rule support — steered by your premise, not a fixed genre.",
     humanCardTitle: "Human narrator",
     humanCardBody:
-      "A person at the table drives the story; WhatIfPlay keeps characters, votes, and state in sync.",
+      "A person at the table drives the story; WhatIf keeps characters, votes, and state in sync.",
     partyCardTitle: "Party game",
     partyCardBody:
       "Fast room: one shared scene — everyone pitches a line each round, AI weaves them, you vote for the take that should steer the story. No hero builder; names are just for the scoreboard. Separate from campaign quests.",

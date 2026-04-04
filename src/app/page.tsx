@@ -712,35 +712,36 @@ export default function Home() {
   }
 
   return (
-    <main className="min-h-dvh flex flex-col items-center px-5 pb-[calc(2rem+env(safe-area-inset-bottom))] bg-[var(--color-obsidian)]">
-      <div className="flex flex-col gap-[var(--void-gap)] w-full max-w-lg pt-8">
-        {/* Hero — L1 spec: headline + sub + CTAs scroll to setup */}
-        <header className="relative overflow-hidden rounded-[var(--radius-card)] border border-[var(--border-ui)] bg-[var(--surface-container)]/35 backdrop-blur-[10px] px-6 py-8 sm:py-9">
-          <div className="pointer-events-none absolute inset-0 opacity-80">
-            <div className="absolute -top-20 -left-28 h-64 w-64 rounded-full bg-[color-mix(in_srgb,var(--color-gold-rare)_14%,transparent)] blur-3xl" />
-            <div className="absolute -bottom-24 -right-32 h-80 w-80 rounded-full bg-[color-mix(in_srgb,var(--atmosphere-mystery)_18%,transparent)] blur-3xl" />
-            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 h-48 w-48 rounded-full bg-[color-mix(in_srgb,var(--atmosphere-exploration)_12%,transparent)] blur-3xl" />
-            <div className="absolute inset-0 bg-gradient-to-b from-transparent via-transparent to-[var(--color-obsidian)]/90" />
+    <main className="relative z-[1] min-h-dvh flex flex-col items-center px-5 pb-[calc(2rem+env(safe-area-inset-bottom))]">
+      <div
+        className="home-atmosphere-layer pointer-events-none fixed inset-0 -z-10 min-h-dvh bg-[var(--color-obsidian)]"
+        aria-hidden
+      />
+      <div className="flex flex-col gap-[var(--void-gap)] w-full max-w-lg pt-6 sm:pt-8">
+        {/* Hero — compact; full pitch lives under “How it works” */}
+        <header className="relative overflow-hidden rounded-[var(--radius-card)] border border-[var(--border-ui)] bg-[var(--surface-container)]/45 backdrop-blur-[12px] px-5 py-6 sm:px-6 sm:py-7 shadow-[0_20px_60px_rgba(0,0,0,0.35)]">
+          <div className="pointer-events-none absolute inset-0 opacity-90">
+            <div className="absolute -top-16 -left-24 h-56 w-56 rounded-full bg-[color-mix(in_srgb,var(--color-gold-rare)_16%,transparent)] blur-3xl" />
+            <div className="absolute -bottom-20 -right-28 h-72 w-72 rounded-full bg-[color-mix(in_srgb,var(--atmosphere-mystery)_22%,transparent)] blur-3xl" />
+            <div className="absolute top-1/3 right-0 h-40 w-40 rounded-full bg-[color-mix(in_srgb,var(--accent-cyan)_08%,transparent)] blur-3xl" />
+            <div className="absolute inset-0 bg-gradient-to-b from-transparent via-transparent to-[var(--color-obsidian)]/88" />
           </div>
 
           <div className="relative flex flex-col gap-3 text-left">
-            <p className="text-[10px] uppercase tracking-[0.26em] text-[var(--outline)]">
+            <p className="pl-3 border-l-2 border-[var(--accent-cyan-muted)] text-[10px] uppercase tracking-[0.22em] text-[var(--text-tertiary)]">
               {COPY.landing.eyebrow}
             </p>
-            <p className="text-xs font-semibold tracking-[0.12em] text-[var(--color-gold-rare)]">
+            <p className="text-sm font-semibold tracking-[0.14em] text-[var(--color-gold-rare)]">
               {getBrandName(brand)}
             </p>
             <h1 className="text-[1.65rem] sm:text-3xl font-bold text-[var(--color-silver-muted)] leading-[1.2] tracking-tight font-[family-name:var(--font-gameplay)]">
               {COPY.landing.heroTitle}
             </h1>
-            <p className="text-sm text-[var(--color-silver-dim)] leading-relaxed max-w-[28rem]">
+            <p className="text-[15px] sm:text-base text-[var(--text-secondary)] leading-relaxed max-w-[28rem] font-[family-name:var(--font-gameplay)]">
               {COPY.landing.heroSub}
             </p>
-            <p className="text-xs text-[var(--color-silver-dim)]/95 leading-relaxed max-w-[28rem] border-t border-[var(--border-ui)] pt-4 mt-1">
-              {COPY.landing.lead}
-            </p>
 
-            <div className="mt-5 flex flex-col gap-3 sm:flex-row sm:flex-wrap">
+            <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:flex-wrap">
               <GoldButton
                 type="button"
                 size="lg"
@@ -763,7 +764,7 @@ export default function Home() {
               </GhostButton>
               <Link
                 href="/worlds"
-                className="w-full sm:w-auto min-h-[48px] inline-flex items-center justify-center rounded-[var(--radius-button)] border border-[var(--border-ui-strong)] px-6 text-xs font-bold uppercase tracking-[0.12em] text-[var(--color-silver-muted)] hover:border-[var(--color-gold-rare)] hover:text-[var(--color-gold-rare)] transition-all [transition-timing-function:var(--ease-out-soft)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-gold-rare)]/70 focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--color-obsidian)]"
+                className="w-full sm:w-auto min-h-[48px] inline-flex items-center justify-center rounded-[var(--radius-button)] border border-[var(--border-ui-strong)] px-6 text-xs font-bold uppercase tracking-[0.12em] text-[var(--color-silver-muted)] hover:border-[color-mix(in_srgb,var(--accent-cyan)_55%,var(--border-ui-strong))] hover:text-[var(--accent-cyan)] transition-all [transition-timing-function:var(--ease-out-soft)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-cyan)]/45 focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--color-obsidian)]"
               >
                 {COPY.landing.browseWorldsCta}
               </Link>
@@ -860,39 +861,7 @@ export default function Home() {
           </div>
         </header>
 
-        <section
-          className="rounded-[var(--radius-card)] border border-[var(--border-ui)] bg-[var(--color-midnight)]/85 p-4 space-y-3"
-          aria-labelledby="how-it-works-heading"
-        >
-          <div className="flex items-center gap-2">
-            <span className="w-1 h-4 bg-[var(--color-gold-rare)]/80 rounded-full" />
-            <h2
-              id="how-it-works-heading"
-              className="text-[10px] font-black uppercase tracking-[0.2em] text-[var(--outline)]"
-            >
-              {COPY.landing.howTitle}
-            </h2>
-          </div>
-          <ol className="space-y-3 list-none m-0 p-0">
-            {COPY.landing.steps.map((step, i) => (
-              <li key={step.title} className="flex gap-3">
-                <span className="shrink-0 w-6 h-6 rounded-full border border-[rgba(212,175,55,0.35)] text-[10px] font-black text-[var(--color-gold-rare)] grid place-items-center">
-                  {i + 1}
-                </span>
-                <div className="min-w-0">
-                  <p className="text-xs font-bold text-[var(--color-silver-muted)]">
-                    {step.title}
-                  </p>
-                  <p className="text-[11px] text-[var(--color-silver-dim)] leading-relaxed mt-0.5">
-                    {step.body}
-                  </p>
-                </div>
-              </li>
-            ))}
-          </ol>
-        </section>
-
-        {/* Story setup anchor — primary CTA scrolls here */}
+        {/* Story setup — directly under hero (minimal scroll) */}
         <section
           ref={storySetupRef}
           id="story-setup"
@@ -1083,6 +1052,42 @@ export default function Home() {
             </div>
           </button>
         </section>
+
+        <details className="rounded-[var(--radius-card)] border border-[var(--border-ui)] bg-[var(--color-midnight)]/90 p-4 space-y-3 shadow-[0_12px_40px_rgba(0,0,0,0.25)] group">
+          <summary className="cursor-pointer list-none flex items-center justify-between gap-3 [&::-webkit-details-marker]:hidden">
+            <div className="flex items-center gap-2 min-w-0">
+              <span className="w-1 h-4 shrink-0 bg-[var(--accent-cyan-muted)] rounded-full" />
+              <span className="text-[10px] font-black uppercase tracking-[0.2em] text-[var(--text-tertiary)]">
+                {COPY.landing.howTitle}
+              </span>
+            </div>
+            <span className="material-symbols-outlined text-[var(--accent-cyan)] text-xl shrink-0 transition-transform group-open:rotate-180">
+              expand_more
+            </span>
+          </summary>
+          <div className="pt-3 space-y-4 border-t border-[var(--border-divide)] mt-3">
+            <p className="text-[15px] text-[var(--text-secondary)] leading-relaxed font-[family-name:var(--font-gameplay)]">
+              {COPY.landing.lead}
+            </p>
+            <ol className="space-y-3 list-none m-0 p-0">
+              {COPY.landing.steps.map((step, i) => (
+                <li key={step.title} className="flex gap-3">
+                  <span className="shrink-0 w-7 h-7 rounded-full border border-[var(--border-ui-strong)] text-[11px] font-black text-[var(--color-gold-rare)] grid place-items-center">
+                    {i + 1}
+                  </span>
+                  <div className="min-w-0">
+                    <p className="text-sm font-bold text-[var(--color-silver-muted)]">
+                      {step.title}
+                    </p>
+                    <p className="text-[13px] text-[var(--color-silver-dim)] leading-relaxed mt-0.5">
+                      {step.body}
+                    </p>
+                  </div>
+                </li>
+              ))}
+            </ol>
+          </div>
+        </details>
 
         {/* Configuration */}
         {mode ? (
