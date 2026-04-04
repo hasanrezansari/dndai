@@ -100,7 +100,7 @@ function SessionPlaySkeleton() {
         <SkeletonCard className="min-h-[104px]" />
       </div>
       <div className="flex min-h-0 flex-1 flex-col gap-[var(--void-gap)] px-4 pb-2 pt-[var(--void-gap)]">
-        <div className="min-h-0 flex-1 flex flex-col gap-3 rounded-[var(--radius-card)] border border-[rgba(77,70,53,0.15)] bg-[var(--surface-container)]/30 p-3">
+        <div className="min-h-0 flex-1 flex flex-col gap-3 rounded-[var(--radius-card)] border border-[var(--border-ui)] bg-[var(--surface-container)]/30 p-3">
           <SkeletonText lines={6} />
         </div>
         <div className="flex gap-4 items-center overflow-x-auto pb-1">
@@ -582,7 +582,7 @@ export default function SessionGameplayPage() {
             setHydrated(false);
             setLoadError(null);
           }}
-          className="min-h-[44px] rounded-[var(--radius-chip)] border border-white/15 bg-[var(--glass-bg)]/40 px-5 py-2 text-sm font-medium text-[var(--color-silver-muted)] backdrop-blur-sm transition-colors hover:bg-white/10"
+          className="min-h-[44px] rounded-[var(--radius-chip)] border border-[var(--border-ui)] bg-[var(--glass-bg)]/40 px-5 py-2 text-sm font-medium text-[var(--color-silver-muted)] backdrop-blur-sm transition-colors hover:bg-[var(--surface-high)]/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-gold-rare)]/45 focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--color-obsidian)]"
         >
           Retry
         </button>
@@ -618,11 +618,11 @@ export default function SessionGameplayPage() {
           onDismiss={() => setSceneTransitionTrigger(false)}
         />
         <ConnectionStatus />
-        <div className="relative z-[1] h-[min(40vh,300px)] w-full shrink-0 overflow-hidden sm:h-[min(36vh,320px)]">
+        <header className="relative z-[1] h-[min(40vh,300px)] w-full shrink-0 overflow-hidden border-b border-[var(--border-divide)] sm:h-[min(36vh,320px)]">
           <button
             type="button"
             onClick={handleLeaveSession}
-            className="absolute left-3 top-3 z-30 min-h-[36px] min-w-[36px] rounded-[var(--radius-card)] border border-[rgba(77,70,53,0.2)] bg-[var(--color-obsidian)]/80 backdrop-blur-md px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.1em] text-[var(--outline)] transition-all hover:border-[var(--color-failure)]/30 hover:text-[var(--color-failure)] flex items-center gap-1.5"
+            className="absolute left-3 top-3 z-30 min-h-[40px] min-w-[40px] rounded-[var(--radius-card)] border border-[var(--border-ui)] bg-[var(--color-obsidian)]/85 backdrop-blur-md px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.1em] text-[var(--outline)] transition-all hover:border-[var(--color-failure)]/30 hover:text-[var(--color-failure)] flex items-center gap-1.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-gold-rare)]/50 focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--color-obsidian)]"
           >
             <span className="material-symbols-outlined text-sm">arrow_back</span>
             Leave
@@ -640,9 +640,9 @@ export default function SessionGameplayPage() {
             showTapHint={false}
             showTurnWhenNoTeaser={false}
           />
-        </div>
+        </header>
         {narrativeText?.trim() ? (
-          <div className="relative z-[2] max-h-[min(24vh,200px)] shrink-0 overflow-y-auto px-3 pb-1 pt-0.5 sm:max-h-[min(32vh,260px)] sm:px-4 sm:pt-1">
+          <div className="relative z-[2] max-h-[min(24vh,200px)] shrink-0 overflow-y-auto border-b border-[var(--border-divide)] bg-[color-mix(in_srgb,var(--color-deep-void)_35%,transparent)] px-3 pb-1 pt-0.5 backdrop-blur-[4px] sm:max-h-[min(32vh,260px)] sm:px-4 sm:pt-1">
             <PartySessionCard
               title="Scene"
               contentClassName="!py-2 !leading-relaxed sm:!py-2.5"
@@ -796,11 +796,11 @@ export default function SessionGameplayPage() {
       </BottomSheet>
       <DiceOverlay />
       <StatPopupOverlay />
-      <div className="relative z-[1] h-[min(36vh,320px)] w-full shrink-0 overflow-hidden">
+      <header className="relative z-[1] h-[min(36vh,320px)] w-full shrink-0 overflow-hidden border-b border-[var(--border-divide)]">
         <button
           type="button"
           onClick={handleLeaveSession}
-          className="absolute left-3 top-3 z-30 min-h-[36px] min-w-[36px] rounded-[var(--radius-card)] border border-[rgba(77,70,53,0.2)] bg-[var(--color-obsidian)]/80 backdrop-blur-md px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.1em] text-[var(--outline)] transition-all hover:text-[var(--color-failure)] hover:border-[var(--color-failure)]/30 flex items-center gap-1.5"
+          className="absolute left-3 top-3 z-30 min-h-[40px] min-w-[40px] rounded-[var(--radius-card)] border border-[var(--border-ui)] bg-[var(--color-obsidian)]/85 backdrop-blur-md px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.1em] text-[var(--outline)] transition-all hover:text-[var(--color-failure)] hover:border-[var(--color-failure)]/30 flex items-center gap-1.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-gold-rare)]/50 focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--color-obsidian)]"
         >
           <span className="material-symbols-outlined text-sm">arrow_back</span>
           Leave
@@ -817,18 +817,18 @@ export default function SessionGameplayPage() {
           teaser={narrativeText}
           onOpenDetails={() => setSceneDetailOpen(true)}
         />
-      </div>
+      </header>
 
-      <div className="relative z-[2] shrink-0 space-y-2 px-4">
+      <div className="relative z-[2] shrink-0 space-y-2 border-b border-[var(--border-divide)] bg-[color-mix(in_srgb,var(--color-deep-void)_40%,transparent)] px-4 py-2 backdrop-blur-[4px]">
         <NarrativeCard
           isThinking={isThinking}
           roundNumber={session?.currentRound ?? 1}
           currentPlayerName={currentPlayerName}
           phaseLabel={phaseLabel}
         />
-        <div className="rounded-[var(--radius-card)] border border-[rgba(77,70,53,0.18)] bg-[var(--surface-container)]/30 px-3 py-2.5">
+        <div className="rounded-[var(--radius-card)] border border-[var(--border-ui)] bg-[var(--surface-container)]/35 backdrop-blur-[6px] px-3 py-2.5 shadow-[0_8px_32px_rgba(0,0,0,0.2)]">
           <p className="mb-2 text-[9px] font-black uppercase tracking-[0.2em] text-[var(--outline)]">
-            Table layout
+            Session & cast
           </p>
           <SessionViewModeToggle
             mode={sessionUiMode}
@@ -838,7 +838,7 @@ export default function SessionGameplayPage() {
             <GhostButton
               type="button"
               size="md"
-              className="min-h-[44px] flex-1 border-[rgba(77,70,53,0.22)]"
+              className="min-h-[44px] flex-1 border-[var(--border-ui-strong)]"
               onClick={() => void openRoomDisplayInNewTab()}
             >
               <span className="material-symbols-outlined text-base">tv</span>
@@ -847,7 +847,7 @@ export default function SessionGameplayPage() {
             <button
               type="button"
               aria-label="Copy room display link"
-              className="shrink-0 min-h-[44px] min-w-[44px] rounded-[var(--radius-card)] border border-[rgba(77,70,53,0.22)] bg-[var(--surface-high)]/50 flex items-center justify-center text-[var(--outline)] hover:border-[var(--color-gold-rare)]/35 hover:text-[var(--color-gold-rare)] transition-colors"
+              className="shrink-0 min-h-[44px] min-w-[44px] rounded-[var(--radius-card)] border border-[var(--border-ui-strong)] bg-[var(--surface-high)]/50 flex items-center justify-center text-[var(--outline)] hover:border-[var(--color-gold-rare)]/35 hover:text-[var(--color-gold-rare)] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-gold-rare)]/45 focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--color-obsidian)]"
               onClick={() => void copyRoomDisplayLink()}
             >
               <span className="material-symbols-outlined text-base">
@@ -871,7 +871,10 @@ export default function SessionGameplayPage() {
         </div>
       </div>
 
-      <div className="flex min-h-0 flex-1 flex-col gap-[var(--void-gap)] px-4 pb-2 pt-[var(--void-gap)]">
+      <section
+        aria-label="Story feed and play"
+        className="flex min-h-0 flex-1 flex-col gap-[var(--void-gap)] px-4 pb-2 pt-[var(--void-gap)]"
+      >
         {session?.mode === "human_dm" && isDm ? (
           <div className="flex shrink-0 items-center justify-center gap-3 text-[9px] font-black uppercase tracking-[0.2em] text-[var(--color-gold-rare)]">
             <span className="h-px w-8 bg-[var(--color-gold-rare)]/30" />
@@ -886,7 +889,7 @@ export default function SessionGameplayPage() {
             <button
               type="button"
               onClick={() => setChronicleOpen(true)}
-              className="flex min-h-[44px] shrink-0 items-center justify-center gap-2 rounded-[var(--radius-card)] border border-[rgba(77,70,53,0.25)] bg-[var(--surface-high)]/80 px-4 py-2 text-[10px] font-black uppercase tracking-[0.15em] text-[var(--color-gold-support)] transition-colors hover:border-[var(--color-gold-rare)]/35 hover:text-[var(--color-gold-rare)]"
+              className="flex min-h-[44px] shrink-0 items-center justify-center gap-2 rounded-[var(--radius-card)] border border-[var(--border-ui-strong)] bg-[var(--surface-high)]/80 px-4 py-2 text-[10px] font-black uppercase tracking-[0.15em] text-[var(--color-gold-support)] transition-colors hover:border-[var(--color-gold-rare)]/35 hover:text-[var(--color-gold-rare)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-gold-rare)]/40 focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--color-obsidian)]"
             >
               <span className="material-symbols-outlined text-base">menu_book</span>
               Open Chronicle
@@ -911,7 +914,7 @@ export default function SessionGameplayPage() {
             setEnemyInspectNpcId(npcId);
           }}
         />
-        <div className="sticky bottom-0 z-20 mt-auto shrink-0 pt-1">
+        <footer className="sticky bottom-0 z-20 mt-auto shrink-0 border-t border-[var(--border-divide)] bg-[var(--color-obsidian)]/92 pt-2 pb-[max(0.25rem,env(safe-area-inset-bottom))] backdrop-blur-md supports-[backdrop-filter]:bg-[var(--color-obsidian)]/85">
           {quest ? <QuestDock quest={quest} onOpen={() => setQuestOpen(true)} /> : null}
           <TurnBanner visible={isMyTurn && !(session?.mode === "human_dm" && isDm)} />
           {session?.mode === "human_dm" && isDm && currentPlayerId ? (
@@ -934,8 +937,8 @@ export default function SessionGameplayPage() {
               npcs={npcs}
             />
           )}
-        </div>
-      </div>
+        </footer>
+      </section>
     </div>
   );
 }

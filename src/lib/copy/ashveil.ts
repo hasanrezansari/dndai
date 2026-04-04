@@ -14,19 +14,24 @@ export const COPY = {
   awaitingHero: "Awaiting hero…",
   /** In-session UI; role is facilitator, not a genre lock. */
   aiDmWaiting: "AI facilitator — waiting to begin",
-  /** Home / Falvos — strings only; does not change API or routes. */
+  /** Home / main app — strings only; does not change API or routes. */
   landing: {
-    eyebrow: "Multiplayer story engine",
+    eyebrow: "Multiplayer story platform",
+    heroTitle: "Play any story you can imagine",
+    heroSub:
+      "Solo or with friends. AI or human narrator. One story, one turn at a time.",
+    ctaScrollSetup: "Set up your story",
+    browseWorldsCta: "Browse worlds",
     lead:
       "Play together from one link. Drop a premise in any genre — the table stays yours; the app handles turns, sheets, and (optionally) narration.",
     howTitle: "How it works",
     steps: [
       {
-        title: "Choose a host",
-        body: "AI facilitator for full automation, or a human host with manual control.",
+        title: "Choose how to play",
+        body: "AI narrator for full automation, or a human narrator with manual control.",
       },
       {
-        title: "Set your world",
+        title: "Set your story",
         body: "Optional seed, tone tags, world bible, and art direction shape the opening.",
       },
       {
@@ -35,12 +40,12 @@ export const COPY = {
       },
     ],
     modesTitle: "Who runs this table?",
-    aiCardTitle: "AI facilitator",
+    aiCardTitle: "AI narrator",
     aiCardBody:
       "Narration, scene images, and rule support — steered by your premise, not a fixed genre.",
-    humanCardTitle: "Human host",
+    humanCardTitle: "Human narrator",
     humanCardBody:
-      "A person at the table drives the story; Falvos keeps characters, votes, and state in sync.",
+      "A person at the table drives the story; WhatIfPlay keeps characters, votes, and state in sync.",
     partyCardTitle: "Party game",
     partyCardBody:
       "Fast room: one shared scene — everyone pitches a line each round, AI weaves them, you vote for the take that should steer the story. No hero builder; names are just for the scoreboard. Separate from campaign quests.",
@@ -52,11 +57,12 @@ export const COPY = {
     toneTagsHint:
       "Tone tags (optional) — nudge mood and opening flavor.",
     partyLabel: "Party size",
-    joinTitle: "Join a session",
+    joinTitle: "Join a story",
     joinSubtitle: "Enter the code your host shared.",
-    ctaCreate: "Create session",
+    ctaCreate: "Create story",
     ctaJoin: "Join with code",
-    ctaEnterSession: "Join session",
+    ctaEnterSession: "Join story",
+    creatingStory: "Creating your story…",
     backToCreate: "Back",
   },
 } as const;

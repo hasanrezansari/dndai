@@ -123,10 +123,10 @@ export function WorldDetailClient(props: WorldDetailClientProps) {
 
   return (
     <div className="min-h-dvh flex flex-col bg-[var(--color-obsidian)] pb-[calc(2rem+env(safe-area-inset-bottom))]">
-      <header className="sticky top-0 z-20 border-b border-[rgba(77,70,53,0.2)] bg-[var(--color-obsidian)]/92 backdrop-blur-[var(--glass-blur)] px-4 py-3 flex items-center justify-between gap-3">
+      <header className="sticky top-0 z-20 border-b border-[var(--border-divide)] bg-[var(--color-obsidian)]/92 backdrop-blur-[var(--glass-blur)] px-4 py-3 flex items-center justify-between gap-3">
         <Link
           href="/worlds"
-          className="inline-flex items-center justify-center min-h-[40px] px-4 py-2 text-xs font-bold uppercase tracking-[0.1em] rounded-[var(--radius-button)] border border-[rgba(77,70,53,0.3)] text-[var(--color-silver-muted)] hover:border-[var(--color-gold-rare)] hover:text-[var(--color-gold-rare)] transition-colors"
+          className="inline-flex items-center justify-center min-h-[40px] px-4 py-2 text-xs font-bold uppercase tracking-[0.1em] rounded-[var(--radius-button)] border border-[var(--border-ui-strong)] text-[var(--color-silver-muted)] hover:border-[var(--color-gold-rare)] hover:text-[var(--color-gold-rare)] transition-colors"
         >
           ← Worlds
         </Link>
@@ -140,7 +140,7 @@ export function WorldDetailClient(props: WorldDetailClientProps) {
 
       <main className="flex-1 max-w-lg mx-auto px-4 pt-6 space-y-6 w-full">
         {props.coverImageUrl ? (
-          <div className="relative aspect-[2/1] w-full overflow-hidden rounded-[var(--radius-card)] border border-[rgba(77,70,53,0.25)] bg-[var(--color-deep-void)] -mx-0">
+          <div className="relative aspect-[2/1] w-full overflow-hidden rounded-[var(--radius-card)] border border-[var(--border-ui-strong)] bg-[var(--color-deep-void)] -mx-0">
             <Image
               src={props.coverImageUrl}
               alt={props.coverImageAlt || props.title}
@@ -177,14 +177,14 @@ export function WorldDetailClient(props: WorldDetailClientProps) {
 
         {props.description ? (
           props.description.length > 360 ? (
-            <details className="group rounded-[var(--radius-card)] border border-[rgba(77,70,53,0.2)] bg-[var(--color-midnight)]/60 p-4 open:bg-[var(--surface-high)]/30">
+            <details className="group rounded-[var(--radius-card)] border border-[var(--border-ui)] bg-[var(--color-midnight)]/60 p-4 open:bg-[var(--surface-high)]/30">
               <summary className="cursor-pointer text-xs font-bold uppercase tracking-[0.16em] text-[var(--color-gold-rare)] list-none flex items-center justify-between gap-2">
                 <span>Full premise</span>
                 <span className="material-symbols-outlined text-base text-[var(--outline)] group-open:rotate-180 transition-transform">
                   expand_more
                 </span>
               </summary>
-              <p className="text-sm text-[var(--color-silver-muted)] leading-relaxed whitespace-pre-wrap mt-3 pt-3 border-t border-[rgba(77,70,53,0.15)]">
+              <p className="text-sm text-[var(--color-silver-muted)] leading-relaxed whitespace-pre-wrap mt-3 pt-3 border-t border-[var(--border-divide)]">
                 {props.description}
               </p>
             </details>

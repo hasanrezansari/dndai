@@ -55,7 +55,7 @@ export default function TutorialPage() {
         </p>
       </header>
 
-      <section className="rounded-[var(--radius-card)] border border-[rgba(77,70,53,0.2)] bg-[var(--surface-container)]/35 p-5 space-y-3">
+      <section className="rounded-[var(--radius-card)] border border-[var(--border-ui)] bg-[var(--surface-container)]/35 p-5 space-y-3">
         <p className="text-sm leading-relaxed">
           You’ll take 3 quick turns. The story never punishes experimentation —
           it rewards bold choices.

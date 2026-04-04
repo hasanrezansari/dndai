@@ -57,7 +57,7 @@ export function TutorialOverlay(props: {
 
   return (
     <div className="fixed inset-x-0 bottom-0 z-40 px-4 pb-4 pointer-events-none">
-      <div className="pointer-events-auto mx-auto w-full max-w-md rounded-[var(--radius-card)] border border-[rgba(77,70,53,0.25)] bg-[var(--surface-high)]/90 backdrop-blur-md p-4 shadow-[0_24px_80px_rgba(0,0,0,0.65)]">
+      <div className="pointer-events-auto mx-auto w-full max-w-md rounded-[var(--radius-card)] border border-[var(--border-ui-strong)] bg-[var(--surface-high)]/90 backdrop-blur-md p-4 shadow-[0_24px_80px_rgba(0,0,0,0.65)]">
         <div className="flex items-start justify-between gap-3">
           <div className="space-y-1">
             <p className="text-[10px] font-black uppercase tracking-[0.2em] text-[var(--color-gold-rare)]/80">

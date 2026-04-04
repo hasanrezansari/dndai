@@ -38,7 +38,7 @@ export default function GlobalError({
       />
       <div className="relative z-10 flex flex-col items-center gap-6 max-w-md w-full text-center">
         <div
-          className="w-16 h-16 rounded-[var(--radius-card)] border border-[rgba(255,68,68,0.25)] flex items-center justify-center bg-[var(--color-deep-void)]/80"
+          className="w-16 h-16 rounded-[var(--radius-card)] border border-[color-mix(in_srgb,var(--color-failure)_35%,transparent)] flex items-center justify-center bg-[var(--color-deep-void)]/80"
           aria-hidden
         >
           <svg
@@ -79,7 +79,7 @@ export default function GlobalError({
           </GoldButton>
           <Link
             href="/"
-            className="w-full min-h-[44px] flex items-center justify-center px-8 py-4 text-lg bg-transparent text-[var(--color-silver-muted)] border border-[rgba(255,255,255,0.12)] rounded-[var(--radius-button)] transition-all duration-[var(--duration-med)] [transition-timing-function:var(--ease-out-soft)] hover:border-[var(--color-gold-support)] hover:text-[var(--color-gold-support)] active:scale-[0.97]"
+            className="w-full min-h-[44px] flex items-center justify-center px-8 py-4 text-lg bg-transparent text-[var(--color-silver-muted)] border border-[var(--border-ui)] rounded-[var(--radius-button)] transition-all duration-[var(--duration-med)] [transition-timing-function:var(--ease-out-soft)] hover:border-[var(--color-gold-support)] hover:text-[var(--color-gold-support)] active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-gold-rare)]/50 focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--color-obsidian)]"
           >
             Return Home
           </Link>

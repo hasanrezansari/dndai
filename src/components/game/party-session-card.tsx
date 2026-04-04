@@ -25,7 +25,7 @@ export function PartySessionCard({
   const shell =
     variant === "muted"
       ? "border-white/12 bg-black/25 shadow-none"
-      : "border-[rgba(77,70,53,0.24)] bg-[var(--surface-container)]/55 shadow-[0_10px_40px_rgba(0,0,0,0.18)]";
+      : "border-[var(--border-ui-strong)] bg-[var(--surface-container)]/55 shadow-[0_10px_40px_rgba(0,0,0,0.18)]";
   return (
     <section
       className={`rounded-[var(--radius-card)] border px-4 py-3 ${shell} ${className}`}

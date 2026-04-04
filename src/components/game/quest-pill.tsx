@@ -139,7 +139,7 @@ export function QuestPill({
               type="button"
               disabled={voteBusy}
               onClick={() => onEndingVote("continue")}
-              className="min-h-[40px] flex-1 rounded-[var(--radius-card)] border border-[rgba(77,70,53,0.2)] bg-[var(--surface-high)] text-[10px] font-black uppercase tracking-wider text-[var(--color-silver-muted)] disabled:opacity-30"
+              className="min-h-[40px] flex-1 rounded-[var(--radius-card)] border border-[var(--border-ui)] bg-[var(--surface-high)] text-[10px] font-black uppercase tracking-wider text-[var(--color-silver-muted)] disabled:opacity-30"
             >
               Continue
             </button>
@@ -189,7 +189,7 @@ export function QuestDock({ quest, onOpen }: QuestDockProps) {
     <button
       type="button"
       onClick={onOpen}
-      className="w-full rounded-[var(--radius-card)] border border-[rgba(77,70,53,0.25)] bg-[var(--surface-container)]/90 px-3 py-2 text-left backdrop-blur-sm"
+      className="w-full rounded-[var(--radius-card)] border border-[var(--border-ui-strong)] bg-[var(--surface-container)]/90 px-3 py-2 text-left backdrop-blur-sm"
       aria-label="Open quest details"
     >
       <div className="flex items-center gap-2">

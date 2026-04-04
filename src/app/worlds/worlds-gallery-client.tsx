@@ -154,7 +154,7 @@ export function WorldsGalleryClient() {
 
   return (
     <div className="min-h-dvh flex flex-col bg-[var(--color-obsidian)] pb-[calc(2rem+env(safe-area-inset-bottom))]">
-      <header className="sticky top-0 z-30 border-b border-[rgba(77,70,53,0.2)] bg-[var(--color-obsidian)]/92 backdrop-blur-[var(--glass-blur)]">
+      <header className="sticky top-0 z-30 border-b border-[var(--border-divide)] bg-[var(--color-obsidian)]/92 backdrop-blur-[var(--glass-blur)]">
         <div className="max-w-3xl mx-auto px-4 py-3 flex items-center justify-between gap-3">
           <Link
             href="/"
@@ -185,7 +185,7 @@ export function WorldsGalleryClient() {
         {joinOpen ? (
           <form
             onSubmit={(e) => void onJoinSubmit(e)}
-            className="max-w-3xl mx-auto px-4 pb-3 flex flex-col gap-2 border-t border-[rgba(77,70,53,0.12)] pt-3"
+            className="max-w-3xl mx-auto px-4 pb-3 flex flex-col gap-2 border-t border-[var(--border-divide)] pt-3"
           >
             <label className="text-[10px] uppercase tracking-[0.18em] text-[var(--outline)]">
               Join code
@@ -200,7 +200,7 @@ export function WorldsGalleryClient() {
                 placeholder="ABC123"
                 autoComplete="off"
                 maxLength={8}
-                className="flex-1 min-h-[44px] px-3 rounded-[var(--radius-card)] bg-[var(--color-deep-void)] border border-[rgba(77,70,53,0.25)] text-[var(--color-gold-rare)] text-center tracking-[0.2em] uppercase"
+                className="flex-1 min-h-[44px] px-3 rounded-[var(--radius-card)] bg-[var(--color-deep-void)] border border-[var(--border-ui-strong)] text-[var(--color-gold-rare)] text-center tracking-[0.2em] uppercase"
               />
               <GoldButton
                 type="submit"
@@ -252,7 +252,7 @@ export function WorldsGalleryClient() {
             </div>
             <Link
               href="/adventures"
-              className="block rounded-[var(--radius-card)] border border-[rgba(77,70,53,0.2)] bg-[var(--surface-high)]/60 px-4 py-3 text-sm text-[var(--color-silver-muted)] hover:border-[var(--color-gold-rare)]/35 transition-colors min-h-[44px] flex items-center"
+              className="block rounded-[var(--radius-card)] border border-[var(--border-ui)] bg-[var(--surface-high)]/60 px-4 py-3 text-sm text-[var(--color-silver-muted)] hover:border-[var(--color-gold-rare)]/35 transition-colors min-h-[44px] flex items-center"
             >
               My adventures →
             </Link>
@@ -275,7 +275,7 @@ export function WorldsGalleryClient() {
               </h2>
             </div>
             <Link href={`/worlds/${heroWorld.slug}`} className="block group">
-              <GlassCard className="overflow-hidden p-0 border border-[rgba(77,70,53,0.28)] bg-[var(--surface-container)]/40 transition-colors group-hover:border-[var(--color-gold-rare)]/30">
+              <GlassCard className="overflow-hidden p-0 border border-[var(--border-ui-strong)] bg-[var(--surface-container)]/40 transition-colors group-hover:border-[var(--color-gold-rare)]/30">
                 <div className="relative aspect-[21/9] w-full bg-[var(--color-deep-void)]">
                   {heroWorld.coverImageUrl ? (
                     <Image
@@ -326,7 +326,7 @@ export function WorldsGalleryClient() {
                   All worlds
                 </h2>
               </div>
-              <div className="flex gap-1 p-0.5 rounded-[var(--radius-chip)] bg-[var(--color-deep-void)] border border-[rgba(77,70,53,0.2)]">
+              <div className="flex gap-1 p-0.5 rounded-[var(--radius-chip)] bg-[var(--color-deep-void)] border border-[var(--border-ui)]">
                 <button
                   type="button"
                   onClick={() => setGridFilter("all")}

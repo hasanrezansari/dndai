@@ -36,7 +36,7 @@ export function RoomDisplayNarration({
 
   return (
     <section
-      className="flex min-h-0 flex-1 flex-col rounded-[var(--radius-card)] border border-[rgba(77,70,53,0.18)] bg-[var(--surface-container)]/35 px-6 py-6 backdrop-blur-md sm:px-10 sm:py-8"
+      className="flex min-h-0 flex-1 flex-col rounded-[var(--radius-card)] border border-[var(--border-ui)] bg-[var(--surface-container)]/35 px-6 py-6 backdrop-blur-md sm:px-10 sm:py-8"
       aria-label="Narration"
     >
       <div className="mb-4 flex items-center gap-2">

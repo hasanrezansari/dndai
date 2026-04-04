@@ -14,7 +14,7 @@ export const GlassCard = forwardRef<HTMLDivElement, GlassCardProps>(
       variant === "heavy"
         ? "glass-heavy"
         : variant === "surface"
-          ? "bg-[var(--surface-high)] border border-[rgba(77,70,53,0.2)] rounded-[var(--radius-card)]"
+          ? "bg-[var(--surface-high)] border border-[var(--border-ui)] rounded-[var(--radius-card)]"
           : "glass";
     const glowClass = glow ? "glow-gold" : "";
 

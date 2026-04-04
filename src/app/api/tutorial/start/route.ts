@@ -19,7 +19,7 @@ const BodySchema = z.object({
 const TUTORIAL_MODULE_KEY = "tutorial_v1";
 
 const TUTORIAL_OPENING =
-  "Welcome, adventurer.\n\nThis is a short guided run to teach the rhythm of Falvos: you speak an intent, the world responds, dice decide risk, and the story advances.\n\nOn your next turn, try something simple like: “I search the altar for clues.”";
+  "Welcome, adventurer.\n\nThis is a short guided run to teach the rhythm of play: you speak an intent, the world responds, dice decide risk, and the story advances.\n\nOn your next turn, try something simple like: “I search the altar for clues.”";
 
 export async function POST(request: NextRequest) {
   try {

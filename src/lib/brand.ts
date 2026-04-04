@@ -12,7 +12,7 @@ export function getBrandName(brand: AppBrand): string {
       return "PlayRomana";
     case "falvos":
     default:
-      return "Falvos";
+      return "WhatIfPlay";
   }
 }
 
@@ -22,7 +22,7 @@ export function getBrandTagline(brand: AppBrand): string {
       return "Curated Roman adventures — play instantly with friends.";
     case "falvos":
     default:
-      return "Your table. Any setting. One link.";
+      return "Play any story you can imagine — your table, one link.";
   }
 }
 

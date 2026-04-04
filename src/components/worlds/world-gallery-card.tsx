@@ -39,7 +39,7 @@ export function WorldGalleryCard({ world, variant = "grid", className = "" }: Pr
       href={`/worlds/${world.slug}`}
       className={`block group ${frame} ${className}`.trim()}
     >
-      <GlassCard className="overflow-hidden border border-[rgba(77,70,53,0.22)] bg-[var(--color-midnight)]/90 p-0 transition-colors group-hover:border-[var(--color-gold-rare)]/28">
+      <GlassCard className="overflow-hidden border border-[var(--border-ui-strong)] bg-[var(--color-midnight)]/90 p-0 transition-colors group-hover:border-[var(--color-gold-rare)]/28">
         <div
           className={`relative w-full overflow-hidden bg-[var(--color-deep-void)] ${
             isRail ? "aspect-[2/3]" : "aspect-[16/10]"
@@ -72,7 +72,7 @@ export function WorldGalleryCard({ world, variant = "grid", className = "" }: Pr
             ) : null}
           </div>
         </div>
-        <div className="px-3 py-2 flex flex-wrap gap-1.5 border-t border-[rgba(77,70,53,0.15)]">
+        <div className="px-3 py-2 flex flex-wrap gap-1.5 border-t border-[var(--border-divide)]">
           {world.tags.slice(0, 3).map((t) => (
             <span
               key={t}

@@ -134,7 +134,7 @@ function EntryChoiceActions(props: {
 
       <button
         type="button"
-        className="w-full text-center text-[10px] uppercase tracking-[0.14em] text-[var(--outline)] hover:text-[var(--color-gold-rare)] transition-colors py-1"
+        className="w-full min-h-[40px] text-center text-[10px] uppercase tracking-[0.14em] text-[var(--outline)] hover:text-[var(--color-gold-rare)] transition-colors py-2 rounded-[var(--radius-button)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-gold-rare)]/40 focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--color-obsidian)]"
         onClick={() => setGuestNameOpen((o) => !o)}
         aria-expanded={guestNameOpen}
       >
@@ -152,7 +152,7 @@ function EntryChoiceActions(props: {
             onChange={(e) => setDisplayName(e.target.value)}
             maxLength={48}
             placeholder="Adventurer"
-            className="w-full min-h-[44px] rounded-[var(--radius-card)] bg-[var(--color-deep-void)] border border-[rgba(255,255,255,0.08)] px-4 text-[var(--color-silver-muted)] text-sm focus:outline-none focus:border-[rgba(212,175,55,0.25)]"
+            className="w-full min-h-[44px] rounded-[var(--radius-card)] bg-[var(--color-deep-void)] border border-[var(--border-ui)] px-4 text-[var(--color-silver-muted)] text-sm focus:outline-none focus:border-[color-mix(in_srgb,var(--color-gold-rare)_35%,transparent)] focus-visible:ring-2 focus-visible:ring-[var(--color-gold-rare)]/35 focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--color-obsidian)]"
           />
         </div>
       ) : null}
@@ -189,12 +189,12 @@ function AuthGateInner({ children }: { children: React.ReactNode }) {
   const [guestNameOpen, setGuestNameOpen] = useState(false);
   const [entryBusy, setEntryBusy] = useState<null | "guest" | "google">(null);
   const [error, setError] = useState<string | null>(null);
-  /** PlayRomana: auto guest failed — show same entry card as Falvos for retry. */
+  /** PlayRomana: auto guest failed — show same entry card as main app for retry. */
   const [playromanaGuestFallback, setPlayromanaGuestFallback] =
     useState(false);
   const playromanaAutoGuestMounted = useRef(false);
 
-  // Sync optional guest display name from storage (Falvos: before tapping Play as guest; PlayRomana: auto-entry).
+  // Sync optional guest display name from storage (main app: before Play as guest; PlayRomana: auto-entry).
   useEffect(() => {
     if (displayBypass) return;
     try {
@@ -341,14 +341,14 @@ function AuthGateInner({ children }: { children: React.ReactNode }) {
     authErrorParam ? (
       <div
         role="status"
-        className="w-full max-w-md mx-auto mb-4 rounded-[var(--radius-card)] border border-[rgba(242,202,80,0.22)] bg-[var(--color-deep-void)]/90 px-4 py-3 text-center"
+        className="w-full max-w-md mx-auto mb-4 rounded-[var(--radius-card)] border border-[color-mix(in_srgb,var(--color-gold-rare)_22%,transparent)] bg-[var(--color-deep-void)]/90 px-4 py-3 text-center"
       >
         <p className="text-xs text-[var(--color-silver-dim)] leading-relaxed">
           {oauthHint}
         </p>
         <button
           type="button"
-          className="mt-2 text-[10px] font-bold uppercase tracking-[0.16em] text-[var(--color-gold-rare)] underline-offset-4 hover:underline"
+          className="mt-2 min-h-[40px] px-2 text-[10px] font-bold uppercase tracking-[0.16em] text-[var(--color-gold-rare)] underline-offset-4 hover:underline rounded-[var(--radius-button)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-gold-rare)]/45 focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--color-deep-void)]"
           onClick={() => clearOAuthParamsFromUrl()}
         >
           Dismiss
@@ -366,7 +366,7 @@ function AuthGateInner({ children }: { children: React.ReactNode }) {
       className="min-h-dvh flex flex-col items-center justify-center px-6 bg-[var(--color-obsidian)] gap-[var(--void-gap)] py-10"
     >
       {oauthBanner}
-      <GlassCard className="p-6 w-full max-w-md border-[rgba(212,175,55,0.12)]">
+      <GlassCard className="p-6 w-full max-w-md border-[color-mix(in_srgb,var(--color-gold-rare)_14%,transparent)]">
         <p className="text-fantasy text-center text-xl font-bold text-[var(--color-gold-rare)] tracking-tight uppercase mb-1">
           {getBrandName(brand)}
         </p>
@@ -393,7 +393,7 @@ function AuthGateInner({ children }: { children: React.ReactNode }) {
   );
 
   const falvosHomeEntryStrip = (
-    <GlassCard className="p-4 w-full max-w-md mx-auto mb-4 border-[rgba(212,175,55,0.12)]">
+    <GlassCard className="p-4 w-full max-w-md mx-auto mb-4 border-[color-mix(in_srgb,var(--color-gold-rare)_14%,transparent)]">
       <p className="text-[10px] text-center text-[var(--color-silver-dim)] uppercase tracking-[0.14em] mb-3 leading-relaxed">
         Log in with Google to use the same account everywhere, or play as a guest on this browser.
       </p>
@@ -447,14 +447,14 @@ function AuthGateInner({ children }: { children: React.ReactNode }) {
           className="min-h-dvh flex flex-col items-center justify-center px-6 bg-[var(--color-obsidian)] gap-5"
           role="status"
           aria-live="polite"
-          aria-label="Opening Google sign-in"
+          aria-label="Connecting to Google"
         >
           <div
-            className="h-11 w-11 rounded-full border-2 border-[rgba(242,202,80,0.25)] border-t-[var(--color-gold-rare)] animate-spin"
+            className="h-11 w-11 rounded-full border-2 border-[color-mix(in_srgb,var(--color-gold-rare)_28%,transparent)] border-t-[var(--color-gold-rare)] animate-spin"
             aria-hidden
           />
           <p className="text-xs text-center text-[var(--color-silver-dim)] uppercase tracking-[0.14em] max-w-xs leading-relaxed">
-            Opening Google sign-in…
+            Connecting to Google…
           </p>
         </motion.div>
       ) : needsEntryChoice && falvosHomeEntryInline ? (

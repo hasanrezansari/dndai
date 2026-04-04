@@ -141,14 +141,14 @@ function ChronicleDiceLine({ entry }: { entry: FeedEntry }) {
 
 function ChronicleStatChips({ effects }: { effects: StatEffect[] }) {
   return (
-    <div className="flex flex-wrap gap-2 border-t border-[rgba(77,70,53,0.12)] pt-3 mt-1">
+    <div className="flex flex-wrap gap-2 border-t border-[var(--border-divide)] pt-3 mt-1">
       <span className="w-full text-[9px] font-black uppercase tracking-[0.2em] text-[var(--color-gold-support)]/75">
         Fate
       </span>
       {effects.map((e, i) => (
         <div
           key={i}
-          className="rounded-md border border-[rgba(77,70,53,0.2)] bg-[var(--color-deep-void)]/40 px-2.5 py-1"
+          className="rounded-md border border-[var(--border-ui)] bg-[var(--color-deep-void)]/40 px-2.5 py-1"
         >
           <span className="text-fantasy text-[11px] font-bold text-[var(--color-silver-muted)]">
             {e.targetName}
@@ -190,7 +190,7 @@ function ChronicleEntryBlock({
 
     if (isRoundBreak) {
       return (
-        <div className="border-t border-[rgba(77,70,53,0.08)] pt-2">
+        <div className="border-t border-[var(--border-divide)] pt-2">
           <div className="flex items-start gap-2">
             <span className="mt-0.5 shrink-0 rounded border border-[rgba(212,175,55,0.12)] bg-[var(--color-deep-void)]/50 px-1.5 py-0 text-[8px] font-black uppercase tracking-[0.14em] text-[var(--color-gold-rare)]/85">
               {entry.detail}
@@ -207,7 +207,7 @@ function ChronicleEntryBlock({
     return (
       <div className="space-y-3">
         {entry.imageUrl ? (
-          <div className="-mx-1 overflow-hidden rounded-md ring-1 ring-[rgba(77,70,53,0.2)]">
+          <div className="-mx-1 overflow-hidden rounded-md ring-1 ring-[var(--border-ui)]">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src={entry.imageUrl}
@@ -261,7 +261,7 @@ function ChronicleEntryBlock({
 
   if (entry.type === "state_change") {
     return (
-      <p className="border-t border-[rgba(77,70,53,0.06)] pt-1.5 text-left text-[8px] uppercase tracking-[0.08em] text-[var(--outline)]/32">
+      <p className="border-t border-[var(--border-divide)] pt-1.5 text-left text-[8px] uppercase tracking-[0.08em] text-[var(--outline)]/32">
         {entry.text}
         {entry.detail ? (
           <span className="text-[var(--outline)]/25"> · {entry.detail}</span>
@@ -372,7 +372,7 @@ export function ChronicleFeed({ entries, className = "" }: ChronicleFeedProps) {
               <div
                 className={
                   compact
-                    ? "rounded-[2px] border border-[rgba(77,70,53,0.12)] bg-[var(--color-deep-void)]/35 px-3 py-2"
+                    ? "rounded-[2px] border border-[var(--border-ui)] bg-[var(--color-deep-void)]/35 px-3 py-2"
                     : "rounded-[2px] px-4 py-4 sm:px-5 sm:py-5"
                 }
                 style={
@@ -410,7 +410,7 @@ export function ChronicleFeed({ entries, className = "" }: ChronicleFeedProps) {
                 </div>
 
                 {!compact && time ? (
-                  <footer className="mt-3 border-t border-[rgba(77,70,53,0.1)] pt-2 text-center">
+                  <footer className="mt-3 border-t border-[var(--border-divide)] pt-2 text-center">
                     <time
                       className="text-[9px] tabular-nums tracking-wider text-[var(--outline)]/45"
                       dateTime={

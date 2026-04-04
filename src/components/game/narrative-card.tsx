@@ -33,7 +33,7 @@ export function NarrativeCard({
 
   return (
     <div
-      className={`relative z-10 -mt-[20px] bg-[var(--color-obsidian)]/90 backdrop-blur-lg rounded-[var(--radius-card)] border border-[rgba(77,70,53,0.2)] px-5 py-4 shadow-[0_8px_32px_rgba(0,0,0,0.4)] transition-all duration-500 ${
+      className={`relative z-10 -mt-[20px] bg-[var(--color-obsidian)]/90 backdrop-blur-lg rounded-[var(--radius-card)] border border-[var(--border-ui)] px-5 py-4 shadow-[0_8px_32px_rgba(0,0,0,0.4)] transition-all duration-500 ${
         isThinking ? "border-[var(--color-gold-rare)]/30 shadow-[0_0_20px_rgba(242,202,80,0.1)]" : ""
       } ${isThinking ? "border-l-[3px] border-l-[var(--color-gold-rare)]" : ""}`}
     >

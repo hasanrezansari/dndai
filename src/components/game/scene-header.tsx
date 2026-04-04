@@ -295,7 +295,7 @@ export function SceneHeader({
                 className={`rounded-[var(--radius-pill)] border bg-[var(--color-obsidian)]/75 px-2.5 py-1 text-[9px] font-black uppercase tracking-[0.14em] backdrop-blur-sm ${
                   c.accentPhase
                     ? phaseChipClass(c.accentPhase)
-                    : "border-[rgba(77,70,53,0.25)] text-[var(--outline)]"
+                    : "border-[var(--border-ui-strong)] text-[var(--outline)]"
                 }`}
               >
                 {c.text}

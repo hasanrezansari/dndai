@@ -67,7 +67,7 @@ export default function TvWatchPage() {
 
         <form
           onSubmit={(ev) => void handleSubmit(ev)}
-          className="rounded-[var(--radius-card)] border border-[rgba(77,70,53,0.28)] bg-[var(--surface-high)]/80 p-6 flex flex-col gap-4"
+          className="rounded-[var(--radius-card)] border border-[var(--border-ui-strong)] bg-[var(--surface-high)]/80 p-6 flex flex-col gap-4"
         >
           <label
             htmlFor="tv-room-code"

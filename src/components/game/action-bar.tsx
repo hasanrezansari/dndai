@@ -63,7 +63,7 @@ export function ActionBar({
     "pb-[max(0.75rem,env(safe-area-inset-bottom,0px))]";
 
   const sheetBtn =
-    "min-h-[44px] flex items-center justify-center gap-1.5 rounded-[var(--radius-chip)] bg-[var(--surface-high)] border border-[rgba(77,70,53,0.15)] px-3 text-[10px] font-bold uppercase tracking-[0.1em] text-[var(--color-silver-dim)] transition-colors hover:text-[var(--color-gold-rare)] hover:border-[var(--color-gold-rare)]/30 active:scale-[0.97]";
+    "min-h-[44px] flex items-center justify-center gap-1.5 rounded-[var(--radius-chip)] bg-[var(--surface-high)] border border-[var(--border-ui)] px-3 text-[10px] font-bold uppercase tracking-[0.1em] text-[var(--color-silver-dim)] transition-colors hover:text-[var(--color-gold-rare)] hover:border-[var(--color-gold-rare)]/30 active:scale-[0.97]";
 
   if (isMyTurn) {
     const showGuided = guidedTurnUi;
@@ -71,7 +71,7 @@ export function ActionBar({
 
     return (
       <div
-        className={`bg-[var(--color-obsidian)] border-t border-[rgba(77,70,53,0.15)] space-y-3 px-4 py-3 ${safeBottom}`}
+        className={`bg-[var(--color-obsidian)] border-t border-[var(--border-divide)] space-y-3 px-4 py-3 ${safeBottom}`}
       >
         <div className="grid grid-cols-3 gap-2">
           <button
@@ -105,7 +105,7 @@ export function ActionBar({
           value={value}
           onChange={(e) => setValue(e.target.value)}
           placeholder="What do you do?"
-          className="min-h-[48px] w-full rounded-[var(--radius-button)] border border-[rgba(77,70,53,0.2)] bg-[var(--color-deep-void)] px-4 text-base text-[var(--color-silver-muted)] placeholder:text-[var(--outline)]/40 font-serif italic transition-all duration-200 focus:border-[var(--color-gold-rare)]/40 focus:outline-none focus:shadow-[0_0_20px_rgba(242,202,80,0.1)]"
+          className="min-h-[48px] w-full rounded-[var(--radius-button)] border border-[var(--border-ui)] bg-[var(--color-deep-void)] px-4 text-base text-[var(--color-silver-muted)] placeholder:text-[var(--outline)]/40 font-serif italic transition-all duration-200 focus:border-[var(--color-gold-rare)]/40 focus:outline-none focus:shadow-[0_0_20px_rgba(242,202,80,0.1)]"
           onKeyDown={(e) => {
             if (e.key === "Enter") void submit();
           }}
@@ -119,7 +119,7 @@ export function ActionBar({
                   key={c.key}
                   type="button"
                   onClick={() => appendToInput(c.insert)}
-                  className="min-h-[40px] shrink-0 flex items-center gap-1.5 rounded-[var(--radius-pill)] bg-[var(--surface-high)] border border-[rgba(77,70,53,0.1)] px-4 text-[11px] font-bold uppercase tracking-wider text-[var(--color-silver-dim)] transition-all hover:text-[var(--color-gold-rare)] hover:border-[var(--color-gold-rare)]/20 active:scale-[0.95]"
+                  className="min-h-[40px] shrink-0 flex items-center gap-1.5 rounded-[var(--radius-pill)] bg-[var(--surface-high)] border border-[var(--border-ui)] px-4 text-[11px] font-bold uppercase tracking-wider text-[var(--color-silver-dim)] transition-all hover:text-[var(--color-gold-rare)] hover:border-[var(--color-gold-rare)]/20 active:scale-[0.95]"
                 >
                   <span className="material-symbols-outlined text-sm">
                     {c.icon}
@@ -184,7 +184,7 @@ export function ActionBar({
                     appendToInput(`${n.name} [target:npc:${n.id}]: `);
                     setTargetOpen(false);
                   }}
-                  className="flex min-h-[48px] w-full items-center justify-between gap-3 rounded-[var(--radius-card)] border border-[rgba(77,70,53,0.2)] bg-[var(--surface-container)]/50 px-4 py-2 text-left transition-colors hover:border-[var(--atmosphere-combat)]/40"
+                  className="flex min-h-[48px] w-full items-center justify-between gap-3 rounded-[var(--radius-card)] border border-[var(--border-ui)] bg-[var(--surface-container)]/50 px-4 py-2 text-left transition-colors hover:border-[var(--atmosphere-combat)]/40"
                 >
                   <span className="text-fantasy text-sm font-bold text-[var(--color-silver-muted)]">
                     {n.name}
@@ -204,7 +204,7 @@ export function ActionBar({
   const name = currentPlayerName ?? "another player";
 
   return (
-    <div className={`bg-[var(--color-obsidian)] border-t border-[rgba(77,70,53,0.15)] space-y-3 px-4 py-3 ${safeBottom}`}>
+    <div className={`bg-[var(--color-obsidian)] border-t border-[var(--border-divide)] space-y-3 px-4 py-3 ${safeBottom}`}>
       <p className="text-center text-xs text-[var(--outline)] flex items-center justify-center gap-2 uppercase tracking-[0.15em]">
         <span className="material-symbols-outlined text-sm animate-pulse">
           hourglass_top

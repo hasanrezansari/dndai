@@ -23,7 +23,7 @@ export function EnemyDetailPanel({ npc }: EnemyDetailPanelProps) {
 
   return (
     <div className="flex flex-col gap-5 pb-6">
-      <div className="flex items-start gap-4 border-b border-[rgba(77,70,53,0.15)] pb-4">
+      <div className="flex items-start gap-4 border-b border-[var(--border-divide)] pb-4">
         <div
           className={`flex h-16 w-16 shrink-0 items-center justify-center rounded-[var(--radius-avatar)] border-2 text-xl font-black ${
             alive
@@ -65,12 +65,12 @@ export function EnemyDetailPanel({ npc }: EnemyDetailPanelProps) {
               {npc.status}
             </span>
             {revealPartial && npc.ac !== undefined ? (
-              <span className="rounded-[var(--radius-pill)] border border-[rgba(77,70,53,0.2)] bg-[var(--surface-high)] px-2.5 py-1 text-[9px] font-black uppercase tracking-[0.15em] text-[var(--outline)]">
+              <span className="rounded-[var(--radius-pill)] border border-[var(--border-ui)] bg-[var(--surface-high)] px-2.5 py-1 text-[9px] font-black uppercase tracking-[0.15em] text-[var(--outline)]">
                 AC {npc.ac}
               </span>
             ) : null}
             {!revealFull ? (
-              <span className="rounded-[var(--radius-pill)] border border-[rgba(77,70,53,0.2)] bg-[var(--surface-high)] px-2.5 py-1 text-[9px] font-black uppercase tracking-[0.15em] text-[var(--outline)]">
+              <span className="rounded-[var(--radius-pill)] border border-[var(--border-ui)] bg-[var(--surface-high)] px-2.5 py-1 text-[9px] font-black uppercase tracking-[0.15em] text-[var(--outline)]">
                 Intel: {revealPartial ? "partial" : "unknown"}
               </span>
             ) : null}

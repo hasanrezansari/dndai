@@ -1,6 +1,9 @@
 "use client";
 
+import { getBrandName, getBuildTimeBrand } from "@/lib/brand";
+
 export function RouteLoadingUI() {
+  const brand = getBuildTimeBrand();
   return (
     <div className="min-h-dvh flex flex-col items-center justify-center bg-[var(--color-obsidian)] px-6 relative overflow-hidden">
       <div
@@ -20,11 +23,13 @@ export function RouteLoadingUI() {
                 "0 0 40px rgba(212, 175, 55, 0.35), 0 0 80px rgba(123, 45, 142, 0.12)",
             }}
           >
-            FALVOS
+            {getBrandName(brand)}
           </h1>
         </div>
         <p className="text-base text-[var(--color-silver-muted)] tracking-wide">
-          Entering the world…
+          {brand === "playromana"
+            ? "Entering the world…"
+            : "Loading your story…"}
         </p>
       </div>
     </div>

@@ -54,7 +54,7 @@ export function PlayerStrip({
                   className={`relative flex h-12 w-12 items-center justify-center rounded-[var(--radius-avatar)] text-sm font-black transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-gold-rare)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--color-obsidian)] ${
                     active
                       ? "selected-glow bg-[var(--surface-high)] text-[var(--color-gold-rare)] border-2 border-[var(--color-gold-rare)]"
-                      : "bg-[var(--color-midnight)] text-[var(--color-silver-dim)] border border-[rgba(77,70,53,0.2)]"
+                      : "bg-[var(--color-midnight)] text-[var(--color-silver-dim)] border border-[var(--border-ui)]"
                   } ${flash === "damage" ? "animate-hp-flash-damage" : flash === "heal" ? "animate-hp-flash-heal" : ""}`}
                   aria-label={`Open character sheet for ${displayName}`}
                 >
@@ -65,7 +65,7 @@ export function PlayerStrip({
                   className={`relative flex h-12 w-12 items-center justify-center rounded-[var(--radius-avatar)] text-sm font-black transition-all ${
                     active
                       ? "selected-glow bg-[var(--surface-high)] text-[var(--color-gold-rare)] border-2 border-[var(--color-gold-rare)]"
-                      : "bg-[var(--color-midnight)] text-[var(--color-silver-dim)] border border-[rgba(77,70,53,0.2)]"
+                      : "bg-[var(--color-midnight)] text-[var(--color-silver-dim)] border border-[var(--border-ui)]"
                   } ${flash === "damage" ? "animate-hp-flash-damage" : flash === "heal" ? "animate-hp-flash-heal" : ""}`}
                 >
                   {p.isConnected ? avatarLetter(p) : "…"}

@@ -57,6 +57,57 @@
   --radius-chip: 4px;
   --radius-avatar: 4px;
   --radius-pill: 9999px;
+
+  /* CTA shadow — referenced by GoldButton; overridden on WhatIfPlay skin */
+  --shadow-cta-glow: 0 4px 12px rgba(242, 202, 80, 0.3);
+
+  --border-ui: rgba(77, 70, 53, 0.2);
+  --border-ui-strong: rgba(77, 70, 53, 0.3);
+  --border-divide: rgba(77, 70, 53, 0.12);
+}
+
+/*
+ * WhatIfPlay (main app / Falvos build only).
+ * PlayRomana uses html[data-app-skin="playromana"] and inherits :root tokens above.
+ */
+html[data-app-skin="whatifplay"] {
+  --color-obsidian: #0c0a14;
+  --color-midnight: #12101c;
+  --color-deep-void: #08060e;
+
+  --color-gold-rare: #e8a84a;
+  --color-gold-support: #c76e2a;
+
+  --surface-container: #161326;
+  --surface-high: #1e1c2e;
+  --surface-highest: #262238;
+  --surface-bright: #2e2c42;
+  --outline-variant: rgba(167, 139, 250, 0.22);
+  --outline: rgba(196, 181, 253, 0.45);
+
+  --atmosphere-exploration: #1e3a5f;
+  --atmosphere-combat: #8b2c1a;
+  --atmosphere-mystery: #5b21b6;
+  --atmosphere-social: #b45309;
+
+  --color-silver-muted: #e8e4f0;
+  --color-silver-dim: #a8a0b8;
+
+  --glass-bg: rgba(18, 16, 38, 0.72);
+  --glass-bg-heavy: rgba(12, 10, 22, 0.9);
+  --glass-edge-glow: 0 0 24px rgba(34, 211, 238, 0.08);
+  --glass-inner-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
+
+  --radius-card: 14px;
+  --radius-button: 12px;
+  --radius-chip: 10px;
+  --radius-avatar: 12px;
+
+  --shadow-cta-glow: 0 4px 18px rgba(232, 168, 74, 0.38);
+
+  --border-ui: color-mix(in srgb, var(--outline) 22%, transparent);
+  --border-ui-strong: color-mix(in srgb, var(--outline) 38%, transparent);
+  --border-divide: color-mix(in srgb, var(--outline) 14%, transparent);
 }
 
 @theme inline {
@@ -118,7 +169,7 @@ body {
   backdrop-filter: blur(var(--glass-blur));
   -webkit-backdrop-filter: blur(var(--glass-blur));
   box-shadow: var(--glass-inner-shadow);
-  border: 1px solid rgba(77, 70, 53, 0.2);
+  border: 1px solid var(--border-ui);
   border-radius: var(--radius-card);
 }
 
@@ -127,7 +178,7 @@ body {
   backdrop-filter: blur(var(--glass-blur));
   -webkit-backdrop-filter: blur(var(--glass-blur));
   box-shadow: var(--glass-inner-shadow);
-  border: 1px solid rgba(77, 70, 53, 0.3);
+  border: 1px solid var(--border-ui-strong);
   border-radius: var(--radius-card);
 }
 

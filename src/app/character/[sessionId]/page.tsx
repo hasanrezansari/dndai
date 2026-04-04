@@ -499,7 +499,7 @@ export default function CharacterCreationPage() {
           Forge Your Hero
         </h1>
         <p className="text-[10px] text-[var(--outline)] uppercase tracking-[0.2em]">
-          Shape the vessel that enters Falvos
+          Shape the hero who steps into this story
         </p>
         <p className="text-xs text-[var(--color-silver-dim)] leading-relaxed max-w-md mx-auto mt-2">
           Start by describing who you are in <em>this</em> story — tone and setting follow your table.
@@ -508,8 +508,31 @@ export default function CharacterCreationPage() {
         </p>
       </header>
 
+      <nav
+        className="sticky top-0 z-20 -mx-4 px-4 py-2.5 flex gap-2 overflow-x-auto scrollbar-hide border-b border-[var(--border-divide)] bg-[var(--color-obsidian)]/92 backdrop-blur-md supports-[backdrop-filter]:bg-[var(--color-obsidian)]/85"
+        aria-label="Character setup sections"
+      >
+        {[
+          { href: "#character-saved", label: "Saved heroes" },
+          { href: "#character-identity", label: "Portrait & name" },
+          { href: "#character-role", label: "Role & build" },
+          { href: "#character-stats", label: "Stats & gear" },
+        ].map(({ href, label }) => (
+          <a
+            key={href}
+            href={href}
+            className="shrink-0 min-h-[40px] inline-flex items-center px-3 rounded-full border border-[var(--border-ui)] text-[10px] font-bold uppercase tracking-[0.12em] text-[var(--color-silver-dim)] hover:border-[var(--color-gold-rare)]/40 hover:text-[var(--color-gold-rare)] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-gold-rare)]/50 focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--color-obsidian)]"
+          >
+            {label}
+          </a>
+        ))}
+      </nav>
+
       {/* Saved Hero */}
-      <section className="rounded-[var(--radius-card)] border border-[rgba(77,70,53,0.15)] bg-[var(--surface-container)]/30 p-5">
+      <section
+        id="character-saved"
+        className="scroll-mt-28 rounded-[var(--radius-card)] border border-[var(--border-ui)] bg-[var(--surface-container)]/30 p-5"
+      >
         <p className="text-[10px] font-black uppercase tracking-[0.2em] text-[var(--outline)]">
           Use saved hero
         </p>
@@ -582,7 +605,7 @@ export default function CharacterCreationPage() {
             </div>
 
             {selectedSavedHero ? (
-              <div className="rounded-[var(--radius-card)] border border-[rgba(77,70,53,0.2)] bg-[var(--color-midnight)] p-4">
+              <div className="rounded-[var(--radius-card)] border border-[var(--border-ui)] bg-[var(--color-midnight)] p-4">
                 <p className="text-[10px] font-black uppercase tracking-[0.2em] text-[var(--outline)]">
                   Saved hero preview
                 </p>
@@ -627,7 +650,10 @@ export default function CharacterCreationPage() {
       </section>
 
       {/* Portrait */}
-      <section className="rounded-[var(--radius-card)] border border-[rgba(77,70,53,0.15)] bg-[var(--surface-container)]/30 p-5">
+      <section
+        id="character-identity"
+        className="scroll-mt-28 rounded-[var(--radius-card)] border border-[var(--border-ui)] bg-[var(--surface-container)]/30 p-5"
+      >
         <p className="text-[10px] font-black uppercase tracking-[0.2em] text-[var(--outline)]">
           Portrait
         </p>
@@ -685,7 +711,7 @@ export default function CharacterCreationPage() {
           onChange={(e) => setName(e.target.value)}
           autoComplete="off"
           maxLength={48}
-          className="w-full min-h-[48px] rounded-[var(--radius-button)] bg-[var(--color-deep-void)] border border-[rgba(77,70,53,0.2)] px-4 text-lg font-serif text-[var(--color-silver-muted)] placeholder:text-[var(--outline)]/40 focus:outline-none focus:border-[var(--color-gold-rare)]/40 transition-colors"
+          className="w-full min-h-[48px] rounded-[var(--radius-button)] bg-[var(--color-deep-void)] border border-[var(--border-ui)] px-4 text-lg font-serif text-[var(--color-silver-muted)] placeholder:text-[var(--outline)]/40 focus:outline-none focus:border-[var(--color-gold-rare)]/40 transition-colors"
           placeholder="What shall we call you?"
         />
       </section>
@@ -714,7 +740,7 @@ export default function CharacterCreationPage() {
       </section>
 
       {/* Class / role */}
-      <section className="flex flex-col gap-3">
+      <section id="character-role" className="scroll-mt-28 flex flex-col gap-3">
         <div className="flex items-center gap-3">
           <span className="w-1 h-5 bg-[var(--color-gold-rare)]" />
           <h2 className="text-[10px] font-black uppercase tracking-[0.2em] text-[var(--outline)]">
@@ -773,7 +799,7 @@ export default function CharacterCreationPage() {
               onChange={(e) => setCustomConcept(e.target.value)}
               maxLength={180}
               rows={3}
-              className="w-full rounded-[var(--radius-button)] bg-[var(--color-deep-void)] border border-[rgba(77,70,53,0.2)] px-4 py-3 text-sm text-[var(--color-silver-muted)] placeholder:text-[var(--outline)]/40 focus:outline-none focus:border-[var(--color-gold-rare)]/40 resize-none transition-colors leading-relaxed"
+              className="w-full rounded-[var(--radius-button)] bg-[var(--color-deep-void)] border border-[var(--border-ui)] px-4 py-3 text-sm text-[var(--color-silver-muted)] placeholder:text-[var(--outline)]/40 focus:outline-none focus:border-[var(--color-gold-rare)]/40 resize-none transition-colors leading-relaxed"
               placeholder="e.g. timid lady's maid who notices everything; salvage tech on a dying ship; noir fixer with a code"
             />
             <p className="text-[10px] uppercase tracking-[0.12em] text-[var(--outline)]">
@@ -830,7 +856,7 @@ export default function CharacterCreationPage() {
             </GhostButton>
 
             {customClassProfile ? (
-              <div className="rounded-[var(--radius-card)] border border-[rgba(77,70,53,0.2)] bg-[var(--color-midnight)] p-4 flex flex-col gap-3">
+              <div className="rounded-[var(--radius-card)] border border-[var(--border-ui)] bg-[var(--color-midnight)] p-4 flex flex-col gap-3">
                 <label
                   htmlFor="custom-class-name"
                   className="text-[10px] font-black uppercase tracking-[0.2em] text-[var(--outline)]"
@@ -846,7 +872,7 @@ export default function CharacterCreationPage() {
                       prev ? { ...prev, display_name: e.target.value.slice(0, 40) } : prev,
                     )
                   }
-                  className="w-full min-h-[44px] rounded-[var(--radius-button)] bg-[var(--color-deep-void)] border border-[rgba(77,70,53,0.2)] px-4 text-sm text-[var(--color-silver-muted)] focus:outline-none focus:border-[var(--color-gold-rare)]/40 transition-colors"
+                  className="w-full min-h-[44px] rounded-[var(--radius-button)] bg-[var(--color-deep-void)] border border-[var(--border-ui)] px-4 text-sm text-[var(--color-silver-muted)] focus:outline-none focus:border-[var(--color-gold-rare)]/40 transition-colors"
                 />
                 <label
                   htmlFor="custom-class-fantasy"
@@ -863,7 +889,7 @@ export default function CharacterCreationPage() {
                       prev ? { ...prev, fantasy: e.target.value.slice(0, 180) } : prev,
                     )
                   }
-                  className="w-full rounded-[var(--radius-button)] bg-[var(--color-deep-void)] border border-[rgba(77,70,53,0.2)] px-4 py-3 text-sm text-[var(--color-silver-muted)] focus:outline-none focus:border-[var(--color-gold-rare)]/40 resize-none transition-colors leading-relaxed"
+                  className="w-full rounded-[var(--radius-button)] bg-[var(--color-deep-void)] border border-[var(--border-ui)] px-4 py-3 text-sm text-[var(--color-silver-muted)] focus:outline-none focus:border-[var(--color-gold-rare)]/40 resize-none transition-colors leading-relaxed"
                 />
                 <p className="text-[10px] uppercase tracking-[0.12em] text-[var(--outline)]">
                   Ability Budget {customAbilityBudget}/{ABILITY_BUDGET_CAP}
@@ -882,7 +908,7 @@ export default function CharacterCreationPage() {
                             return { ...prev, abilities: next };
                           })
                         }
-                        className="col-span-2 w-full min-h-[40px] rounded-[var(--radius-button)] bg-[var(--color-deep-void)] border border-[rgba(77,70,53,0.2)] px-3 text-sm text-[var(--color-silver-muted)] focus:outline-none focus:border-[var(--color-gold-rare)]/40 transition-colors"
+                        className="col-span-2 w-full min-h-[40px] rounded-[var(--radius-button)] bg-[var(--color-deep-void)] border border-[var(--border-ui)] px-3 text-sm text-[var(--color-silver-muted)] focus:outline-none focus:border-[var(--color-gold-rare)]/40 transition-colors"
                       />
                       <PillSelect
                         options={[
@@ -943,7 +969,7 @@ export default function CharacterCreationPage() {
                               return { ...prev, abilities: next };
                             })
                           }
-                          className="mt-1 w-full min-h-[36px] rounded-[var(--radius-button)] bg-[var(--color-deep-void)] border border-[rgba(77,70,53,0.2)] px-3 text-sm text-[var(--color-silver-muted)] focus:outline-none focus:border-[var(--color-gold-rare)]/40 transition-colors"
+                          className="mt-1 w-full min-h-[36px] rounded-[var(--radius-button)] bg-[var(--color-deep-void)] border border-[var(--border-ui)] px-3 text-sm text-[var(--color-silver-muted)] focus:outline-none focus:border-[var(--color-gold-rare)]/40 transition-colors"
                         />
                       </label>
                       <label className="text-[10px] uppercase tracking-[0.12em] text-[var(--outline)]">
@@ -964,7 +990,7 @@ export default function CharacterCreationPage() {
                               return { ...prev, abilities: next };
                             })
                           }
-                          className="mt-1 w-full min-h-[36px] rounded-[var(--radius-button)] bg-[var(--color-deep-void)] border border-[rgba(77,70,53,0.2)] px-3 text-sm text-[var(--color-silver-muted)] focus:outline-none focus:border-[var(--color-gold-rare)]/40 transition-colors"
+                          className="mt-1 w-full min-h-[36px] rounded-[var(--radius-button)] bg-[var(--color-deep-void)] border border-[var(--border-ui)] px-3 text-sm text-[var(--color-silver-muted)] focus:outline-none focus:border-[var(--color-gold-rare)]/40 transition-colors"
                         />
                       </label>
                       <label className="text-[10px] uppercase tracking-[0.12em] text-[var(--outline)]">
@@ -985,7 +1011,7 @@ export default function CharacterCreationPage() {
                               return { ...prev, abilities: next };
                             })
                           }
-                          className="mt-1 w-full min-h-[36px] rounded-[var(--radius-button)] bg-[var(--color-deep-void)] border border-[rgba(77,70,53,0.2)] px-3 text-sm text-[var(--color-silver-muted)] focus:outline-none focus:border-[var(--color-gold-rare)]/40 transition-colors"
+                          className="mt-1 w-full min-h-[36px] rounded-[var(--radius-button)] bg-[var(--color-deep-void)] border border-[var(--border-ui)] px-3 text-sm text-[var(--color-silver-muted)] focus:outline-none focus:border-[var(--color-gold-rare)]/40 transition-colors"
                         />
                       </label>
                     </div>
@@ -1008,7 +1034,7 @@ export default function CharacterCreationPage() {
                             return { ...prev, starting_gear: next };
                           })
                         }
-                        className="col-span-2 w-full min-h-[40px] rounded-[var(--radius-button)] bg-[var(--color-deep-void)] border border-[rgba(77,70,53,0.2)] px-3 text-sm text-[var(--color-silver-muted)] focus:outline-none focus:border-[var(--color-gold-rare)]/40 transition-colors"
+                        className="col-span-2 w-full min-h-[40px] rounded-[var(--radius-button)] bg-[var(--color-deep-void)] border border-[var(--border-ui)] px-3 text-sm text-[var(--color-silver-muted)] focus:outline-none focus:border-[var(--color-gold-rare)]/40 transition-colors"
                       />
                       <PillSelect
                         options={[
@@ -1049,7 +1075,7 @@ export default function CharacterCreationPage() {
                               return { ...prev, starting_gear: next };
                             })
                           }
-                          className="mt-1 w-full min-h-[36px] rounded-[var(--radius-button)] bg-[var(--color-deep-void)] border border-[rgba(77,70,53,0.2)] px-3 text-sm text-[var(--color-silver-muted)] focus:outline-none focus:border-[var(--color-gold-rare)]/40 transition-colors"
+                          className="mt-1 w-full min-h-[36px] rounded-[var(--radius-button)] bg-[var(--color-deep-void)] border border-[var(--border-ui)] px-3 text-sm text-[var(--color-silver-muted)] focus:outline-none focus:border-[var(--color-gold-rare)]/40 transition-colors"
                         />
                       </label>
                     </div>
@@ -1075,7 +1101,7 @@ export default function CharacterCreationPage() {
       </section>
 
       {/* Role preview — updates from your choices above */}
-      <div className="relative overflow-hidden rounded-[var(--radius-card)] border border-[rgba(77,70,53,0.15)] bg-gradient-to-b from-[var(--surface-container)] to-[var(--color-obsidian)] p-6 flex flex-col items-center gap-3">
+      <div className="relative overflow-hidden rounded-[var(--radius-card)] border border-[var(--border-ui)] bg-gradient-to-b from-[var(--surface-container)] to-[var(--color-obsidian)] p-6 flex flex-col items-center gap-3">
         {classMode === "preset" && selectedMeta?.imageUrl ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img
@@ -1124,7 +1150,7 @@ export default function CharacterCreationPage() {
           onChange={(e) => setAppearance(e.target.value)}
           maxLength={220}
           rows={2}
-          className="w-full rounded-[var(--radius-button)] bg-[var(--color-deep-void)] border border-[rgba(77,70,53,0.2)] px-4 py-3 text-sm text-[var(--color-silver-muted)] placeholder:text-[var(--outline)]/40 focus:outline-none focus:border-[var(--color-gold-rare)]/40 resize-none transition-colors leading-relaxed"
+          className="w-full rounded-[var(--radius-button)] bg-[var(--color-deep-void)] border border-[var(--border-ui)] px-4 py-3 text-sm text-[var(--color-silver-muted)] placeholder:text-[var(--outline)]/40 focus:outline-none focus:border-[var(--color-gold-rare)]/40 resize-none transition-colors leading-relaxed"
           placeholder="e.g. scarred jaw, raven cloak, silver-trim armor, amber eyes"
         />
       </section>
@@ -1145,7 +1171,7 @@ export default function CharacterCreationPage() {
           onChange={(e) => setBackstory(e.target.value)}
           maxLength={500}
           rows={3}
-          className="w-full rounded-[var(--radius-button)] bg-[var(--color-deep-void)] border border-[rgba(77,70,53,0.2)] px-4 py-3 text-sm font-serif italic text-[var(--color-silver-muted)] placeholder:text-[var(--outline)]/40 focus:outline-none focus:border-[var(--color-gold-rare)]/40 resize-none transition-colors leading-relaxed"
+          className="w-full rounded-[var(--radius-button)] bg-[var(--color-deep-void)] border border-[var(--border-ui)] px-4 py-3 text-sm font-serif italic text-[var(--color-silver-muted)] placeholder:text-[var(--outline)]/40 focus:outline-none focus:border-[var(--color-gold-rare)]/40 resize-none transition-colors leading-relaxed"
           placeholder="A brief origin story — the AI weaves it into narration"
         />
       </section>
@@ -1168,7 +1194,7 @@ export default function CharacterCreationPage() {
           onChange={(e) => setTraits(e.target.value)}
           autoComplete="off"
           maxLength={200}
-          className="w-full min-h-[44px] rounded-[var(--radius-button)] bg-[var(--color-deep-void)] border border-[rgba(77,70,53,0.2)] px-4 text-sm text-[var(--color-silver-muted)] placeholder:text-[var(--outline)]/40 focus:outline-none focus:border-[var(--color-gold-rare)]/40 transition-colors"
+          className="w-full min-h-[44px] rounded-[var(--radius-button)] bg-[var(--color-deep-void)] border border-[var(--border-ui)] px-4 text-sm text-[var(--color-silver-muted)] placeholder:text-[var(--outline)]/40 focus:outline-none focus:border-[var(--color-gold-rare)]/40 transition-colors"
           placeholder="e.g. cautious, scarred, short-tempered"
         />
       </section>
@@ -1206,14 +1232,14 @@ export default function CharacterCreationPage() {
               autoComplete="off"
               maxLength={CHARACTER_RACE_MAX_LEN}
               placeholder="e.g. Belt miner clone, uplifted octopus, Martian settler"
-              className="w-full min-h-[44px] rounded-[var(--radius-button)] bg-[var(--color-deep-void)] border border-[rgba(77,70,53,0.2)] px-4 text-sm text-[var(--color-silver-muted)] placeholder:text-[var(--outline)]/40 focus:outline-none focus:border-[var(--color-gold-rare)]/40 transition-colors"
+              className="w-full min-h-[44px] rounded-[var(--radius-button)] bg-[var(--color-deep-void)] border border-[var(--border-ui)] px-4 text-sm text-[var(--color-silver-muted)] placeholder:text-[var(--outline)]/40 focus:outline-none focus:border-[var(--color-gold-rare)]/40 transition-colors"
             />
           </label>
         ) : null}
       </section>
 
       {/* Ability Scores */}
-      <section className="flex flex-col gap-4">
+      <section id="character-stats" className="scroll-mt-28 flex flex-col gap-4">
         <div className="flex items-center justify-between gap-2">
           <div className="flex items-center gap-3">
             <span className="w-1 h-5 bg-[var(--color-gold-rare)]" />
@@ -1225,7 +1251,7 @@ export default function CharacterCreationPage() {
             type="button"
             onClick={() => void handleReroll()}
             disabled={rerollLoading || !initialRollDone}
-            className="min-h-[44px] flex items-center gap-2 px-4 py-2 rounded-[var(--radius-button)] bg-[var(--surface-high)] border border-[rgba(77,70,53,0.2)] text-[10px] font-bold uppercase tracking-[0.15em] text-[var(--color-silver-dim)] hover:text-[var(--color-gold-rare)] hover:border-[var(--color-gold-rare)]/30 transition-all disabled:opacity-30"
+            className="min-h-[44px] flex items-center gap-2 px-4 py-2 rounded-[var(--radius-button)] bg-[var(--surface-high)] border border-[var(--border-ui)] text-[10px] font-bold uppercase tracking-[0.15em] text-[var(--color-silver-dim)] hover:text-[var(--color-gold-rare)] hover:border-[var(--color-gold-rare)]/30 transition-all disabled:opacity-30"
           >
             <span className="material-symbols-outlined text-sm">casino</span>
             {rerollLoading ? "Rolling…" : "Reroll"}
@@ -1257,7 +1283,7 @@ export default function CharacterCreationPage() {
             Starting Gear
           </h2>
         </div>
-        <div className="bg-[var(--color-midnight)] rounded-[var(--radius-card)] border border-[rgba(77,70,53,0.15)] divide-y divide-[rgba(77,70,53,0.1)]">
+        <div className="bg-[var(--color-midnight)] rounded-[var(--radius-card)] border border-[var(--border-ui)] divide-y divide-[var(--border-divide)]">
           {equipment.map((item) => (
             <div key={item.name} className="flex items-center gap-3 px-4 py-3">
               <span className="material-symbols-outlined text-[var(--outline)] text-lg">

@@ -199,7 +199,7 @@ function MemorySummaries() {
 export function JournalSheet() {
   const feed = useGameStore((s) => s.feed);
   const campaignTitle =
-    useGameStore((s) => s.session?.campaignTitle) ?? "Ashveil Chronicle";
+    useGameStore((s) => s.session?.campaignTitle) ?? "Your story";
   const [publishedStory, setPublishedStory] = useState<string | null>(null);
   const [copyHint, setCopyHint] = useState<string | null>(null);
 

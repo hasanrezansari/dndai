@@ -2,7 +2,7 @@
 
 import { useSession } from "next-auth/react";
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 
 import { GoogleSignInButton } from "@/components/auth/google-sign-in-button";
@@ -62,6 +62,14 @@ export default function Home() {
   const [upgradeError, setUpgradeError] = useState<string | null>(null);
   const [upgradeBusy, setUpgradeBusy] = useState(false);
   const [playromanaQuickLineIdx, setPlayromanaQuickLineIdx] = useState(0);
+  const storySetupRef = useRef<HTMLElement>(null);
+
+  const scrollToStorySetup = useCallback(() => {
+    storySetupRef.current?.scrollIntoView({
+      behavior: "smooth",
+      block: "start",
+    });
+  }, []);
 
   const isGuest =
     typeof authSession?.user?.email === "string" &&
@@ -350,7 +358,9 @@ export default function Home() {
           </header>
           <ModeCardsSkeleton />
           <p className="text-[10px] text-[var(--color-silver-dim)] text-center uppercase tracking-[0.2em]">
-            Consulting the Archivist...
+            {brand === "playromana"
+              ? "Consulting the Archivist..."
+              : "Preparing your space…"}
           </p>
         </div>
       </main>
@@ -451,7 +461,7 @@ export default function Home() {
               {ROMA_MODULES.map((m) => (
                 <div
                   key={m.key}
-                  className="rounded-[var(--radius-card)] p-5 bg-[var(--surface-high)] border border-[rgba(77,70,53,0.25)]"
+                  className="rounded-[var(--radius-card)] p-5 bg-[var(--surface-high)] border border-[var(--border-ui-strong)]"
                 >
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
@@ -511,7 +521,7 @@ export default function Home() {
               ))}
             </div>
 
-            <div className="rounded-[var(--radius-card)] p-5 bg-[var(--surface-high)] border border-[rgba(77,70,53,0.25)]">
+            <div className="rounded-[var(--radius-card)] p-5 bg-[var(--surface-high)] border border-[var(--border-ui-strong)]">
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
                   <h3 className="text-fantasy text-lg font-bold text-[var(--color-silver-muted)] tracking-tight">
@@ -548,7 +558,7 @@ export default function Home() {
               </div>
             ) : null}
 
-            <div className="rounded-[var(--radius-card)] p-4 bg-[var(--color-midnight)] border border-[rgba(77,70,53,0.18)]">
+            <div className="rounded-[var(--radius-card)] p-4 bg-[var(--color-midnight)] border border-[var(--border-ui)]">
               <p className="text-[10px] uppercase tracking-[0.18em] text-[var(--outline)]">
                 No prompts. No setup.
               </p>
@@ -569,7 +579,7 @@ export default function Home() {
                   }),
                 }).catch(() => {});
               }}
-              className="w-full min-h-[48px] flex items-center justify-center rounded-[var(--radius-button)] border border-[rgba(77,70,53,0.3)] text-[var(--color-silver-muted)] font-bold uppercase tracking-[0.1em] text-sm hover:border-[var(--color-gold-rare)] hover:text-[var(--color-gold-rare)] transition-colors"
+              className="w-full min-h-[48px] flex items-center justify-center rounded-[var(--radius-button)] border border-[var(--border-ui-strong)] text-[var(--color-silver-muted)] font-bold uppercase tracking-[0.1em] text-sm hover:border-[var(--color-gold-rare)] hover:text-[var(--color-gold-rare)] transition-colors"
             >
               More worlds (playdndai)
             </Link>
@@ -616,7 +626,7 @@ export default function Home() {
             {joinOpen ? (
               <form
                 onSubmit={handleJoinSubmit}
-                className="flex flex-col gap-4 w-full bg-[var(--surface-high)] rounded-[var(--radius-card)] p-6 border border-[rgba(77,70,53,0.3)] animate-slide-up"
+                className="flex flex-col gap-4 w-full bg-[var(--surface-high)] rounded-[var(--radius-card)] p-6 border border-[var(--border-ui-strong)] animate-slide-up"
               >
                 <div className="text-center mb-2">
                   <h3 className="text-fantasy text-xl text-[var(--color-silver-muted)] tracking-tight">
@@ -703,51 +713,63 @@ export default function Home() {
 
   return (
     <main className="min-h-dvh flex flex-col items-center px-5 pb-[calc(2rem+env(safe-area-inset-bottom))] bg-[var(--color-obsidian)]">
-      <div className="flex flex-col gap-[var(--void-gap)] w-full max-w-md pt-8">
-        {/* Brand */}
-        <header className="relative overflow-hidden rounded-[var(--radius-card)] border border-[rgba(77,70,53,0.18)] bg-[var(--surface-container)]/25 p-6">
-          <div className="pointer-events-none absolute inset-0 opacity-70">
-            <div className="absolute -top-16 -left-24 h-56 w-56 rounded-full bg-[rgba(212,175,55,0.10)] blur-3xl" />
-            <div className="absolute -bottom-20 -right-28 h-72 w-72 rounded-full bg-[rgba(120,74,32,0.18)] blur-3xl" />
-            <div className="absolute inset-0 bg-gradient-to-b from-transparent via-transparent to-[var(--color-obsidian)]" />
+      <div className="flex flex-col gap-[var(--void-gap)] w-full max-w-lg pt-8">
+        {/* Hero — L1 spec: headline + sub + CTAs scroll to setup */}
+        <header className="relative overflow-hidden rounded-[var(--radius-card)] border border-[var(--border-ui)] bg-[var(--surface-container)]/35 backdrop-blur-[10px] px-6 py-8 sm:py-9">
+          <div className="pointer-events-none absolute inset-0 opacity-80">
+            <div className="absolute -top-20 -left-28 h-64 w-64 rounded-full bg-[color-mix(in_srgb,var(--color-gold-rare)_14%,transparent)] blur-3xl" />
+            <div className="absolute -bottom-24 -right-32 h-80 w-80 rounded-full bg-[color-mix(in_srgb,var(--atmosphere-mystery)_18%,transparent)] blur-3xl" />
+            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 h-48 w-48 rounded-full bg-[color-mix(in_srgb,var(--atmosphere-exploration)_12%,transparent)] blur-3xl" />
+            <div className="absolute inset-0 bg-gradient-to-b from-transparent via-transparent to-[var(--color-obsidian)]/90" />
           </div>
 
-          <div className="relative text-center flex flex-col gap-2">
-            <p className="text-[10px] uppercase tracking-[0.22em] text-[var(--outline)]">
+          <div className="relative flex flex-col gap-3 text-left">
+            <p className="text-[10px] uppercase tracking-[0.26em] text-[var(--outline)]">
               {COPY.landing.eyebrow}
             </p>
-            <h1 className="text-fantasy text-4xl font-black text-[var(--color-gold-rare)] tracking-tight uppercase">
+            <p className="text-xs font-semibold tracking-[0.12em] text-[var(--color-gold-rare)]">
               {getBrandName(brand)}
-            </h1>
-            <p className="text-[var(--color-silver-dim)] text-sm italic tracking-wide font-serif">
-              &ldquo;{getBrandTagline(brand)}&rdquo;
             </p>
-            <p className="text-xs text-[var(--color-silver-dim)] leading-relaxed text-left mt-2 px-0.5 border-t border-[rgba(77,70,53,0.2)] pt-3">
+            <h1 className="text-[1.65rem] sm:text-3xl font-bold text-[var(--color-silver-muted)] leading-[1.2] tracking-tight font-[family-name:var(--font-gameplay)]">
+              {COPY.landing.heroTitle}
+            </h1>
+            <p className="text-sm text-[var(--color-silver-dim)] leading-relaxed max-w-[28rem]">
+              {COPY.landing.heroSub}
+            </p>
+            <p className="text-xs text-[var(--color-silver-dim)]/95 leading-relaxed max-w-[28rem] border-t border-[var(--border-ui)] pt-4 mt-1">
               {COPY.landing.lead}
             </p>
 
-            <div className="mt-4 w-full flex flex-col gap-2 max-w-[280px] mx-auto">
-              <Link
-                href="/worlds"
-                className="min-h-[44px] w-full inline-flex items-center justify-center rounded-[var(--radius-button)] bg-gradient-to-b from-[var(--color-gold-rare)] to-[var(--color-gold-support)] text-[var(--color-obsidian)] font-bold uppercase tracking-[0.12em] text-xs shadow-[inset_0_1px_0_rgba(255,255,255,0.2),0_4px_12px_rgba(242,202,80,0.25)] hover:brightness-110 active:scale-[0.98] transition-all"
+            <div className="mt-5 flex flex-col gap-3 sm:flex-row sm:flex-wrap">
+              <GoldButton
+                type="button"
+                size="lg"
+                className="w-full sm:w-auto sm:min-w-[200px]"
+                onClick={scrollToStorySetup}
               >
-                Browse story worlds
-              </Link>
+                {COPY.landing.ctaScrollSetup}
+              </GoldButton>
               <GhostButton
                 type="button"
-                size="md"
-                className="min-h-[40px] w-full text-[10px] uppercase tracking-[0.12em]"
+                size="lg"
+                className="w-full sm:w-auto"
                 onClick={() => {
                   setJoinOpen(true);
                   setJoinError(null);
                   setJoinShakeKey(0);
                 }}
               >
-                Join with code
+                {COPY.landing.ctaJoin}
               </GhostButton>
+              <Link
+                href="/worlds"
+                className="w-full sm:w-auto min-h-[48px] inline-flex items-center justify-center rounded-[var(--radius-button)] border border-[var(--border-ui-strong)] px-6 text-xs font-bold uppercase tracking-[0.12em] text-[var(--color-silver-muted)] hover:border-[var(--color-gold-rare)] hover:text-[var(--color-gold-rare)] transition-all [transition-timing-function:var(--ease-out-soft)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-gold-rare)]/70 focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--color-obsidian)]"
+              >
+                {COPY.landing.browseWorldsCta}
+              </Link>
             </div>
 
-            <div className="mt-3 flex items-center justify-center gap-2 flex-wrap">
+            <div className="mt-4 flex items-center justify-start gap-2 flex-wrap">
               <Link
                 href="/profile"
                 className="min-h-[38px] px-3.5 rounded-[var(--radius-chip)] border border-[rgba(255,255,255,0.10)] bg-gradient-to-b from-[rgba(255,255,255,0.06)] to-[rgba(0,0,0,0.14)] text-[10px] font-black uppercase tracking-[0.16em] text-[var(--color-silver-dim)] hover:text-[var(--color-gold-rare)] hover:border-[rgba(242,202,80,0.28)] transition-colors shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]"
@@ -787,8 +809,8 @@ export default function Home() {
             </div>
 
             {authSession?.user?.name ? (
-              <div className="mt-2 flex flex-col items-center gap-2">
-                <p className="text-[10px] text-[var(--outline)] uppercase tracking-[0.18em] text-center">
+              <div className="mt-2 flex flex-col items-stretch gap-2">
+                <p className="text-[10px] text-[var(--outline)] uppercase tracking-[0.18em] text-left">
                   {isGuest ? (
                     <>
                       Playing as{" "}
@@ -813,7 +835,7 @@ export default function Home() {
                   )}
                 </p>
                 {isGuest ? (
-                  <div className="w-full max-w-[240px] mx-auto flex flex-col gap-2">
+                  <div className="w-full max-w-[280px] flex flex-col gap-2">
                     <GoogleSignInButton
                       disabled={upgradeBusy}
                       onClick={() => void handleUpgradeToGoogle()}
@@ -821,13 +843,13 @@ export default function Home() {
                         upgradeBusy ? "Saving…" : "Save progress with Google"
                       }
                     />
-                    <p className="text-[9px] text-[var(--outline)] text-center leading-relaxed">
+                    <p className="text-[9px] text-[var(--outline)] text-left leading-relaxed">
                       Opens Google once, then attaches this guest&apos;s games to
                       that login. You don&apos;t need Sign out first — we clear the
                       guest session as part of this.
                     </p>
                     {upgradeError ? (
-                      <p className="text-xs text-[var(--color-failure)] text-center leading-relaxed">
+                      <p className="text-xs text-[var(--color-failure)] text-left leading-relaxed">
                         {upgradeError}
                       </p>
                     ) : null}
@@ -839,7 +861,7 @@ export default function Home() {
         </header>
 
         <section
-          className="rounded-[var(--radius-card)] border border-[rgba(77,70,53,0.15)] bg-[var(--color-midnight)]/80 p-4 space-y-3"
+          className="rounded-[var(--radius-card)] border border-[var(--border-ui)] bg-[var(--color-midnight)]/85 p-4 space-y-3"
           aria-labelledby="how-it-works-heading"
         >
           <div className="flex items-center gap-2">
@@ -870,12 +892,16 @@ export default function Home() {
           </ol>
         </section>
 
-        {/* Mode Selection */}
-        <section className="space-y-4">
+        {/* Story setup anchor — primary CTA scrolls here */}
+        <section
+          ref={storySetupRef}
+          id="story-setup"
+          className="space-y-4 scroll-mt-10"
+        >
           {!tutorialComplete ? (
             <Link
               href="/tutorial"
-              className="w-full flex items-center justify-center gap-2 min-h-[48px] rounded-[var(--radius-card)] border border-[rgba(77,70,53,0.25)] bg-[var(--surface-container)]/40 text-[var(--color-silver-muted)] text-[10px] font-bold uppercase tracking-[0.14em] hover:border-[var(--color-gold-rare)]/30 hover:text-[var(--color-gold-rare)] transition-colors"
+              className="w-full flex items-center justify-center gap-2 min-h-[48px] rounded-[var(--radius-card)] border border-[var(--border-ui-strong)] bg-[var(--surface-container)]/40 text-[var(--color-silver-muted)] text-[10px] font-bold uppercase tracking-[0.14em] hover:border-[var(--color-gold-rare)]/30 hover:text-[var(--color-gold-rare)] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-gold-rare)]/60 focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--color-obsidian)]"
             >
               <span className="material-symbols-outlined text-lg">school</span>
               Start tutorial
@@ -895,13 +921,13 @@ export default function Home() {
               setPartyRoom(false);
               setMode("ai_dm");
             }}
-            className="text-left w-full min-h-[44px] transition-all duration-200 active:scale-[0.98] focus:outline-none"
+            className="text-left w-full min-h-[44px] transition-all duration-200 active:scale-[0.98] rounded-[var(--radius-card)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-gold-rare)]/50 focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--color-obsidian)]"
           >
             <div
               className={`relative h-44 rounded-[var(--radius-card)] p-6 flex flex-col justify-end overflow-hidden transition-all duration-300 ${
                 mode === "ai_dm" && !partyRoom
                   ? "bg-[var(--surface-high)] selected-glow metallic-edge"
-                  : "bg-[var(--color-midnight)] border border-[rgba(77,70,53,0.2)] opacity-70 hover:opacity-100 hover:bg-[var(--surface-container)]"
+                  : "bg-[var(--color-midnight)] border border-[var(--border-ui)] opacity-70 hover:opacity-100 hover:bg-[var(--surface-container)]"
               }`}
             >
               <div className="relative z-10 flex items-start justify-between gap-3 mb-auto">
@@ -952,13 +978,13 @@ export default function Home() {
               setPartyRoom(false);
               setMode("human_dm");
             }}
-            className="text-left w-full min-h-[44px] transition-all duration-200 active:scale-[0.98] focus:outline-none"
+            className="text-left w-full min-h-[44px] transition-all duration-200 active:scale-[0.98] rounded-[var(--radius-card)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-gold-rare)]/50 focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--color-obsidian)]"
           >
             <div
               className={`relative h-44 rounded-[var(--radius-card)] p-6 flex flex-col justify-end overflow-hidden transition-all duration-300 ${
                 mode === "human_dm"
                   ? "bg-[var(--surface-high)] selected-glow metallic-edge"
-                  : "bg-[var(--color-midnight)] border border-[rgba(77,70,53,0.2)] opacity-70 hover:opacity-100 hover:bg-[var(--surface-container)]"
+                  : "bg-[var(--color-midnight)] border border-[var(--border-ui)] opacity-70 hover:opacity-100 hover:bg-[var(--surface-container)]"
               }`}
             >
               <div className="relative z-10 flex items-start justify-between gap-3 mb-auto">
@@ -1007,13 +1033,13 @@ export default function Home() {
               setPartyRoom(true);
               setMode("ai_dm");
             }}
-            className="text-left w-full min-h-[44px] transition-all duration-200 active:scale-[0.98] focus:outline-none"
+            className="text-left w-full min-h-[44px] transition-all duration-200 active:scale-[0.98] rounded-[var(--radius-card)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-gold-rare)]/50 focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--color-obsidian)]"
           >
             <div
               className={`relative h-44 rounded-[var(--radius-card)] p-6 flex flex-col justify-end overflow-hidden transition-all duration-300 ${
                 partyRoom
                   ? "bg-[var(--surface-high)] selected-glow metallic-edge"
-                  : "bg-[var(--color-midnight)] border border-[rgba(77,70,53,0.2)] opacity-70 hover:opacity-100 hover:bg-[var(--surface-container)]"
+                  : "bg-[var(--color-midnight)] border border-[var(--border-ui)] opacity-70 hover:opacity-100 hover:bg-[var(--surface-container)]"
               }`}
             >
               <div className="relative z-10 flex items-start justify-between gap-3 mb-auto">
@@ -1092,7 +1118,7 @@ export default function Home() {
                   placeholder="Short pitch: setting, hook, or vibe (any genre)."
                   rows={4}
                   maxLength={8000}
-                  className="w-full h-36 bg-[var(--color-deep-void)] p-5 rounded-[var(--radius-card)] border border-[rgba(77,70,53,0.2)] focus:border-[var(--color-gold-rare)]/50 focus:ring-0 text-[var(--color-silver-muted)] font-serif italic text-base leading-relaxed placeholder:text-[var(--outline)]/40 resize-none transition-all"
+                  className="w-full h-36 bg-[var(--color-deep-void)] p-5 rounded-[var(--radius-card)] border border-[var(--border-ui)] focus:border-[var(--color-gold-rare)]/50 focus:ring-0 text-[var(--color-silver-muted)] font-serif italic text-base leading-relaxed placeholder:text-[var(--outline)]/40 resize-none transition-all"
                 />
                 <p className="text-[10px] text-[var(--outline)] mt-2 uppercase tracking-[0.12em]">
                   {partyRoom
@@ -1114,7 +1140,7 @@ export default function Home() {
                         className={`px-3 py-1.5 rounded-full text-[10px] font-bold uppercase tracking-[0.14em] border transition-colors ${
                           on
                             ? "border-[var(--color-gold-rare)] bg-[var(--color-gold-rare)]/15 text-[var(--color-gold-rare)]"
-                            : "border-[rgba(77,70,53,0.35)] text-[var(--color-silver-dim)] hover:border-[var(--color-gold-rare)]/40"
+                            : "border-[var(--border-ui-strong)] text-[var(--color-silver-dim)] hover:border-[var(--color-gold-rare)]/40"
                         }`}
                       >
                         {t.label}
@@ -1135,7 +1161,7 @@ export default function Home() {
                   placeholder="Longer premise, NPCs, plot beats — fed to the AI as canon."
                   rows={5}
                   maxLength={32000}
-                  className="w-full min-h-[120px] bg-[var(--color-deep-void)] p-4 rounded-[var(--radius-card)] border border-[rgba(77,70,53,0.2)] focus:border-[var(--color-gold-rare)]/50 focus:ring-0 text-[var(--color-silver-muted)] text-sm leading-relaxed placeholder:text-[var(--outline)]/40 resize-y transition-all"
+                  className="w-full min-h-[120px] bg-[var(--color-deep-void)] p-4 rounded-[var(--radius-card)] border border-[var(--border-ui)] focus:border-[var(--color-gold-rare)]/50 focus:ring-0 text-[var(--color-silver-muted)] text-sm leading-relaxed placeholder:text-[var(--outline)]/40 resize-y transition-all"
                 />
                 <label
                   htmlFor="art-direction"
@@ -1150,7 +1176,7 @@ export default function Home() {
                   onChange={(e) => setArtDirection(e.target.value)}
                   placeholder="e.g. soft anime watercolor, 90s film grain, travel photography…"
                   maxLength={2000}
-                  className="w-full h-12 bg-[var(--color-deep-void)] px-4 rounded-[var(--radius-card)] border border-[rgba(77,70,53,0.2)] focus:border-[var(--color-gold-rare)]/50 focus:ring-0 text-[var(--color-silver-muted)] text-sm placeholder:text-[var(--outline)]/40"
+                  className="w-full h-12 bg-[var(--color-deep-void)] px-4 rounded-[var(--radius-card)] border border-[var(--border-ui)] focus:border-[var(--color-gold-rare)]/50 focus:ring-0 text-[var(--color-silver-muted)] text-sm placeholder:text-[var(--outline)]/40"
                 />
               </div>
             ) : null}
@@ -1169,7 +1195,7 @@ export default function Home() {
                       className={`min-h-[40px] min-w-[44px] rounded-[var(--radius-card)] border px-3 text-sm font-bold transition-colors ${
                         partyRounds === n
                           ? "border-[var(--color-gold-rare)] bg-[var(--color-gold-rare)]/15 text-[var(--color-gold-rare)]"
-                          : "border-[rgba(77,70,53,0.35)] text-[var(--color-silver-dim)] hover:border-[var(--color-gold-rare)]/40"
+                          : "border-[var(--border-ui-strong)] text-[var(--color-silver-dim)] hover:border-[var(--color-gold-rare)]/40"
                       }`}
                     >
                       {n}
@@ -1200,7 +1226,7 @@ export default function Home() {
               <label className="block text-[10px] font-bold uppercase tracking-[0.2em] text-[var(--outline)] mb-4">
                 {COPY.landing.partyLabel}
               </label>
-              <div className="flex items-center bg-[var(--color-midnight)] p-1.5 rounded-[var(--radius-card)] border border-[rgba(77,70,53,0.1)]">
+              <div className="flex items-center bg-[var(--color-midnight)] p-1.5 rounded-[var(--radius-card)] border border-[var(--border-ui)]">
                 {PARTY_SIZES.map((n) => (
                   <button
                     key={n}
@@ -1230,7 +1256,7 @@ export default function Home() {
         ) : null}
 
         {/* Bottom actions (not floating) */}
-        <section className="mt-2 rounded-[var(--radius-card)] border border-[rgba(77,70,53,0.25)] bg-[var(--surface-high)]/60 backdrop-blur-md p-4 shadow-[0_24px_80px_rgba(0,0,0,0.45)]">
+        <section className="mt-2 rounded-[var(--radius-card)] border border-[var(--border-ui-strong)] bg-[var(--surface-high)]/60 backdrop-blur-md p-4 shadow-[0_24px_80px_rgba(0,0,0,0.45)]">
           <div className="flex flex-col gap-3">
             <GoldButton
               type="button"
@@ -1241,7 +1267,7 @@ export default function Home() {
             >
               {createLoading ? (
                 <>
-                  <span>Opening portal…</span>
+                  <span>{COPY.landing.creatingStory}</span>
                   <span
                     className="absolute inset-0 animate-shimmer opacity-40 pointer-events-none"
                     aria-hidden

@@ -898,7 +898,7 @@ export default function ProfilePage() {
                 {worldSubs.map((w) => (
                   <li
                     key={w.id}
-                    className="rounded-[var(--radius-card)] border border-[rgba(77,70,53,0.2)] bg-[var(--color-deep-void)]/60 px-3 py-2"
+                    className="rounded-[var(--radius-card)] border border-[var(--border-ui)] bg-[var(--color-deep-void)]/60 px-3 py-2"
                   >
                     <div className="flex items-start justify-between gap-2">
                       <div className="min-w-0">
@@ -1187,7 +1187,7 @@ export default function ProfilePage() {
               </div>
 
               {inspectedHero && inspectedHeroId ? (
-                <div className="rounded-[var(--radius-card)] border border-[rgba(77,70,53,0.2)] bg-[var(--color-midnight)] p-4">
+                <div className="rounded-[var(--radius-card)] border border-[var(--border-ui)] bg-[var(--color-midnight)] p-4">
                   <p className="text-[10px] font-black uppercase tracking-[0.2em] text-[var(--outline)]">
                     Build: {inspectedHero.name}
                   </p>
@@ -1274,7 +1274,7 @@ export default function ProfilePage() {
                 </div>
 
                 {builderClassProfile ? (
-                  <div className="col-span-2 rounded-[var(--radius-card)] border border-[rgba(77,70,53,0.2)] bg-[var(--color-midnight)] p-4">
+                  <div className="col-span-2 rounded-[var(--radius-card)] border border-[var(--border-ui)] bg-[var(--color-midnight)] p-4">
                     <p className="text-[10px] font-black uppercase tracking-[0.2em] text-[var(--outline)]">
                       Generated kit preview
                     </p>
@@ -1324,7 +1324,7 @@ export default function ProfilePage() {
                                     return { ...parsed.data, abilities: next };
                                   })
                                 }
-                                className="col-span-2 w-full min-h-[40px] rounded-[var(--radius-button)] bg-[var(--color-deep-void)] border border-[rgba(77,70,53,0.2)] px-3 text-sm text-[var(--color-silver-muted)] focus:outline-none focus:border-[var(--color-gold-rare)]/40 transition-colors"
+                                className="col-span-2 w-full min-h-[40px] rounded-[var(--radius-button)] bg-[var(--color-deep-void)] border border-[var(--border-ui)] px-3 text-sm text-[var(--color-silver-muted)] focus:outline-none focus:border-[var(--color-gold-rare)]/40 transition-colors"
                               />
                               <PillSelect
                                 options={[
@@ -1397,7 +1397,7 @@ export default function ProfilePage() {
                                       return { ...parsed.data, abilities: next };
                                     })
                                   }
-                                  className="mt-1 w-full min-h-[36px] rounded-[var(--radius-button)] bg-[var(--color-deep-void)] border border-[rgba(77,70,53,0.2)] px-3 text-sm text-[var(--color-silver-muted)] focus:outline-none focus:border-[var(--color-gold-rare)]/40 transition-colors"
+                                  className="mt-1 w-full min-h-[36px] rounded-[var(--radius-button)] bg-[var(--color-deep-void)] border border-[var(--border-ui)] px-3 text-sm text-[var(--color-silver-muted)] focus:outline-none focus:border-[var(--color-gold-rare)]/40 transition-colors"
                                 />
                               </label>
                               <label className="text-[10px] uppercase tracking-[0.12em] text-[var(--outline)]">
@@ -1422,7 +1422,7 @@ export default function ProfilePage() {
                                       return { ...parsed.data, abilities: next };
                                     })
                                   }
-                                  className="mt-1 w-full min-h-[36px] rounded-[var(--radius-button)] bg-[var(--color-deep-void)] border border-[rgba(77,70,53,0.2)] px-3 text-sm text-[var(--color-silver-muted)] focus:outline-none focus:border-[var(--color-gold-rare)]/40 transition-colors"
+                                  className="mt-1 w-full min-h-[36px] rounded-[var(--radius-button)] bg-[var(--color-deep-void)] border border-[var(--border-ui)] px-3 text-sm text-[var(--color-silver-muted)] focus:outline-none focus:border-[var(--color-gold-rare)]/40 transition-colors"
                                 />
                               </label>
                               <label className="text-[10px] uppercase tracking-[0.12em] text-[var(--outline)]">
@@ -1447,7 +1447,7 @@ export default function ProfilePage() {
                                       return { ...parsed.data, abilities: next };
                                     })
                                   }
-                                  className="mt-1 w-full min-h-[36px] rounded-[var(--radius-button)] bg-[var(--color-deep-void)] border border-[rgba(77,70,53,0.2)] px-3 text-sm text-[var(--color-silver-muted)] focus:outline-none focus:border-[var(--color-gold-rare)]/40 transition-colors"
+                                  className="mt-1 w-full min-h-[36px] rounded-[var(--radius-button)] bg-[var(--color-deep-void)] border border-[var(--border-ui)] px-3 text-sm text-[var(--color-silver-muted)] focus:outline-none focus:border-[var(--color-gold-rare)]/40 transition-colors"
                                 />
                               </label>
                             </div>
@@ -1493,7 +1493,7 @@ export default function ProfilePage() {
                                     return { ...parsed.data, starting_gear: next };
                                   })
                                 }
-                                className="col-span-2 w-full min-h-[40px] rounded-[var(--radius-button)] bg-[var(--color-deep-void)] border border-[rgba(77,70,53,0.2)] px-3 text-sm text-[var(--color-silver-muted)] focus:outline-none focus:border-[var(--color-gold-rare)]/40 transition-colors"
+                                className="col-span-2 w-full min-h-[40px] rounded-[var(--radius-button)] bg-[var(--color-deep-void)] border border-[var(--border-ui)] px-3 text-sm text-[var(--color-silver-muted)] focus:outline-none focus:border-[var(--color-gold-rare)]/40 transition-colors"
                               />
                               <PillSelect
                                 options={[
@@ -1542,7 +1542,7 @@ export default function ProfilePage() {
                                       return { ...parsed.data, starting_gear: next };
                                     })
                                   }
-                                  className="mt-1 w-full min-h-[36px] rounded-[var(--radius-button)] bg-[var(--color-deep-void)] border border-[rgba(77,70,53,0.2)] px-3 text-sm text-[var(--color-silver-muted)] focus:outline-none focus:border-[var(--color-gold-rare)]/40 transition-colors"
+                                  className="mt-1 w-full min-h-[36px] rounded-[var(--radius-button)] bg-[var(--color-deep-void)] border border-[var(--border-ui)] px-3 text-sm text-[var(--color-silver-muted)] focus:outline-none focus:border-[var(--color-gold-rare)]/40 transition-colors"
                                 />
                               </label>
                             </div>
@@ -1592,7 +1592,7 @@ export default function ProfilePage() {
                                     return { ...parsed.data, stat_bias: nextBias };
                                   })
                                 }
-                                className="mt-1 w-full min-h-[36px] rounded-[var(--radius-button)] bg-[var(--color-deep-void)] border border-[rgba(77,70,53,0.2)] px-3 text-sm text-[var(--color-silver-muted)] focus:outline-none focus:border-[var(--color-gold-rare)]/40 transition-colors"
+                                className="mt-1 w-full min-h-[36px] rounded-[var(--radius-button)] bg-[var(--color-deep-void)] border border-[var(--border-ui)] px-3 text-sm text-[var(--color-silver-muted)] focus:outline-none focus:border-[var(--color-gold-rare)]/40 transition-colors"
                               />
                             </label>
                           ))}

@@ -40,7 +40,7 @@ export function NarrationPlaybackButton({
             toggleNarrationPlayback(trimmed);
           }}
           aria-label={label}
-          className="inline-flex size-7 shrink-0 items-center justify-center rounded-md border border-[rgba(77,70,53,0.2)] bg-[var(--surface-high)]/60 text-[var(--color-gold-support)] transition-colors hover:border-[var(--color-gold-rare)]/35 hover:text-[var(--color-gold-rare)]"
+          className="inline-flex size-7 shrink-0 items-center justify-center rounded-md border border-[var(--border-ui)] bg-[var(--surface-high)]/60 text-[var(--color-gold-support)] transition-colors hover:border-[var(--color-gold-rare)]/35 hover:text-[var(--color-gold-rare)]"
         >
           <span className="material-symbols-outlined text-base">{icon}</span>
         </button>
@@ -51,7 +51,7 @@ export function NarrationPlaybackButton({
               stopNarrationSpeech();
             }}
             aria-label="Stop narration"
-            className="inline-flex size-7 shrink-0 items-center justify-center rounded-md border border-[rgba(77,70,53,0.2)] bg-[var(--surface-high)]/60 text-[var(--outline)] transition-colors hover:border-[var(--color-failure)]/35 hover:text-[var(--color-failure)]"
+            className="inline-flex size-7 shrink-0 items-center justify-center rounded-md border border-[var(--border-ui)] bg-[var(--surface-high)]/60 text-[var(--outline)] transition-colors hover:border-[var(--color-failure)]/35 hover:text-[var(--color-failure)]"
           >
             <span className="material-symbols-outlined text-base">stop</span>
           </button>
@@ -68,7 +68,7 @@ export function NarrationPlaybackButton({
           if (!trimmed) return;
           toggleNarrationPlayback(trimmed);
         }}
-        className="inline-flex min-h-[40px] items-center gap-1.5 rounded-[var(--radius-chip)] border border-[rgba(77,70,53,0.25)] bg-[var(--surface-high)] px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.12em] text-[var(--color-gold-support)] transition-colors hover:border-[var(--color-gold-rare)]/35 hover:text-[var(--color-gold-rare)]"
+        className="inline-flex min-h-[40px] items-center gap-1.5 rounded-[var(--radius-chip)] border border-[var(--border-ui-strong)] bg-[var(--surface-high)] px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.12em] text-[var(--color-gold-support)] transition-colors hover:border-[var(--color-gold-rare)]/35 hover:text-[var(--color-gold-rare)]"
       >
         <span className="material-symbols-outlined text-sm">{icon}</span>
         {label}
@@ -79,7 +79,7 @@ export function NarrationPlaybackButton({
           onClick={() => {
             stopNarrationSpeech();
           }}
-          className="inline-flex min-h-[40px] items-center gap-1.5 rounded-[var(--radius-chip)] border border-[rgba(77,70,53,0.25)] bg-[var(--surface-high)] px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.12em] text-[var(--outline)] transition-colors hover:border-[var(--color-failure)]/35 hover:text-[var(--color-failure)]"
+          className="inline-flex min-h-[40px] items-center gap-1.5 rounded-[var(--radius-chip)] border border-[var(--border-ui-strong)] bg-[var(--surface-high)] px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.12em] text-[var(--outline)] transition-colors hover:border-[var(--color-failure)]/35 hover:text-[var(--color-failure)]"
         >
           <span className="material-symbols-outlined text-sm">stop</span>
           Stop

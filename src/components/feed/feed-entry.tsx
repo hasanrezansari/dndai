@@ -62,7 +62,7 @@ function avatarLetter(name?: string) {
 
 function StatEffectRow({ effect }: { effect: StatEffect }) {
   return (
-    <div className="flex flex-col gap-1.5 rounded-[var(--radius-card)] border border-[rgba(77,70,53,0.25)] bg-[var(--color-deep-void)]/50 px-3 py-2.5">
+    <div className="flex flex-col gap-1.5 rounded-[var(--radius-card)] border border-[var(--border-ui-strong)] bg-[var(--color-deep-void)]/50 px-3 py-2.5">
       <div className="flex items-center justify-between gap-2">
         <span className="text-fantasy text-xs font-bold tracking-tight text-[var(--color-silver-muted)]">
           {effect.targetName}
@@ -167,7 +167,7 @@ export function FeedEntryRow({ entry }: FeedEntryRowProps) {
     return (
       <motion.div {...motionProps} className="relative px-1 py-3">
         <div
-          className="border-y border-[rgba(77,70,53,0.35)] py-3"
+          className="rounded-[var(--radius-card)] border-y border-[var(--border-divide)] bg-[var(--surface-high)]/20 py-3"
           role="status"
         >
           <p className="text-center text-[11px] leading-relaxed text-[var(--outline)] flex items-center justify-center gap-2 px-6">
@@ -192,7 +192,7 @@ export function FeedEntryRow({ entry }: FeedEntryRowProps) {
     return (
       <motion.div
         {...motionProps}
-        className={`rounded-[var(--radius-card)] border border-[rgba(77,70,53,0.22)] bg-[var(--surface-container)]/55 pl-3 pr-3 py-3 backdrop-blur-sm ${
+        className={`rounded-[var(--radius-card)] border border-[var(--border-ui)] border-l-[3px] border-l-[color-mix(in_srgb,var(--color-gold-rare)_45%,transparent)] bg-[var(--surface-container)]/55 pl-3 pr-3 py-3 backdrop-blur-sm ${
           highlighted ? "feed-entry-action-highlight" : ""
         }`}
       >
@@ -201,7 +201,7 @@ export function FeedEntryRow({ entry }: FeedEntryRowProps) {
             className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-[var(--radius-avatar)] text-sm font-black ${
               highlighted
                 ? "selected-glow border-2 border-[var(--color-gold-rare)] bg-[var(--surface-high)] text-[var(--color-gold-rare)]"
-                : "border border-[rgba(77,70,53,0.25)] bg-[var(--color-midnight)] text-[var(--color-silver-dim)]"
+                : "border border-[var(--border-ui-strong)] bg-[var(--color-midnight)] text-[var(--color-silver-dim)]"
             }`}
             aria-hidden
           >
@@ -312,7 +312,7 @@ export function FeedEntryRow({ entry }: FeedEntryRowProps) {
         className="flex justify-center py-1"
         role="status"
       >
-        <div className="w-full max-w-[min(100%,280px)] rounded-[var(--radius-card)] border border-[rgba(77,70,53,0.28)] bg-[var(--color-deep-void)]/70 py-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] backdrop-blur-sm">
+        <div className="w-full max-w-[min(100%,280px)] rounded-[var(--radius-card)] border border-[var(--border-ui)] bg-[var(--color-deep-void)]/70 py-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] ring-1 ring-[color-mix(in_srgb,var(--outline-variant)_35%,transparent)] backdrop-blur-sm">
           {body}
           <time
             className={`${timeClass} block w-full px-3 pt-2 text-center`}
@@ -388,10 +388,10 @@ export function FeedEntryRow({ entry }: FeedEntryRowProps) {
     return (
       <motion.div
         {...motionProps}
-        className="overflow-hidden rounded-[var(--radius-card)] border border-[rgba(77,70,53,0.25)] feed-entry-narration-bg"
+        className="overflow-hidden rounded-[var(--radius-card)] border border-[color-mix(in_srgb,var(--color-gold-support)_28%,transparent)] feed-entry-narration-bg shadow-[0_0_0_1px_color-mix(in_srgb,var(--color-gold-support)_12%,transparent),inset_0_1px_0_rgba(255,255,255,0.04)]"
       >
         {entry.imageUrl ? (
-          <div className="relative -mx-px -mt-px overflow-hidden border-b border-[rgba(77,70,53,0.2)]">
+          <div className="relative -mx-px -mt-px overflow-hidden border-b border-[var(--border-divide)]">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src={entry.imageUrl}

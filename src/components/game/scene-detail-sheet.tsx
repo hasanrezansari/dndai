@@ -27,7 +27,7 @@ export function SceneDetailPanel({
 
   return (
     <div className="flex max-h-[min(75vh,640px)] flex-col gap-4 overflow-y-auto pb-4">
-      <div className="relative aspect-[16/10] w-full overflow-hidden rounded-[var(--radius-card)] border border-[rgba(77,70,53,0.2)] bg-[var(--color-deep-void)]">
+      <div className="relative aspect-[16/10] w-full overflow-hidden rounded-[var(--radius-card)] border border-[var(--border-ui)] bg-[var(--color-deep-void)]">
         {src ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img

@@ -34,7 +34,7 @@ export function FeedSemanticChips({
             className={`shrink-0 rounded-[var(--radius-pill)] border px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.12em] transition-colors min-h-[36px] ${
               active
                 ? "border-[var(--color-gold-rare)]/45 bg-[color-mix(in_srgb,var(--color-gold-rare)_12%,transparent)] text-[var(--color-gold-rare)]"
-                : "border-[rgba(77,70,53,0.2)] bg-[var(--color-deep-void)]/60 text-[var(--outline)] hover:text-[var(--color-silver-dim)]"
+                : "border-[var(--border-ui)] bg-[var(--color-deep-void)]/60 text-[var(--outline)] hover:text-[var(--color-silver-dim)]"
             }`}
           >
             {label}

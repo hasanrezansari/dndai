@@ -150,7 +150,7 @@ export async function POST(
 
     const quest = await getQuestState(sessionId);
     const chapter = buildFinalChapter({
-      campaignTitle: sessionRow.campaignTitle?.trim() || "Ashveil Chronicle",
+      campaignTitle: sessionRow.campaignTitle?.trim() || "Your story",
       party: partyNames,
       earlyBeat,
       lateBeat,

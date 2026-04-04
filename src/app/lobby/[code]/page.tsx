@@ -11,6 +11,7 @@ import { getPusherClient, getSessionChannel } from "@/lib/socket/client";
 import type { Player, Session } from "@/lib/schemas/domain";
 import { SessionStartedEventSchema } from "@/lib/schemas/events";
 import { getBuildTimeBrand } from "@/lib/brand";
+import { COPY } from "@/lib/copy/ashveil";
 import { ROMA_MODULES } from "@/lib/rome/modules";
 import { LOBBY_TONE_TAG_OPTIONS } from "@/lib/session/tone-tag-options";
 
@@ -226,8 +227,12 @@ export default function LobbyPage() {
   const playromanaAutoStartRef = useRef(false);
 
   const lobbyTeaser = useMemo(() => {
+    const fallback =
+      getBuildTimeBrand() === "playromana"
+        ? "Gather your party. The portal stirs beyond the veil."
+        : "Gather your party. Your story is about to begin.";
     if (!session) {
-      return "Gather your party. The portal stirs beyond the veil.";
+      return fallback;
     }
     const fromPrompt = session.adventure_prompt?.trim();
     const fromBible = session.world_bible?.trim().slice(0, 280);
@@ -237,7 +242,7 @@ export default function LobbyPage() {
       const mod = ROMA_MODULES.find((x) => x.key === session.module_key);
       if (mod) return mod.pitch;
     }
-    return "Gather your party. The portal stirs beyond the veil.";
+    return fallback;
   }, [session]);
 
   useEffect(() => {
@@ -539,7 +544,7 @@ export default function LobbyPage() {
   if (loading) {
     return (
       <main className="min-h-dvh flex flex-col px-6 pt-10 pb-10 bg-[var(--color-obsidian)]">
-        <div className="flex flex-col flex-1 w-full max-w-md mx-auto gap-[var(--void-gap-lg)]">
+        <div className="flex flex-col flex-1 w-full max-w-lg mx-auto gap-[var(--void-gap-lg)]">
           <SkeletonCard className="min-h-[140px]" />
           <div className="flex flex-col gap-3 flex-1">
             <SkeletonCard className="min-h-[72px]" />
@@ -548,7 +553,9 @@ export default function LobbyPage() {
             ))}
           </div>
           <p className="text-center text-[10px] text-[var(--color-silver-dim)] uppercase tracking-[0.2em]">
-            Entering the gathering circle…
+            {getBuildTimeBrand() === "playromana"
+              ? "Entering the gathering circle…"
+              : "Loading your table…"}
           </p>
         </div>
       </main>
@@ -585,12 +592,14 @@ export default function LobbyPage() {
 
   return (
     <main className="min-h-dvh flex flex-col px-6 pb-10 bg-[var(--color-obsidian)]">
-      <div className="flex flex-col flex-1 w-full max-w-md mx-auto pt-8">
+      <div className="flex flex-col flex-1 w-full max-w-lg mx-auto pt-8">
         {/* Header */}
         <header className="mb-8 relative">
-          <div className="bg-gradient-to-b from-[var(--surface-container)] to-[var(--color-obsidian)] rounded-[var(--radius-card)] px-6 py-8 text-center border border-[rgba(77,70,53,0.15)]">
+          <div className="bg-gradient-to-b from-[var(--surface-container)]/90 to-[var(--color-obsidian)] rounded-[var(--radius-card)] px-6 py-8 text-center border border-[var(--border-ui)] backdrop-blur-[6px] shadow-[0_20px_60px_rgba(0,0,0,0.35)]">
             <p className="text-[10px] font-bold uppercase tracking-[0.25em] text-[var(--outline)]">
-              Invitation Glyph
+              {getBuildTimeBrand() === "playromana"
+                ? "Invitation Glyph"
+                : "Join code"}
             </p>
             <div className="mt-3 flex items-center justify-center gap-3">
               <p className="text-fantasy text-4xl text-[var(--color-gold-rare)] tracking-[0.3em] font-black">
@@ -599,7 +608,7 @@ export default function LobbyPage() {
               <button
                 type="button"
                 onClick={handleShare}
-                className="bg-[var(--surface-high)] p-2 rounded-[var(--radius-card)] border border-[rgba(77,70,53,0.2)] hover:border-[var(--color-gold-rare)]/30 transition-colors group"
+                className="bg-[var(--surface-high)] p-2 rounded-[var(--radius-card)] border border-[var(--border-ui)] hover:border-[var(--color-gold-rare)]/30 transition-colors group min-h-[44px] min-w-[44px] items-center justify-center flex"
                 aria-label="Copy join code"
               >
                 <span className="material-symbols-outlined text-[var(--outline)] group-hover:text-[var(--color-gold-rare)] text-lg transition-colors">
@@ -631,12 +640,16 @@ export default function LobbyPage() {
           </p>
         ) : null}
 
-        <section className="mb-6 overflow-hidden rounded-[var(--radius-card)] border border-[rgba(77,70,53,0.18)]">
+        <section className="mb-6 overflow-hidden rounded-[var(--radius-card)] border border-[var(--border-ui)] shadow-[0_12px_40px_rgba(0,0,0,0.25)]">
           <div className="relative aspect-[16/10]">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src="/images/ashveil-start-cover.png"
-              alt="Ashveil adventure key art"
+              alt={
+                getBuildTimeBrand() === "playromana"
+                  ? "PlayRomana adventure key art"
+                  : "WhatIfPlay story key art"
+              }
               className="absolute inset-0 h-full w-full object-cover"
               loading="eager"
             />
@@ -653,7 +666,9 @@ export default function LobbyPage() {
                 </div>
                 <div className="min-w-0">
                   <p className="text-[9px] font-black uppercase tracking-[0.18em] text-[var(--color-gold-rare)]">
-                    Portal Forecast
+                    {getBuildTimeBrand() === "playromana"
+                      ? "Portal Forecast"
+                      : "Story preview"}
                   </p>
                   <p className="mt-1 text-fantasy text-[13px] leading-relaxed text-[var(--color-silver-muted)]">
                     {lobbyTeaser}
@@ -667,9 +682,11 @@ export default function LobbyPage() {
         {isHost &&
         session.status === "lobby" &&
         getBuildTimeBrand() !== "playromana" ? (
-          <section className="mb-6 rounded-[var(--radius-card)] border border-[rgba(77,70,53,0.2)] bg-[var(--surface-high)]/40 p-4 space-y-3">
+          <section className="mb-6 rounded-[var(--radius-card)] border border-[var(--border-ui)] bg-[var(--surface-high)]/45 backdrop-blur-sm p-4 space-y-3">
             <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-[var(--color-gold-rare)]">
-              Tune the portal
+              {getBuildTimeBrand() === "playromana"
+                ? "Tune the portal"
+                : "Refine setup"}
             </p>
             <p className="text-[10px] text-[var(--outline)] leading-relaxed">
               Edit premise before start — party sees updates after you save.
@@ -689,19 +706,19 @@ export default function LobbyPage() {
                   onChange={(e) => setDraftSharedRoleLabel(e.target.value)}
                   maxLength={200}
                   placeholder="e.g. the salvage crew"
-                  className="w-full h-10 bg-[var(--color-deep-void)] px-3 rounded-[var(--radius-card)] border border-[rgba(77,70,53,0.2)] text-sm text-[var(--color-silver-muted)]"
+                  className="w-full h-10 bg-[var(--color-deep-void)] px-3 rounded-[var(--radius-card)] border border-[var(--border-ui)] text-sm text-[var(--color-silver-muted)] focus:border-[var(--color-gold-rare)]/40 focus:outline-none"
                 />
               </>
             ) : null}
             <label className="block text-[9px] uppercase tracking-[0.15em] text-[var(--outline)]">
-              Narrative seed
+              {COPY.landing.narrativeSeedLabel}
             </label>
             <textarea
               value={draftAdventure}
               onChange={(e) => setDraftAdventure(e.target.value)}
               rows={3}
               maxLength={8000}
-              className="w-full bg-[var(--color-deep-void)] p-3 rounded-[var(--radius-card)] border border-[rgba(77,70,53,0.2)] text-sm text-[var(--color-silver-muted)] resize-none"
+              className="w-full bg-[var(--color-deep-void)] p-3 rounded-[var(--radius-card)] border border-[var(--border-ui)] text-sm text-[var(--color-silver-muted)] resize-none focus:border-[var(--color-gold-rare)]/40 focus:outline-none"
             />
             <label className="block text-[9px] uppercase tracking-[0.15em] text-[var(--outline)]">
               World bible
@@ -711,7 +728,7 @@ export default function LobbyPage() {
               onChange={(e) => setDraftWorldBible(e.target.value)}
               rows={4}
               maxLength={32000}
-              className="w-full bg-[var(--color-deep-void)] p-3 rounded-[var(--radius-card)] border border-[rgba(77,70,53,0.2)] text-sm text-[var(--color-silver-muted)] resize-y min-h-[88px]"
+              className="w-full bg-[var(--color-deep-void)] p-3 rounded-[var(--radius-card)] border border-[var(--border-ui)] text-sm text-[var(--color-silver-muted)] resize-y min-h-[88px] focus:border-[var(--color-gold-rare)]/40 focus:outline-none"
             />
             <label className="block text-[9px] uppercase tracking-[0.15em] text-[var(--outline)]">
               Art direction
@@ -721,7 +738,7 @@ export default function LobbyPage() {
               value={draftArtDirection}
               onChange={(e) => setDraftArtDirection(e.target.value)}
               maxLength={2000}
-              className="w-full h-10 bg-[var(--color-deep-void)] px-3 rounded-[var(--radius-card)] border border-[rgba(77,70,53,0.2)] text-sm text-[var(--color-silver-muted)]"
+              className="w-full h-10 bg-[var(--color-deep-void)] px-3 rounded-[var(--radius-card)] border border-[var(--border-ui)] text-sm text-[var(--color-silver-muted)] focus:border-[var(--color-gold-rare)]/40 focus:outline-none"
             />
             <div className="flex flex-wrap gap-2">
               {LOBBY_TONE_TAG_OPTIONS.map((t) => {
@@ -738,7 +755,7 @@ export default function LobbyPage() {
                     className={`px-2.5 py-1 rounded-full text-[9px] font-bold uppercase tracking-[0.12em] border ${
                       on
                         ? "border-[var(--color-gold-rare)] text-[var(--color-gold-rare)] bg-[var(--color-gold-rare)]/10"
-                        : "border-[rgba(77,70,53,0.35)] text-[var(--color-silver-dim)]"
+                        : "border-[var(--border-ui-strong)] text-[var(--color-silver-dim)]"
                     }`}
                   >
                     {t.label}
@@ -762,7 +779,10 @@ export default function LobbyPage() {
         ) : null}
 
         {/* Party List */}
-        <section className="flex-1 space-y-0 overflow-hidden rounded-[var(--radius-card)] border border-[rgba(77,70,53,0.15)] divide-y divide-[rgba(77,70,53,0.1)]">
+        <section
+          className="flex-1 space-y-0 overflow-hidden rounded-[var(--radius-card)] border border-[var(--border-ui)] divide-y divide-[var(--border-divide)]"
+          aria-label="Players at the table"
+        >
           {session.mode === "ai_dm" ? <PlayerSlot isAiDm /> : null}
 
           {slots.map(({ seat, player }) =>
@@ -777,7 +797,7 @@ export default function LobbyPage() {
               type="button"
               disabled={capLoading}
               onClick={() => void handleAddSeat()}
-              className="w-full flex items-center justify-center gap-2 min-h-[56px] px-4 text-[10px] font-bold uppercase tracking-[0.2em] text-[var(--color-gold-rare)] border-t border-[rgba(77,70,53,0.1)] bg-[var(--surface-high)]/40 hover:bg-[var(--surface-high)]/70 transition-colors disabled:opacity-50"
+              className="w-full flex items-center justify-center gap-2 min-h-[56px] px-4 text-[10px] font-bold uppercase tracking-[0.2em] text-[var(--color-gold-rare)] border-t border-[var(--border-divide)] bg-[var(--surface-high)]/40 hover:bg-[var(--surface-high)]/70 transition-colors disabled:opacity-50"
             >
               <span className="material-symbols-outlined text-lg">add</span>
               {capLoading ? "Opening seat…" : "Add seat — share code to invite"}
@@ -836,7 +856,15 @@ export default function LobbyPage() {
               disabled={!canStart || startLoading || playromanaAutoLobbyBusy}
               onClick={() => void handleStart()}
             >
-              <span>{startLoading ? "Opening portal…" : "Begin Adventure"}</span>
+              <span>
+                {startLoading
+                  ? getBuildTimeBrand() === "playromana"
+                    ? "Opening portal…"
+                    : "Starting…"
+                  : getBuildTimeBrand() === "playromana"
+                    ? "Begin Adventure"
+                    : "Start story"}
+              </span>
               <span className="material-symbols-outlined text-lg">swords</span>
             </GoldButton>
           ) : null}
@@ -847,7 +875,7 @@ export default function LobbyPage() {
                 <GhostButton
                   type="button"
                   size="lg"
-                  className="flex-1 min-h-[48px] flex items-center justify-center gap-2 border-[rgba(77,70,53,0.25)]"
+                  className="flex-1 min-h-[48px] flex items-center justify-center gap-2 border-[var(--border-ui-strong)]"
                   onClick={() => void openRoomDisplayInNewTab()}
                 >
                   <span className="material-symbols-outlined text-lg">tv</span>
@@ -856,7 +884,7 @@ export default function LobbyPage() {
                 <button
                   type="button"
                   aria-label="Copy room display link"
-                  className="shrink-0 min-h-[48px] min-w-[48px] rounded-[var(--radius-card)] border border-[rgba(77,70,53,0.25)] bg-[var(--surface-high)]/50 flex items-center justify-center text-[var(--outline)] hover:border-[var(--color-gold-rare)]/35 hover:text-[var(--color-gold-rare)] transition-colors"
+                  className="shrink-0 min-h-[48px] min-w-[48px] rounded-[var(--radius-card)] border border-[var(--border-ui-strong)] bg-[var(--surface-high)]/50 flex items-center justify-center text-[var(--outline)] hover:border-[var(--color-gold-rare)]/35 hover:text-[var(--color-gold-rare)] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-gold-rare)]/45 focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--color-obsidian)]"
                   onClick={() => void copyRoomDisplayLink()}
                 >
                   <span className="material-symbols-outlined text-lg">

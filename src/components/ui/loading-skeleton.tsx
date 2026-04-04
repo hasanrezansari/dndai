@@ -26,7 +26,7 @@ export function SkeletonText({
 export function SkeletonCard({ className = "" }: { className?: string }) {
   return (
     <div
-      className={`rounded-[var(--radius-card)] min-h-[88px] bg-[var(--surface-high)] border border-[rgba(77,70,53,0.2)] overflow-hidden relative ${className}`.trim()}
+      className={`rounded-[var(--radius-card)] min-h-[88px] bg-[var(--surface-high)] border border-[var(--border-ui)] overflow-hidden relative ${className}`.trim()}
     >
       <span
         className="absolute inset-0 animate-shimmer opacity-50 pointer-events-none"

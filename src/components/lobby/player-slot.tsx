@@ -1,3 +1,4 @@
+import { getBuildTimeBrand } from "@/lib/brand";
 import { COPY } from "@/lib/copy/ashveil";
 
 export interface PlayerSlotPlayer {
@@ -35,7 +36,9 @@ export function PlayerSlot({ player, isAiDm, isEmpty }: PlayerSlotProps) {
         </div>
         <div>
           <h3 className="text-fantasy text-lg text-[var(--color-gold-rare)] tracking-tight leading-tight">
-            The Chronicler
+            {getBuildTimeBrand() === "playromana"
+              ? "The Chronicler"
+              : "AI narrator"}
           </h3>
           <p className="text-[var(--color-silver-dim)] text-xs italic mt-1 leading-relaxed">
             {COPY.aiDmWaiting}

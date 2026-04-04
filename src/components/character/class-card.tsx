@@ -33,7 +33,7 @@ export function ClassCard({
           ${
             selected
               ? "bg-[var(--surface-high)] selected-glow border-[var(--color-gold-rare)]/40"
-              : "bg-[var(--color-midnight)] border-[rgba(77,70,53,0.15)] hover:bg-[var(--surface-container)] hover:border-[rgba(77,70,53,0.3)]"
+              : "bg-[var(--color-midnight)] border-[var(--border-ui)] hover:bg-[var(--surface-container)] hover:border-[var(--border-ui-strong)]"
           }
         `.trim()}
       >

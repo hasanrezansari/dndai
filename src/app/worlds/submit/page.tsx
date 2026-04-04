@@ -94,7 +94,7 @@ export default function WorldSubmitPage() {
 
   return (
     <div className="min-h-dvh bg-[var(--color-obsidian)] pb-[calc(2rem+env(safe-area-inset-bottom))]">
-      <header className="sticky top-0 z-20 border-b border-[rgba(77,70,53,0.2)] bg-[var(--color-obsidian)]/92 backdrop-blur-[var(--glass-blur)] px-4 py-3 flex items-center justify-between gap-3">
+      <header className="sticky top-0 z-20 border-b border-[var(--border-divide)] bg-[var(--color-obsidian)]/92 backdrop-blur-[var(--glass-blur)] px-4 py-3 flex items-center justify-between gap-3">
         <Link
           href="/worlds"
           className="text-xs font-bold uppercase tracking-[0.1em] text-[var(--color-silver-muted)] hover:text-[var(--color-gold-rare)]"
@@ -127,7 +127,7 @@ export default function WorldSubmitPage() {
               onChange={(e) => setTitle(e.target.value)}
               required
               maxLength={120}
-              className="w-full min-h-[44px] px-3 rounded-[var(--radius-card)] bg-[var(--color-deep-void)] border border-[rgba(77,70,53,0.25)] text-[var(--color-silver-muted)]"
+              className="w-full min-h-[44px] px-3 rounded-[var(--radius-card)] bg-[var(--color-deep-void)] border border-[var(--border-ui-strong)] text-[var(--color-silver-muted)]"
             />
           </label>
 
@@ -139,7 +139,7 @@ export default function WorldSubmitPage() {
               value={subtitle}
               onChange={(e) => setSubtitle(e.target.value)}
               maxLength={240}
-              className="w-full min-h-[44px] px-3 rounded-[var(--radius-card)] bg-[var(--color-deep-void)] border border-[rgba(77,70,53,0.25)] text-[var(--color-silver-muted)]"
+              className="w-full min-h-[44px] px-3 rounded-[var(--radius-card)] bg-[var(--color-deep-void)] border border-[var(--border-ui-strong)] text-[var(--color-silver-muted)]"
             />
           </label>
 
@@ -154,7 +154,7 @@ export default function WorldSubmitPage() {
               minLength={20}
               maxLength={8000}
               rows={5}
-              className="w-full px-3 py-2 rounded-[var(--radius-card)] bg-[var(--color-deep-void)] border border-[rgba(77,70,53,0.25)] text-[var(--color-silver-muted)] text-sm leading-relaxed"
+              className="w-full px-3 py-2 rounded-[var(--radius-card)] bg-[var(--color-deep-void)] border border-[var(--border-ui-strong)] text-[var(--color-silver-muted)] text-sm leading-relaxed"
             />
           </label>
 
@@ -167,7 +167,7 @@ export default function WorldSubmitPage() {
               onChange={(e) => setAdventurePrompt(e.target.value)}
               maxLength={8000}
               rows={3}
-              className="w-full px-3 py-2 rounded-[var(--radius-card)] bg-[var(--color-deep-void)] border border-[rgba(77,70,53,0.25)] text-[var(--color-silver-muted)] text-sm leading-relaxed"
+              className="w-full px-3 py-2 rounded-[var(--radius-card)] bg-[var(--color-deep-void)] border border-[var(--border-ui-strong)] text-[var(--color-silver-muted)] text-sm leading-relaxed"
             />
           </label>
 
@@ -179,7 +179,7 @@ export default function WorldSubmitPage() {
               value={tagsRaw}
               onChange={(e) => setTagsRaw(e.target.value)}
               placeholder="horror, mystery, coastal"
-              className="w-full min-h-[44px] px-3 rounded-[var(--radius-card)] bg-[var(--color-deep-void)] border border-[rgba(77,70,53,0.25)] text-[var(--color-silver-muted)]"
+              className="w-full min-h-[44px] px-3 rounded-[var(--radius-card)] bg-[var(--color-deep-void)] border border-[var(--border-ui-strong)] text-[var(--color-silver-muted)]"
             />
           </label>
 
@@ -192,7 +192,7 @@ export default function WorldSubmitPage() {
               onChange={(e) => setArtDirection(e.target.value)}
               maxLength={2000}
               rows={2}
-              className="w-full px-3 py-2 rounded-[var(--radius-card)] bg-[var(--color-deep-void)] border border-[rgba(77,70,53,0.25)] text-[var(--color-silver-muted)] text-sm leading-relaxed"
+              className="w-full px-3 py-2 rounded-[var(--radius-card)] bg-[var(--color-deep-void)] border border-[var(--border-ui-strong)] text-[var(--color-silver-muted)] text-sm leading-relaxed"
             />
           </label>
 
@@ -205,7 +205,7 @@ export default function WorldSubmitPage() {
               onChange={(e) => setWorldBible(e.target.value)}
               maxLength={16000}
               rows={4}
-              className="w-full px-3 py-2 rounded-[var(--radius-card)] bg-[var(--color-deep-void)] border border-[rgba(77,70,53,0.25)] text-[var(--color-silver-muted)] text-sm leading-relaxed"
+              className="w-full px-3 py-2 rounded-[var(--radius-card)] bg-[var(--color-deep-void)] border border-[var(--border-ui-strong)] text-[var(--color-silver-muted)] text-sm leading-relaxed"
             />
           </label>
 
@@ -219,7 +219,7 @@ export default function WorldSubmitPage() {
               max={8}
               value={maxPlayers}
               onChange={(e) => setMaxPlayers(e.target.value)}
-              className="w-full min-h-[44px] px-3 rounded-[var(--radius-card)] bg-[var(--color-deep-void)] border border-[rgba(77,70,53,0.25)] text-[var(--color-silver-muted)]"
+              className="w-full min-h-[44px] px-3 rounded-[var(--radius-card)] bg-[var(--color-deep-void)] border border-[var(--border-ui-strong)] text-[var(--color-silver-muted)]"
             />
           </label>
 

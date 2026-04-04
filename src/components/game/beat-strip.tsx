@@ -88,10 +88,10 @@ export function BeatStrip() {
 
   return (
     <section
-      className="shrink-0 rounded-[var(--radius-card)] border border-[rgba(77,70,53,0.2)] bg-[var(--surface-container)]/45 px-3 py-2.5"
+      className="shrink-0 rounded-[var(--radius-card)] border border-[var(--border-ui)] bg-[var(--surface-container)]/45 px-3 py-2.5"
       aria-label="Current beat"
     >
-      <div className="mb-2 flex items-center gap-2 border-b border-[rgba(77,70,53,0.12)] pb-2">
+      <div className="mb-2 flex items-center gap-2 border-b border-[var(--border-divide)] pb-2">
         <span
           className="material-symbols-outlined text-[var(--color-gold-support)] text-base"
           aria-hidden
@@ -169,7 +169,7 @@ export function BeatStrip() {
         </dl>
       )}
       {session ? (
-        <p className="mt-2 border-t border-[rgba(77,70,53,0.1)] pt-2 text-[8px] uppercase tracking-[0.1em] text-[var(--outline)]/35">
+        <p className="mt-2 border-t border-[var(--border-divide)] pt-2 text-[8px] uppercase tracking-[0.1em] text-[var(--outline)]/35">
           Round {session.currentRound}
           {lastSync
             ? ` · ${lastSync.text}${lastSync.detail ? ` (${lastSync.detail})` : ""}`

@@ -27,22 +27,24 @@ const inter = Inter({
   display: "swap",
 });
 
+const metaBrand = getBuildTimeBrand();
+
 export const metadata: Metadata = {
-  title: `${getBrandName(getBuildTimeBrand())} — ${getBrandTagline(getBuildTimeBrand())}`,
+  title: `${getBrandName(metaBrand)} — ${getBrandTagline(metaBrand)}`,
   description:
-    getBuildTimeBrand() === "playromana"
+    metaBrand === "playromana"
       ? "Curated Roman adventures. Start instantly, invite friends, and let the world respond."
-      : "Play together from your phone: co-op storytelling in any genre, with an AI or human host. Sessions, heroes, and turns in one link.",
+      : "WhatIfPlay — multiplayer storytelling in any genre. AI or human narrator, shared heroes, turns, and scene art in one link.",
   metadataBase: new URL(
     process.env.NEXTAUTH_URL ?? "https://playdndai.com",
   ),
   openGraph: {
-    title: `${getBrandName(getBuildTimeBrand())} — ${getBrandTagline(getBuildTimeBrand())}`,
+    title: `${getBrandName(metaBrand)} — ${getBrandTagline(metaBrand)}`,
     description:
-      getBuildTimeBrand() === "playromana"
+      metaBrand === "playromana"
         ? "Curated Roman adventures. Start instantly, invite friends, and let the world respond."
-        : "Co-op storytelling in any setting — AI or human host. Play with friends from one link.",
-    siteName: getBrandName(getBuildTimeBrand()),
+        : "Co-op storytelling in any setting — AI or human narrator. Play with friends from one link.",
+    siteName: getBrandName(metaBrand),
     type: "website",
   },
 };
@@ -52,7 +54,7 @@ export const viewport: Viewport = {
   initialScale: 1,
   maximumScale: 1,
   userScalable: false,
-  themeColor: "#131313",
+  themeColor: metaBrand === "playromana" ? "#131313" : "#0c0a14",
 };
 
 export default function RootLayout({
@@ -60,9 +62,11 @@ export default function RootLayout({
 }: {
   children: React.ReactNode;
 }) {
+  const skin = metaBrand === "playromana" ? "playromana" : "whatifplay";
   return (
     <html
       lang="en"
+      data-app-skin={skin}
       className={`dark ${notoSerif.variable} ${manrope.variable} ${inter.variable}`}
     >
       <head>

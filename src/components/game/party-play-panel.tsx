@@ -669,7 +669,7 @@ export function PartyPlayPanel({
           {phase === "submit" || canTiebreakSubmit ? (
             <PartySessionCard
               title={canTiebreakSubmit ? "Tiebreak line" : "Your line"}
-              className="[&_h3]:!mb-1 sm:[&_h3]:!mb-2 !border-white/10 !bg-black/20 !px-2.5 !py-2 sm:!border-[rgba(77,70,53,0.24)] sm:!bg-[var(--surface-container)]/55 sm:!px-4 sm:!py-3"
+              className="[&_h3]:!mb-1 sm:[&_h3]:!mb-2 !border-white/10 !bg-black/20 !px-2.5 !py-2 sm:!border-[var(--border-ui-strong)] sm:!bg-[var(--surface-container)]/55 sm:!px-4 sm:!py-3"
               contentClassName="flex flex-col gap-1.5 sm:gap-2"
             >
               <p className="hidden text-[10px] leading-relaxed text-[var(--color-outline)] sm:block">
@@ -757,7 +757,7 @@ export function PartyPlayPanel({
                               type="button"
                               disabled={busy || !currentPlayerId}
                               onClick={() => void castVoteBySlot(s.slotId)}
-                              className="flex min-h-[88px] w-full flex-col items-stretch justify-between rounded-[var(--radius-card)] border border-[rgba(77,70,53,0.28)] bg-[var(--surface-container)]/45 px-3 py-2.5 text-left transition-colors hover:border-[var(--color-gold-rare)]/35 hover:bg-[var(--surface-container)]/65 disabled:opacity-50 sm:min-h-[120px] sm:px-4 sm:py-3"
+                              className="flex min-h-[88px] w-full flex-col items-stretch justify-between rounded-[var(--radius-card)] border border-[var(--border-ui-strong)] bg-[var(--surface-container)]/45 px-3 py-2.5 text-left transition-colors hover:border-[var(--color-gold-rare)]/35 hover:bg-[var(--surface-container)]/65 disabled:opacity-50 sm:min-h-[120px] sm:px-4 sm:py-3"
                             >
                               <span className="text-[9px] font-black uppercase tracking-[0.18em] text-[var(--outline)]">
                                 Card

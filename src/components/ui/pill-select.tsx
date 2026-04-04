@@ -43,11 +43,12 @@ export function PillSelect<T extends string>({
               transition-all duration-[var(--duration-med)]
               [transition-timing-function:var(--ease-out-soft)]
               active:scale-[0.95]
+              focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-gold-rare)]/50 focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--color-obsidian)]
               ${height}
               ${
                 selected
-                  ? "bg-[var(--color-gold-rare)] text-[var(--color-obsidian)] shadow-lg shadow-[rgba(242,202,80,0.1)]"
-                  : "bg-[var(--surface-high)] text-[var(--color-silver-dim)] border border-[rgba(77,70,53,0.1)] hover:text-[var(--color-silver-muted)]"
+                  ? "bg-[var(--color-gold-rare)] text-[var(--color-obsidian)] shadow-lg shadow-[color-mix(in_srgb,var(--color-gold-rare)_12%,transparent)]"
+                  : "bg-[var(--surface-high)] text-[var(--color-silver-dim)] border border-[var(--border-ui)] hover:text-[var(--color-silver-muted)]"
               }
             `.trim()}
           >

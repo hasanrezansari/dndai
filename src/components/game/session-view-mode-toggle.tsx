@@ -27,7 +27,7 @@ export function SessionViewModeToggle({
 }: SessionViewModeToggleProps) {
   return (
     <div
-      className="grid grid-cols-3 gap-1 rounded-[var(--radius-chip)] border border-[rgba(77,70,53,0.25)] bg-[var(--color-deep-void)]/90 p-1"
+      className="grid grid-cols-3 gap-1 rounded-[var(--radius-chip)] border border-[var(--border-ui-strong)] bg-[var(--color-deep-void)]/90 p-1"
       role="group"
       aria-label="Session layout"
     >

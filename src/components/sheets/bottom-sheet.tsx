@@ -76,7 +76,7 @@ export function BottomSheet({
             role="dialog"
             aria-modal="true"
             aria-labelledby="bottom-sheet-title"
-            className={`relative z-[1] flex w-full flex-col border-[rgba(77,70,53,0.2)] bg-[var(--color-obsidian)] ${
+            className={`relative z-[1] flex w-full flex-col border-[var(--border-ui)] bg-[var(--color-obsidian)] ${
               fullHeight
                 ? "h-dvh max-h-dvh min-h-dvh rounded-none border-0"
                 : "max-h-[85vh] min-h-[70vh] rounded-t-[var(--radius-card)] border-t border-x shadow-[0_-12px_48px_rgba(0,0,0,0.55)]"
@@ -99,7 +99,7 @@ export function BottomSheet({
               }
             }}
           >
-            <div className="flex shrink-0 flex-col items-center gap-3 border-b border-[rgba(77,70,53,0.15)] px-4 pt-2">
+            <div className="flex shrink-0 flex-col items-center gap-3 border-b border-[var(--border-divide)] px-4 pt-2">
               <div
                 className="flex min-h-[44px] w-full cursor-grab touch-none items-center justify-center py-2 active:cursor-grabbing"
                 onPointerDown={startDrag}

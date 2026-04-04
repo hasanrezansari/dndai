@@ -1,6 +1,9 @@
 import Link from "next/link";
 
+import { getBrandName, getBuildTimeBrand } from "@/lib/brand";
+
 export default function NotFound() {
+  const homeLabel = `Return to ${getBrandName(getBuildTimeBrand())}`;
   return (
     <div className="min-h-dvh flex flex-col items-center justify-center bg-[var(--color-obsidian)] px-6 py-10 relative overflow-hidden">
       <div
@@ -22,7 +25,7 @@ export default function NotFound() {
           href="/"
           className="mt-4 w-full max-w-xs min-h-[44px] flex items-center justify-center px-8 py-4 text-lg font-semibold bg-[var(--color-gold-rare)] text-[var(--color-obsidian)] rounded-[var(--radius-button)] transition-all duration-[var(--duration-med)] [transition-timing-function:var(--ease-out-soft)] hover:brightness-110 hover:shadow-[0_0_20px_rgba(212,175,55,0.3)] active:scale-[0.97]"
         >
-          Return to Ashveil
+          {homeLabel}
         </Link>
       </div>
     </div>

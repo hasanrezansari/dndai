@@ -116,7 +116,7 @@ export function CharacterSheet({ viewPlayerId = null }: CharacterSheetProps) {
             <span className="bg-[var(--color-gold-rare)]/10 text-[var(--color-gold-rare)] text-[9px] font-black px-2 py-0.5 border border-[var(--color-gold-rare)]/30 rounded-sm tracking-[0.15em] uppercase">
               Lvl {character.level}
             </span>
-            <span className="bg-[var(--surface-high)] text-[var(--outline)] text-[9px] font-black px-2 py-0.5 border border-[rgba(77,70,53,0.2)] rounded-sm tracking-[0.15em] uppercase flex items-center gap-1">
+            <span className="bg-[var(--surface-high)] text-[var(--outline)] text-[9px] font-black px-2 py-0.5 border border-[var(--border-ui)] rounded-sm tracking-[0.15em] uppercase flex items-center gap-1">
               <span className="material-symbols-outlined text-[10px]">shield</span>
               AC {character.ac}
             </span>
@@ -125,7 +125,7 @@ export function CharacterSheet({ viewPlayerId = null }: CharacterSheetProps) {
       </div>
 
       {/* Resource Bars */}
-      <div className="space-y-3 bg-[var(--surface-container)] rounded-[var(--radius-card)] p-4 border border-[rgba(77,70,53,0.15)]">
+      <div className="space-y-3 bg-[var(--surface-container)] rounded-[var(--radius-card)] p-4 border border-[var(--border-ui)]">
         <div>
           <div className="mb-1.5 flex justify-between text-[10px] font-bold uppercase tracking-wider">
             <span className="text-[var(--outline)] flex items-center gap-1.5">
@@ -180,7 +180,7 @@ export function CharacterSheet({ viewPlayerId = null }: CharacterSheetProps) {
                 className={`flex flex-col items-center gap-1 py-3 rounded-[var(--radius-card)] border transition-colors ${
                   v >= 16
                     ? "bg-[var(--surface-high)] border-[var(--color-gold-rare)]/20"
-                    : "bg-[var(--color-midnight)] border-[rgba(77,70,53,0.1)]"
+                    : "bg-[var(--color-midnight)] border-[var(--border-ui)]"
                 }`}
               >
                 <span className="material-symbols-outlined text-[var(--outline)] text-sm">
@@ -238,7 +238,7 @@ export function CharacterSheet({ viewPlayerId = null }: CharacterSheetProps) {
             Nothing equipped.
           </p>
         ) : (
-          <div className="rounded-[var(--radius-card)] border border-[rgba(77,70,53,0.15)] divide-y divide-[rgba(77,70,53,0.1)] overflow-hidden">
+          <div className="rounded-[var(--radius-card)] border border-[var(--border-ui)] divide-y divide-[var(--border-divide)] overflow-hidden">
             {character.inventory.map((row, i) => (
               <div
                 key={`${itemLabel(row)}-${i}`}
@@ -284,7 +284,7 @@ export function CharacterSheet({ viewPlayerId = null }: CharacterSheetProps) {
             {character.abilities.map((row, i) => (
               <div
                 key={`${abilityName(row)}-${i}`}
-                className="rounded-[var(--radius-card)] border border-[rgba(77,70,53,0.15)] bg-[var(--color-midnight)] px-4 py-3"
+                className="rounded-[var(--radius-card)] border border-[var(--border-ui)] bg-[var(--color-midnight)] px-4 py-3"
               >
                 <div className="flex items-center gap-2">
                   <span className="material-symbols-outlined text-[var(--atmosphere-mystery)] text-sm">
