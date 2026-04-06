@@ -288,7 +288,9 @@ function AuthGateInner({ children }: { children: React.ReactNode }) {
         if (!s) break;
         await new Promise((r) => setTimeout(r, 100));
       }
-      await signIn("google", { callbackUrl: "/", redirect: true });
+      const googleCallbackUrl =
+        pathname === "/profile" ? "/profile" : "/";
+      await signIn("google", { callbackUrl: googleCallbackUrl, redirect: true });
     } catch {
       clearOauthLinkPending();
       setError("Could not reach Google sign-in. Check your connection and try again.");
@@ -298,7 +300,11 @@ function AuthGateInner({ children }: { children: React.ReactNode }) {
   }
 
   const isHome = pathname === "/" || pathname === "";
-  const falvosHomeEntryInline = brand === "falvos" && isHome;
+  /** Same inline guest / Google strip as home — avoids full-screen gate + redirect flash on /profile. */
+  const falvosInlineEntrySurface =
+    brand === "falvos" &&
+    (isHome || pathname === "/profile");
+  const falvosHomeEntryInline = falvosInlineEntrySurface;
   const oauthHint =
     AUTH_ERROR_HINT[authErrorParam] ?? AUTH_ERROR_HINT.Default;
 
@@ -459,12 +465,12 @@ function AuthGateInner({ children }: { children: React.ReactNode }) {
         </motion.div>
       ) : needsEntryChoice && falvosHomeEntryInline ? (
         <motion.div
-          key="home-entry-inline"
+          key="inline-entry-surface"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
           transition={{ duration: 0.25 }}
-          className="flex flex-col items-center w-full min-h-dvh px-5 pt-6"
+          className={`flex flex-col items-center w-full min-h-dvh px-5 ${isHome ? "pt-6" : "pt-3"}`}
         >
           {authErrorParam ? oauthBanner : null}
           {falvosHomeEntryStrip}

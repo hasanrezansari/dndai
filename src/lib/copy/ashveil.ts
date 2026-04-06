@@ -41,14 +41,11 @@ export const COPY = {
     ],
     modesTitle: "Who runs this table?",
     aiCardTitle: "AI narrator",
-    aiCardBody:
-      "Narration, scene images, and rule support — steered by your premise, not a fixed genre.",
+    aiCardBody: "Narration, art, and rules follow your premise — any genre.",
     humanCardTitle: "Human narrator",
-    humanCardBody:
-      "A person at the table drives the story; WhatIf keeps characters, votes, and state in sync.",
-    partyCardTitle: "Party game",
-    partyCardBody:
-      "Fast room: one shared scene — everyone pitches a line each round, AI weaves them, you vote for the take that should steer the story. No hero builder; names are just for the scoreboard. Separate from campaign quests.",
+    humanCardBody: "Someone runs the table; the app keeps sheets and turns in sync.",
+    partyCardTitle: "Party mode",
+    partyCardBody: "One scene, quick lines, merge & vote — built for a fast room.",
     partyRoundsLabel: "Rounds",
     partySeedHint:
       "Story seed and tags set the shared situation everyone is writing into.",

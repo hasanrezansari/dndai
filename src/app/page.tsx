@@ -737,9 +737,9 @@ export default function Home() {
         className="home-atmosphere-layer pointer-events-none fixed inset-0 -z-10 min-h-dvh bg-[var(--color-obsidian)]"
         aria-hidden
       />
-      <div className="flex flex-col gap-[var(--void-gap)] w-full max-w-lg pt-6 sm:pt-8">
+      <div className="flex flex-col gap-[var(--void-gap)] w-full max-w-lg pt-2 sm:pt-4">
         {/* Hero — brand-forward, minimal copy; detail in “How it works” */}
-        <header className="relative overflow-hidden rounded-[var(--radius-card)] border border-[var(--border-ui)] bg-[var(--surface-container)]/45 backdrop-blur-[12px] px-4 py-10 sm:px-8 sm:py-14 shadow-[0_20px_60px_rgba(0,0,0,0.35)]">
+        <header className="relative overflow-hidden rounded-[var(--radius-card)] border border-[var(--border-ui)] bg-[var(--surface-container)]/45 backdrop-blur-[12px] px-4 py-6 sm:px-8 sm:py-9 shadow-[0_20px_60px_rgba(0,0,0,0.35)]">
           <div className="pointer-events-none absolute inset-0 opacity-90">
             <div className="absolute -top-16 left-1/2 h-64 w-64 -translate-x-1/2 rounded-full bg-[color-mix(in_srgb,var(--color-gold-rare)_18%,transparent)] blur-3xl" />
             <div className="absolute -bottom-24 -right-20 h-72 w-72 rounded-full bg-[color-mix(in_srgb,var(--atmosphere-mystery)_20%,transparent)] blur-3xl" />
@@ -756,7 +756,7 @@ export default function Home() {
             </div>
           ) : null}
 
-          <div className="relative z-[1] flex flex-col items-center text-center gap-6 sm:gap-8">
+          <div className="relative z-[1] flex flex-col items-center text-center gap-4 sm:gap-6">
             <h1 className="text-[clamp(2.75rem,12vw,5.5rem)] font-black leading-[0.95] tracking-[-0.02em] text-[var(--color-gold-rare)] drop-shadow-[0_2px_24px_rgba(0,0,0,0.45)]">
               {getBrandName(brand)}
             </h1>
@@ -891,49 +891,51 @@ export default function Home() {
             className="text-left w-full min-w-[min(82vw,300px)] shrink-0 snap-center min-h-[44px] transition-all duration-200 active:scale-[0.98] rounded-[var(--radius-card)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-gold-rare)]/50 focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--color-obsidian)] sm:min-w-0"
           >
             <div
-              className={`relative h-44 rounded-[var(--radius-card)] p-6 flex flex-col justify-end overflow-hidden transition-all duration-300 ${
+              className={`relative h-44 rounded-[var(--radius-card)] overflow-hidden transition-all duration-300 flex flex-col ${
                 mode === "ai_dm" && !partyRoom
                   ? "bg-[var(--surface-high)] selected-glow metallic-edge"
                   : "bg-[var(--color-midnight)] border border-[var(--border-ui)] opacity-70 hover:opacity-100 hover:bg-[var(--surface-container)]"
               }`}
             >
-              <div className="relative z-10 flex items-start justify-between gap-3 mb-auto">
-                <div className="min-h-[24px] px-2 rounded-[var(--radius-chip)] border border-white/10 bg-black/20 text-[9px] font-black uppercase tracking-[0.2em] text-[var(--outline)] flex items-center gap-1.5">
-                  <span className="material-symbols-outlined text-[14px]">
-                    auto_awesome
-                  </span>
-                  AI
-                </div>
-                <div className="h-10 w-10 rounded-[var(--radius-avatar)] border border-white/10 bg-black/20 grid place-items-center text-[var(--outline)]">
-                  <span className="material-symbols-outlined text-base">
-                    image
-                  </span>
-                </div>
-              </div>
-              <div className="pointer-events-none absolute inset-0 opacity-70">
+              <div className="pointer-events-none absolute inset-0 z-0 opacity-70">
                 <div className="absolute inset-0 bg-gradient-to-br from-[rgba(242,202,80,0.18)] via-transparent to-[rgba(123,45,142,0.16)]" />
                 <div className="absolute inset-0 bg-gradient-to-t from-[var(--color-obsidian)] via-[var(--color-obsidian)]/30 to-transparent" />
               </div>
-              {mode === "ai_dm" && !partyRoom ? (
-                <div className="relative flex items-center gap-2 mb-1">
-                  <span
-                    className="material-symbols-outlined text-[var(--color-gold-rare)] text-sm"
-                    style={{ fontVariationSettings: "'FILL' 1" }}
-                  >
-                    auto_awesome
-                  </span>
-                  <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-[var(--color-gold-rare)]">
-                    Active Selection
-                  </span>
+              <div className="relative z-10 flex flex-col flex-1 min-h-0 p-5 gap-2">
+                <div className="flex items-start justify-between gap-3 shrink-0">
+                  <div className="min-h-[24px] px-2 rounded-[var(--radius-chip)] border border-white/10 bg-black/20 text-[9px] font-black uppercase tracking-[0.2em] text-[var(--outline)] flex items-center gap-1.5">
+                    <span className="material-symbols-outlined text-[14px]">
+                      auto_awesome
+                    </span>
+                    AI
+                  </div>
+                  <div className="h-10 w-10 rounded-[var(--radius-avatar)] border border-white/10 bg-black/20 grid place-items-center text-[var(--outline)]">
+                    <span className="material-symbols-outlined text-base">
+                      image
+                    </span>
+                  </div>
                 </div>
-              ) : null}
-              <div className="relative">
-                <h3 className="text-fantasy font-bold text-xl text-[var(--color-silver-muted)]">
-                  {COPY.landing.aiCardTitle}
-                </h3>
-                <p className="text-xs text-[var(--color-silver-dim)] leading-relaxed mt-1">
-                  {COPY.landing.aiCardBody}
-                </p>
+                {mode === "ai_dm" && !partyRoom ? (
+                  <div className="flex items-center gap-2 shrink-0">
+                    <span
+                      className="material-symbols-outlined text-[var(--color-gold-rare)] text-sm"
+                      style={{ fontVariationSettings: "'FILL' 1" }}
+                    >
+                      auto_awesome
+                    </span>
+                    <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-[var(--color-gold-rare)]">
+                      Active
+                    </span>
+                  </div>
+                ) : null}
+                <div className="flex-1 flex flex-col justify-center min-h-0">
+                  <h3 className="text-fantasy font-bold text-lg sm:text-xl text-[var(--color-silver-muted)] leading-tight">
+                    {COPY.landing.aiCardTitle}
+                  </h3>
+                  <p className="text-[10px] sm:text-[11px] text-[var(--color-silver-dim)] leading-snug mt-1 line-clamp-2">
+                    {COPY.landing.aiCardBody}
+                  </p>
+                </div>
               </div>
             </div>
           </button>
@@ -948,47 +950,49 @@ export default function Home() {
             className="text-left w-full min-w-[min(82vw,300px)] shrink-0 snap-center min-h-[44px] transition-all duration-200 active:scale-[0.98] rounded-[var(--radius-card)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-gold-rare)]/50 focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--color-obsidian)] sm:min-w-0"
           >
             <div
-              className={`relative h-44 rounded-[var(--radius-card)] p-6 flex flex-col justify-end overflow-hidden transition-all duration-300 ${
+              className={`relative h-44 rounded-[var(--radius-card)] overflow-hidden transition-all duration-300 flex flex-col ${
                 mode === "human_dm"
                   ? "bg-[var(--surface-high)] selected-glow metallic-edge"
                   : "bg-[var(--color-midnight)] border border-[var(--border-ui)] opacity-70 hover:opacity-100 hover:bg-[var(--surface-container)]"
               }`}
             >
-              <div className="relative z-10 flex items-start justify-between gap-3 mb-auto">
-                <div className="min-h-[24px] px-2 rounded-[var(--radius-chip)] border border-white/10 bg-black/20 text-[9px] font-black uppercase tracking-[0.2em] text-[var(--outline)] flex items-center gap-1.5">
-                  <span className="material-symbols-outlined text-[14px]">handshake</span>
-                  Human
-                </div>
-                <div className="h-10 w-10 rounded-[var(--radius-avatar)] border border-white/10 bg-black/20 grid place-items-center text-[var(--outline)]">
-                  <span className="material-symbols-outlined text-base">
-                    image
-                  </span>
-                </div>
-              </div>
-              <div className="pointer-events-none absolute inset-0 opacity-70">
+              <div className="pointer-events-none absolute inset-0 z-0 opacity-70">
                 <div className="absolute inset-0 bg-gradient-to-br from-[rgba(242,202,80,0.10)] via-transparent to-[rgba(139,37,0,0.22)]" />
                 <div className="absolute inset-0 bg-gradient-to-t from-[var(--color-obsidian)] via-[var(--color-obsidian)]/30 to-transparent" />
               </div>
-              {mode === "human_dm" && (
-                <div className="relative flex items-center gap-2 mb-1">
-                  <span
-                    className="material-symbols-outlined text-[var(--color-gold-rare)] text-sm"
-                    style={{ fontVariationSettings: "'FILL' 1" }}
-                  >
-                    auto_awesome
-                  </span>
-                  <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-[var(--color-gold-rare)]">
-                    Active Selection
-                  </span>
+              <div className="relative z-10 flex flex-col flex-1 min-h-0 p-5 gap-2">
+                <div className="flex items-start justify-between gap-3 shrink-0">
+                  <div className="min-h-[24px] px-2 rounded-[var(--radius-chip)] border border-white/10 bg-black/20 text-[9px] font-black uppercase tracking-[0.2em] text-[var(--outline)] flex items-center gap-1.5">
+                    <span className="material-symbols-outlined text-[14px]">handshake</span>
+                    Human
+                  </div>
+                  <div className="h-10 w-10 rounded-[var(--radius-avatar)] border border-white/10 bg-black/20 grid place-items-center text-[var(--outline)]">
+                    <span className="material-symbols-outlined text-base">
+                      image
+                    </span>
+                  </div>
                 </div>
-              )}
-              <div className="relative">
-                <h3 className="text-fantasy font-bold text-xl text-[var(--color-silver-muted)]">
-                  {COPY.landing.humanCardTitle}
-                </h3>
-                <p className="text-xs text-[var(--color-silver-dim)] leading-relaxed mt-1">
-                  {COPY.landing.humanCardBody}
-                </p>
+                {mode === "human_dm" ? (
+                  <div className="flex items-center gap-2 shrink-0">
+                    <span
+                      className="material-symbols-outlined text-[var(--color-gold-rare)] text-sm"
+                      style={{ fontVariationSettings: "'FILL' 1" }}
+                    >
+                      auto_awesome
+                    </span>
+                    <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-[var(--color-gold-rare)]">
+                      Active
+                    </span>
+                  </div>
+                ) : null}
+                <div className="flex-1 flex flex-col justify-center min-h-0">
+                  <h3 className="text-fantasy font-bold text-lg sm:text-xl text-[var(--color-silver-muted)] leading-tight">
+                    {COPY.landing.humanCardTitle}
+                  </h3>
+                  <p className="text-[10px] sm:text-[11px] text-[var(--color-silver-dim)] leading-snug mt-1 line-clamp-2">
+                    {COPY.landing.humanCardBody}
+                  </p>
+                </div>
               </div>
             </div>
           </button>
@@ -1003,49 +1007,51 @@ export default function Home() {
             className="text-left w-full min-w-[min(82vw,300px)] shrink-0 snap-center min-h-[44px] transition-all duration-200 active:scale-[0.98] rounded-[var(--radius-card)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-gold-rare)]/50 focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--color-obsidian)] sm:min-w-0"
           >
             <div
-              className={`relative h-44 rounded-[var(--radius-card)] p-6 flex flex-col justify-end overflow-hidden transition-all duration-300 ${
+              className={`relative h-44 rounded-[var(--radius-card)] overflow-hidden transition-all duration-300 flex flex-col ${
                 partyRoom
                   ? "bg-[var(--surface-high)] selected-glow metallic-edge"
                   : "bg-[var(--color-midnight)] border border-[var(--border-ui)] opacity-70 hover:opacity-100 hover:bg-[var(--surface-container)]"
               }`}
             >
-              <div className="relative z-10 flex items-start justify-between gap-3 mb-auto">
-                <div className="min-h-[24px] px-2 rounded-[var(--radius-chip)] border border-white/10 bg-black/20 text-[9px] font-black uppercase tracking-[0.2em] text-[var(--outline)] flex items-center gap-1.5">
-                  <span className="material-symbols-outlined text-[14px]">
-                    groups
-                  </span>
-                  Party
-                </div>
-                <div className="h-10 w-10 rounded-[var(--radius-avatar)] border border-white/10 bg-black/20 grid place-items-center text-[var(--outline)]">
-                  <span className="material-symbols-outlined text-base">
-                    celebration
-                  </span>
-                </div>
-              </div>
-              <div className="pointer-events-none absolute inset-0 opacity-70">
+              <div className="pointer-events-none absolute inset-0 z-0 opacity-70">
                 <div className="absolute inset-0 bg-gradient-to-br from-[rgba(123,45,142,0.22)] via-transparent to-[rgba(242,202,80,0.12)]" />
                 <div className="absolute inset-0 bg-gradient-to-t from-[var(--color-obsidian)] via-[var(--color-obsidian)]/30 to-transparent" />
               </div>
-              {partyRoom && (
-                <div className="relative flex items-center gap-2 mb-1">
-                  <span
-                    className="material-symbols-outlined text-[var(--color-gold-rare)] text-sm"
-                    style={{ fontVariationSettings: "'FILL' 1" }}
-                  >
-                    auto_awesome
-                  </span>
-                  <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-[var(--color-gold-rare)]">
-                    Active Selection
-                  </span>
+              <div className="relative z-10 flex flex-col flex-1 min-h-0 p-5 gap-2">
+                <div className="flex items-start justify-between gap-3 shrink-0">
+                  <div className="min-h-[24px] px-2 rounded-[var(--radius-chip)] border border-white/10 bg-black/20 text-[9px] font-black uppercase tracking-[0.2em] text-[var(--outline)] flex items-center gap-1.5">
+                    <span className="material-symbols-outlined text-[14px]">
+                      groups
+                    </span>
+                    Party mode
+                  </div>
+                  <div className="h-10 w-10 rounded-[var(--radius-avatar)] border border-white/10 bg-black/20 grid place-items-center text-[var(--outline)]">
+                    <span className="material-symbols-outlined text-base">
+                      celebration
+                    </span>
+                  </div>
                 </div>
-              )}
-              <div className="relative">
-                <h3 className="text-fantasy font-bold text-xl text-[var(--color-silver-muted)]">
-                  {COPY.landing.partyCardTitle}
-                </h3>
-                <p className="text-xs text-[var(--color-silver-dim)] leading-relaxed mt-1">
-                  {COPY.landing.partyCardBody}
-                </p>
+                {partyRoom ? (
+                  <div className="flex items-center gap-2 shrink-0">
+                    <span
+                      className="material-symbols-outlined text-[var(--color-gold-rare)] text-sm"
+                      style={{ fontVariationSettings: "'FILL' 1" }}
+                    >
+                      auto_awesome
+                    </span>
+                    <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-[var(--color-gold-rare)]">
+                      Active
+                    </span>
+                  </div>
+                ) : null}
+                <div className="flex-1 flex flex-col justify-center min-h-0">
+                  <h3 className="text-fantasy font-bold text-lg sm:text-xl text-[var(--color-silver-muted)] leading-tight">
+                    {COPY.landing.partyCardTitle}
+                  </h3>
+                  <p className="text-[10px] sm:text-[11px] text-[var(--color-silver-dim)] leading-snug mt-1 line-clamp-2">
+                    {COPY.landing.partyCardBody}
+                  </p>
+                </div>
               </div>
             </div>
           </button>

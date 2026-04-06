@@ -213,7 +213,7 @@ export default function ProfilePage() {
   useEffect(() => {
     if (status === "loading") return;
     if (status !== "authenticated") {
-      router.replace("/");
+      setLoading(false);
       return;
     }
     let cancelled = false;
@@ -871,13 +871,15 @@ export default function ProfilePage() {
             </h1>
           </div>
           <div className="flex flex-wrap items-center justify-end gap-2 shrink-0">
-            <GhostButton
-              size="sm"
-              type="button"
-              onClick={() => void signOut({ callbackUrl: "/" })}
-            >
-              Sign out
-            </GhostButton>
+            {status === "authenticated" ? (
+              <GhostButton
+                size="sm"
+                type="button"
+                onClick={() => void signOut({ callbackUrl: "/" })}
+              >
+                Sign out
+              </GhostButton>
+            ) : null}
             <GhostButton size="sm" type="button" onClick={() => router.back()}>
               Back
             </GhostButton>
@@ -885,21 +887,21 @@ export default function ProfilePage() {
         </header>
 
         {status === "authenticated" ? (
-          <GlassCard className="p-4 border-[rgba(212,175,55,0.12)]">
-            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
-              <p className="text-[10px] uppercase tracking-[0.16em] text-[var(--outline)] shrink-0">
-                {COPY.spark.shopTitle}
-              </p>
-              <SparkBalanceInline
-                balance={sparkBalance}
-                loading={sparkBalanceLoading}
-                isGuest={isGuestSession}
-              />
-            </div>
-          </GlassCard>
-        ) : null}
+          <>
+            <GlassCard className="p-4 border-[rgba(212,175,55,0.12)]">
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
+                <p className="text-[10px] uppercase tracking-[0.16em] text-[var(--outline)] shrink-0">
+                  {COPY.spark.shopTitle}
+                </p>
+                <SparkBalanceInline
+                  balance={sparkBalance}
+                  loading={sparkBalanceLoading}
+                  isGuest={isGuestSession}
+                />
+              </div>
+            </GlassCard>
 
-        <GlassCard className="p-4 border-[rgba(212,175,55,0.12)]">
+            <GlassCard className="p-4 border-[rgba(212,175,55,0.12)]">
           {isGuestSession ? (
             <div className="flex flex-col gap-2">
               <p className="text-[10px] uppercase tracking-[0.16em] text-[var(--outline)]">
@@ -1998,6 +2000,13 @@ export default function ProfilePage() {
             )}
           </div>
         </GlassCard>
+          </>
+        ) : (
+          <p className="text-sm text-center text-[var(--color-silver-dim)] leading-relaxed max-w-sm mx-auto px-2">
+            Use the options above to play as a guest or log in with Google. Your profile, heroes,
+            and friends show up here once you&apos;re signed in.
+          </p>
+        )}
       </div>
     </main>
   );
