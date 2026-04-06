@@ -12,10 +12,14 @@ import { runImagePipeline } from "@/lib/orchestrator/image-worker";
 import {
   InsufficientSparksError,
   isMonetizationSpendEnabled,
-  tryDebitSparks,
+  tryDebitSparksWithSessionPool,
 } from "@/server/services/spark-economy-service";
 import { PartyConfigV1Schema } from "@/lib/schemas/party";
 import { broadcastPartyStateRefresh } from "@/lib/party/party-socket";
+import {
+  assertChapterImageBudget,
+  incrementChapterSystemImageUsage,
+} from "@/server/services/chapter-runtime-service";
 
 export const maxDuration = 120;
 
@@ -51,6 +55,11 @@ async function executePartySceneImageJob(params: {
     const sceneContext = `${sceneContextSuffix}; template: ${cfg0.template_key}`;
     let imageUrl: string | null = null;
     try {
+      const budget = await assertChapterImageBudget({ sessionId });
+      if (!budget.ok) {
+        console.warn("[party/scene-image] chapter image budget exhausted", sessionId);
+        return;
+      }
       const result = await runImagePipeline({
         sessionId,
         turnId: null,
@@ -167,9 +176,14 @@ export async function POST(
     const narrativeText = parsed.data.narrative_text;
     const roundIndex = parsed.data.round_index;
 
+    const budget = await assertChapterImageBudget({ sessionId });
+    if (!budget.ok) {
+      return apiError(budget.error, budget.status);
+    }
+
     if (isMonetizationSpendEnabled()) {
       try {
-        await tryDebitSparks({
+        await tryDebitSparksWithSessionPool({
           payerUserId: row.host_user_id,
           amount: SPARK_COST_SCENE_IMAGE,
           idempotencyKey: `party_scene_image:${sessionId}:${roundIndex}`,

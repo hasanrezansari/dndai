@@ -68,6 +68,9 @@ function QuestPins() {
       <p className="text-sm leading-snug text-[var(--color-silver-muted)]">
         {quest.objective}
       </p>
+      <p className="mt-1 text-[10px] leading-snug text-[var(--outline)]">
+        The meter tracks momentum from dice and actions, not literal geography.
+      </p>
       {quest.subObjectives && quest.subObjectives.length > 0 && (
         <ul className="mt-2 space-y-1">
           {quest.subObjectives.map((sub, i) => (

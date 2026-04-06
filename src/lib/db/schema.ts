@@ -324,6 +324,25 @@ export const sessions = pgTable(
     world_revision: integer("world_revision"),
     /** Immutable JSON copied from world at fork; survives world row edits. */
     world_snapshot: jsonb("world_snapshot").$type<Record<string, unknown>>(),
+    /** `standard` = tighter turn + image caps; `cinematic` = longer chapter, more images. */
+    visual_rhythm_preset: text("visual_rhythm_preset").notNull().default("standard"),
+    /** First `current_round` included in the active chapter (inclusive). */
+    chapter_start_round: integer("chapter_start_round").notNull().default(1),
+    chapter_index: integer("chapter_index").notNull().default(1),
+    chapter_max_turns: integer("chapter_max_turns").notNull().default(30),
+    chapter_system_image_budget: integer("chapter_system_image_budget")
+      .notNull()
+      .default(3),
+    chapter_system_images_used: integer("chapter_system_images_used")
+      .notNull()
+      .default(0),
+    last_manual_scene_image_at: timestamp("last_manual_scene_image_at", {
+      withTimezone: true,
+    }),
+    /**
+     * Table-funded Sparks (contributions); spent before `host_user_id` wallet on session AI charges.
+     */
+    spark_pool_balance: integer("spark_pool_balance").notNull().default(0),
     created_at: timestamp("created_at", { withTimezone: true })
       .notNull()
       .defaultNow(),
@@ -543,6 +562,8 @@ export const narrativeEvents = pgTable(
       .$type<Record<string, unknown>>()
       .notNull()
       .default(sql`'{}'::jsonb`),
+    /** One-line factual anchor for the next turn (location + immediate circumstance). */
+    situation_anchor: text("situation_anchor"),
     created_at: timestamp("created_at", { withTimezone: true })
       .notNull()
       .defaultNow(),

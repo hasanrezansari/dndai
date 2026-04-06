@@ -1,8 +1,10 @@
 "use client";
 
+import { useSession } from "next-auth/react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 
+import { SparkBalanceHud } from "@/components/game/spark-balance-hud";
 import { PlayerSlot, type PlayerSlotPlayer } from "@/components/lobby/player-slot";
 import { GoldButton } from "@/components/ui/gold-button";
 import { GhostButton } from "@/components/ui/ghost-button";
@@ -13,6 +15,10 @@ import { SessionStartedEventSchema } from "@/lib/schemas/events";
 import { getBuildTimeBrand } from "@/lib/brand";
 import { COPY } from "@/lib/copy/ashveil";
 import { ROMA_MODULES } from "@/lib/rome/modules";
+import {
+  estimateHostSparksPerChapter,
+  normalizeVisualRhythmPreset,
+} from "@/lib/chapter/chapter-config";
 import { LOBBY_TONE_TAG_OPTIONS } from "@/lib/session/tone-tag-options";
 
 type SessionWithPlayers = Session & { players: Player[] };
@@ -37,6 +43,7 @@ function mapToSlotPlayer(p: Player): PlayerSlotPlayer {
 }
 
 export default function LobbyPage() {
+  const { status: authStatus } = useSession();
   const params = useParams();
   const router = useRouter();
   const codeParam = params.code;
@@ -55,6 +62,27 @@ export default function LobbyPage() {
   const [readyLoading, setReadyLoading] = useState(false);
   const [shareHint, setShareHint] = useState<string | null>(null);
   const [shareDisplayHint, setShareDisplayHint] = useState<string | null>(null);
+  const [sparkBalance, setSparkBalance] = useState<number | null>(null);
+
+  const refetchWallet = useCallback(async () => {
+    try {
+      const r = await fetch("/api/wallet");
+      if (r.ok) {
+        const j = (await r.json()) as { balance?: number };
+        if (typeof j.balance === "number") setSparkBalance(j.balance);
+      }
+    } catch {
+      // ignore
+    }
+  }, []);
+
+  useEffect(() => {
+    if (authStatus !== "authenticated") {
+      setSparkBalance(null);
+      return;
+    }
+    void refetchWallet();
+  }, [authStatus, refetchWallet]);
 
   const refetchSession = useCallback(async (sid: string) => {
     const res = await fetch(`/api/sessions/${sid}`);
@@ -220,6 +248,9 @@ export default function LobbyPage() {
   const [draftSharedRoleLabel, setDraftSharedRoleLabel] = useState("");
   const [premiseSaving, setPremiseSaving] = useState(false);
   const [premiseError, setPremiseError] = useState<string | null>(null);
+  const [visualPresetLoading, setVisualPresetLoading] = useState(false);
+  const [poolContribAmount, setPoolContribAmount] = useState(5);
+  const [poolContribBusy, setPoolContribBusy] = useState(false);
   const [playromanaAutoLobbyBusy, setPlayromanaAutoLobbyBusy] = useState(false);
   const [playromanaAutoLobbyError, setPlayromanaAutoLobbyError] = useState<
     string | null
@@ -262,6 +293,65 @@ export default function LobbyPage() {
     session?.party_config,
     session?.game_kind,
   ]);
+
+  async function handleVisualPreset(
+    preset: "standard" | "cinematic",
+  ): Promise<void> {
+    if (!sessionId || !isHost || visualPresetLoading) return;
+    setVisualPresetLoading(true);
+    try {
+      const res = await fetch(`/api/sessions/${sessionId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ visual_rhythm_preset: preset }),
+      });
+      const data = (await res.json().catch(() => ({}))) as SessionWithPlayers & {
+        error?: string;
+      };
+      if (!res.ok) {
+        setPremiseError(
+          typeof data.error === "string"
+            ? data.error
+            : "Could not update chapter pacing",
+        );
+        return;
+      }
+      setSession(data);
+      setPremiseError(null);
+    } finally {
+      setVisualPresetLoading(false);
+    }
+  }
+
+  async function handlePoolContribute() {
+    if (!sessionId || poolContribBusy) return;
+    const n = Math.min(10_000, Math.max(1, Math.floor(Number(poolContribAmount)) || 1));
+    setPoolContribBusy(true);
+    try {
+      const res = await fetch(
+        `/api/sessions/${sessionId}/spark-pool/contribute`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ amount: n }),
+        },
+      );
+      const data = (await res.json().catch(() => ({}))) as {
+        error?: string;
+        pool_after?: number;
+      };
+      if (!res.ok) {
+        window.alert(
+          typeof data.error === "string" ? data.error : "Could not add to pool",
+        );
+        return;
+      }
+      void refetchSession(sessionId);
+      void refetchWallet();
+    } finally {
+      setPoolContribBusy(false);
+    }
+  }
 
   async function handleSavePremise() {
     if (!sessionId || !session || !isHost || premiseSaving) return;
@@ -591,7 +681,14 @@ export default function LobbyPage() {
   const totalSeats = session.max_players;
 
   return (
-    <main className="min-h-dvh flex flex-col px-6 pb-10 bg-[var(--color-obsidian)]">
+    <main className="relative min-h-dvh flex flex-col px-6 pb-10 bg-[var(--color-obsidian)]">
+      {authStatus === "authenticated" ? (
+        <SparkBalanceHud
+          variant={isHost ? "host" : "guest"}
+          balance={sparkBalance}
+          tablePoolBalance={session?.spark_pool_balance ?? null}
+        />
+      ) : null}
       <div className="flex flex-col flex-1 w-full max-w-lg mx-auto pt-8">
         {/* Header */}
         <header className="mb-8 relative">
@@ -630,6 +727,43 @@ export default function LobbyPage() {
             </p>
           </div>
         </header>
+
+        {session.status === "lobby" && authStatus === "authenticated" ? (
+          <section className="mb-4 rounded-[var(--radius-card)] border border-[var(--border-ui)] bg-[var(--surface-high)]/35 px-4 py-3 backdrop-blur-sm">
+            <p className="text-[9px] font-black uppercase tracking-[0.15em] text-[var(--color-gold-rare)]">
+              Table spark pool
+            </p>
+            <p className="mt-1 text-[10px] text-[var(--outline)] leading-relaxed">
+              {session.spark_pool_balance ?? 0} Sparks in the pool — AI spends
+              draw here before the host wallet.
+            </p>
+            <div className="mt-2 flex flex-wrap items-center gap-2">
+              <label className="sr-only" htmlFor="pool-contrib-amount">
+                Amount to add
+              </label>
+              <input
+                id="pool-contrib-amount"
+                type="number"
+                min={1}
+                max={10000}
+                value={poolContribAmount}
+                onChange={(e) =>
+                  setPoolContribAmount(Number(e.target.value) || 1)
+                }
+                className="h-9 w-20 rounded-[var(--radius-card)] border border-[var(--border-ui)] bg-[var(--color-deep-void)] px-2 text-sm text-[var(--color-silver-muted)]"
+              />
+              <GoldButton
+                type="button"
+                size="sm"
+                className="min-h-[40px]"
+                disabled={poolContribBusy || !sessionId}
+                onClick={() => void handlePoolContribute()}
+              >
+                {poolContribBusy ? "…" : "Add to pool"}
+              </GoldButton>
+            </div>
+          </section>
+        ) : null}
 
         {session.game_kind === "party" ? (
           <p className="mb-4 rounded-[var(--radius-card)] border border-white/10 bg-black/25 px-3 py-2 text-xs leading-relaxed text-[var(--color-silver-dim)]">
@@ -709,6 +843,54 @@ export default function LobbyPage() {
                   className="w-full h-10 bg-[var(--color-deep-void)] px-3 rounded-[var(--radius-card)] border border-[var(--border-ui)] text-sm text-[var(--color-silver-muted)] focus:border-[var(--color-gold-rare)]/40 focus:outline-none"
                 />
               </>
+            ) : null}
+            {session.game_kind === "campaign" &&
+            session.mode === "ai_dm" ? (
+              <div className="rounded-[var(--radius-card)] border border-[var(--border-ui)] bg-[var(--color-deep-void)]/40 p-3 space-y-2">
+                <p className="text-[9px] font-bold uppercase tracking-[0.2em] text-[var(--color-gold-rare)]">
+                  Chapter pacing
+                </p>
+                <p className="text-[10px] text-[var(--outline)] leading-relaxed">
+                  Standard keeps chapters shorter with fewer automatic scene
+                  images; Cinematic stretches the beat and budgets more art per
+                  chapter.
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  {(["standard", "cinematic"] as const).map((p) => {
+                    const active =
+                      normalizeVisualRhythmPreset(session.visual_rhythm_preset) ===
+                      p;
+                    return (
+                      <button
+                        key={p}
+                        type="button"
+                        disabled={visualPresetLoading}
+                        onClick={() => void handleVisualPreset(p)}
+                        className={`min-h-[40px] flex-1 rounded-[var(--radius-card)] border px-2 text-[9px] font-black uppercase tracking-wider transition-colors ${
+                          active
+                            ? "border-[var(--color-gold-rare)] bg-[var(--color-gold-rare)]/15 text-[var(--color-gold-rare)]"
+                            : "border-[var(--border-ui-strong)] text-[var(--color-silver-dim)] hover:border-[var(--color-gold-rare)]/25"
+                        } disabled:opacity-40`}
+                      >
+                        {p === "standard" ? "Standard" : "Cinematic"}
+                      </button>
+                    );
+                  })}
+                </div>
+                <p className="text-[10px] font-bold text-[var(--color-silver-muted)]">
+                  ~
+                  {estimateHostSparksPerChapter({
+                    preset: normalizeVisualRhythmPreset(
+                      session.visual_rhythm_preset,
+                    ),
+                    mode: "ai_dm",
+                  })}{" "}
+                  Sparks / chapter
+                  <span className="ml-1 font-normal text-[var(--outline)]">
+                    (host estimate)
+                  </span>
+                </p>
+              </div>
             ) : null}
             <label className="block text-[9px] uppercase tracking-[0.15em] text-[var(--outline)]">
               {COPY.landing.narrativeSeedLabel}

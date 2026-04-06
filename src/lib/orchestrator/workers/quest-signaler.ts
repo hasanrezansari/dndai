@@ -17,7 +17,8 @@ Rules:
 - Keep tone in-world but concise.
 - "focus_term" should be a short noun phrase (1-4 words).
 - "suggested_sub_objective" is optional and should be under 10 words.
-- Confidence should reflect certainty from provided context (0 to 1).`;
+- Confidence should reflect certainty from provided context (0 to 1).
+- "closure_ready": set true only if the fiction and objective together make it believable that the party could end the session on a satisfying note *right now* (not merely that progress is high). If unsure, false.`;
 
 function fallbackSignal(params: {
   round: number;
@@ -35,6 +36,7 @@ function fallbackSignal(params: {
     focus_term: focusTerm,
     suggested_sub_objective: `Press ${focusTerm} with a decisive action`,
     confidence: 0.62,
+    closure_ready: false,
   });
 }
 

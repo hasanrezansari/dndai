@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, inArray } from "drizzle-orm";
+import { and, desc, eq, inArray } from "drizzle-orm";
 
 import { db } from "@/lib/db";
 import {
@@ -36,7 +36,21 @@ import {
   resolvePlayerDisplayName,
   type ViewerIdentityHint,
 } from "@/lib/session/player-display-name";
+import {
+  estimateHostSparksPerChapter,
+  normalizeVisualRhythmPreset,
+  turnsElapsedInChapter,
+} from "@/lib/chapter/chapter-config";
 import { getQuestState } from "@/server/services/quest-service";
+
+/** Cap scene_snapshots loaded per hydrate (feed pairing + latest hero image). */
+export const SCENE_SNAPSHOT_FEED_LIMIT = 100;
+
+/** Recent actions joined to turns for the session feed (chronicle). */
+const FEED_ACTIONS_LIMIT = 90;
+
+/** `state_delta` rows for Chronicle lazy load (not included in `/state` hydrate). */
+export const STAT_DELTA_TRACE_LAZY_LIMIT = 280;
 
 const DEFAULT_STATS = {
   str: 10,
@@ -50,6 +64,11 @@ const DEFAULT_STATS = {
 function mapSession(row: typeof sessions.$inferSelect): GameSessionView {
   const tags = row.adventure_tags;
   const gameKind = row.game_kind ?? "campaign";
+  const preset = normalizeVisualRhythmPreset(row.visual_rhythm_preset);
+  const turnsThisChapter = turnsElapsedInChapter({
+    currentRound: row.current_round,
+    chapterStartRound: row.chapter_start_round,
+  });
   return {
     status: row.status,
     mode: row.mode,
@@ -68,6 +87,18 @@ function mapSession(row: typeof sessions.$inferSelect): GameSessionView {
     artDirection: row.art_direction,
     worldBible: row.world_bible,
     gameKind,
+    visualRhythmPreset: preset,
+    chapterStartRound: row.chapter_start_round,
+    chapterIndex: row.chapter_index,
+    chapterTurnsElapsed: turnsThisChapter,
+    chapterMaxTurns: row.chapter_max_turns,
+    chapterImagesUsed: row.chapter_system_images_used,
+    chapterImageBudget: row.chapter_system_image_budget,
+    estimatedHostSparksPerChapter:
+      gameKind === "campaign"
+        ? estimateHostSparksPerChapter({ preset, mode: row.mode })
+        : undefined,
+    sparkPoolBalance: row.spark_pool_balance ?? 0,
     party:
       gameKind === "party"
         ? partyConfigForSessionPayload(row.party_config, {
@@ -183,6 +214,278 @@ function rawToStatEffects(
   return out;
 }
 
+function sceneImageServingUrlForSession(
+  sessionId: string,
+  snap: typeof sceneSnapshots.$inferSelect,
+): string | undefined {
+  const raw = snap.image_url;
+  if (!raw?.trim()) return undefined;
+  return raw.startsWith("data:")
+    ? `/api/sessions/${sessionId}/scene-image/${snap.id}`
+    : raw;
+}
+
+export type SessionSceneStatusPayload = {
+  scenePending: boolean;
+  sceneImage: string | null;
+  narrativeText: string | null;
+  sceneTitle: string | null;
+  stateVersion: number;
+};
+
+/**
+ * Minimal scene/narration slice for polling (avoids full `loadSessionStatePayload`).
+ * Same derivation rules as hydrate for party vs campaign.
+ */
+function deriveSceneDisplaySlice(args: {
+  sessionRow: typeof sessions.$inferSelect;
+  sessionId: string;
+  latestScene: typeof sceneSnapshots.$inferSelect | undefined;
+  latestNarrativeText: string | null;
+}): Omit<SessionSceneStatusPayload, "stateVersion"> {
+  const { sessionRow, sessionId, latestScene, latestNarrativeText } = args;
+  let narrativeText = latestNarrativeText;
+  const rawSceneImage = latestScene?.image_url ?? null;
+  let sceneImage =
+    rawSceneImage?.startsWith("data:") && latestScene
+      ? `/api/sessions/${sessionId}/scene-image/${latestScene.id}`
+      : rawSceneImage;
+  const sceneStatusPending =
+    latestScene?.image_status === "pending" ||
+    latestScene?.image_status === "generating";
+  let scenePending = Boolean(rawSceneImage) ? false : sceneStatusPending;
+
+  let sceneTitle =
+    sessionRow.campaign_title?.trim() ||
+    latestScene?.summary.split("\n")[0]?.trim() ||
+    null;
+
+  if (sessionRow.game_kind === "party") {
+    const p = PartyConfigV1Schema.safeParse(sessionRow.party_config);
+    if (p.success) {
+      const pc = p.data;
+      if (
+        (pc.party_phase === "vote" ||
+          pc.party_phase === "forgery_guess" ||
+          pc.party_phase === "reveal" ||
+          pc.party_phase === "tiebreak_vote" ||
+          pc.party_phase === "finale_tie_vote") &&
+        pc.merged_beat?.trim()
+      ) {
+        narrativeText = pc.merged_beat.trim();
+      } else if (
+        pc.party_phase === "submit" ||
+        pc.party_phase === "tiebreak_submit"
+      ) {
+        narrativeText = buildPartySessionNarrativeText({
+          partyPhase: pc.party_phase,
+          sessionRow: {
+            adventure_prompt: sessionRow.adventure_prompt,
+            adventure_tags: sessionRow.adventure_tags,
+            world_bible: sessionRow.world_bible,
+            art_direction: sessionRow.art_direction,
+          },
+          partyConfig: pc,
+        });
+      } else if (pc.party_phase === "ended") {
+        narrativeText =
+          pc.merged_beat?.trim() ||
+          pc.carry_forward?.trim() ||
+          narrativeText;
+      }
+      const art =
+        pc.scene_image_by_round?.[String(pc.round_index)]?.trim() ??
+        pc.scene_image_url?.trim();
+      if (art) {
+        sceneImage = art;
+        scenePending = false;
+      } else if (
+        (pc.party_phase === "vote" ||
+          pc.party_phase === "forgery_guess" ||
+          pc.party_phase === "reveal" ||
+          pc.party_phase === "tiebreak_vote" ||
+          pc.party_phase === "finale_tie_vote") &&
+        pc.merged_beat?.trim()
+      ) {
+        scenePending = true;
+      } else if (
+        (pc.party_phase === "submit" || pc.party_phase === "tiebreak_submit") &&
+        pc.round_scene_beat?.trim()
+      ) {
+        scenePending = true;
+      }
+    }
+  }
+  if (sessionRow.game_kind === "party") {
+    const pr = PartyConfigV1Schema.safeParse(sessionRow.party_config);
+    if (pr.success) {
+      sceneTitle = `Party · Round ${pr.data.round_index} / ${pr.data.total_rounds}`;
+    }
+  }
+
+  return {
+    sceneImage,
+    scenePending,
+    narrativeText,
+    sceneTitle,
+  };
+}
+
+export async function loadSessionSceneStatus(
+  sessionId: string,
+): Promise<SessionSceneStatusPayload | null> {
+  const [sessionRow] = await db
+    .select()
+    .from(sessions)
+    .where(eq(sessions.id, sessionId))
+    .limit(1);
+  if (!sessionRow) {
+    return null;
+  }
+
+  const [latestScene] = await db
+    .select()
+    .from(sceneSnapshots)
+    .where(eq(sceneSnapshots.session_id, sessionId))
+    .orderBy(desc(sceneSnapshots.created_at))
+    .limit(1);
+
+  let latestNarrativeText: string | null = null;
+  if (sessionRow.game_kind !== "party") {
+    const [nr] = await db
+      .select({ scene_text: narrativeEvents.scene_text })
+      .from(narrativeEvents)
+      .where(eq(narrativeEvents.session_id, sessionId))
+      .orderBy(desc(narrativeEvents.created_at))
+      .limit(1);
+    latestNarrativeText = nr?.scene_text ?? null;
+  }
+
+  const slice = deriveSceneDisplaySlice({
+    sessionRow,
+    sessionId,
+    latestScene: latestScene ?? undefined,
+    latestNarrativeText,
+  });
+
+  return {
+    ...slice,
+    stateVersion: sessionRow.state_version,
+  };
+}
+
+function buildStatDeltaTraceFeedEntries(
+  traceRows: (typeof orchestrationTraces.$inferSelect)[],
+  mappedPlayers: GamePlayerView[],
+  npcNamesMap: Map<string, string>,
+  turnRoundById: Map<string, number>,
+): FeedEntry[] {
+  const traceFeed: FeedEntry[] = [];
+  for (const row of [...traceRows].reverse()) {
+    const out = row.output_summary;
+    if (!out || typeof out !== "object") continue;
+    const summary = out as Record<string, unknown>;
+    if (row.step_name !== "state_delta") continue;
+    const effects = rawToStatEffects(
+      summary.consequence_effects,
+      mappedPlayers,
+      npcNamesMap,
+    );
+    if (effects.length === 0) continue;
+    const text = statEffectsToFeedText(effects);
+    if (!text.trim()) continue;
+    traceFeed.push({
+      id: `trace:stat:${row.id}`,
+      type: "stat_change",
+      text,
+      timestamp: row.created_at.toISOString(),
+      statEffects: effects,
+      turnId: row.turn_id ?? undefined,
+      roundNumber: row.turn_id
+        ? turnRoundById.get(row.turn_id)
+        : undefined,
+    });
+  }
+  return traceFeed;
+}
+
+/**
+ * Stat-change rows from orchestration traces — for Chronicle only (reduces `/state` payload).
+ */
+export async function loadStatDeltaTraceFeedForSession(
+  sessionId: string,
+  viewer?: ViewerIdentityHint | null,
+): Promise<FeedEntry[]> {
+  const playerRows = await db
+    .select({
+      player: players,
+      character: characters,
+      userName: authUsers.name,
+      userEmail: authUsers.email,
+    })
+    .from(players)
+    .leftJoin(characters, eq(characters.player_id, players.id))
+    .leftJoin(authUsers, eq(authUsers.id, players.user_id))
+    .where(eq(players.session_id, sessionId));
+
+  const mappedPlayers = playerRows
+    .map((r) => {
+      const { userName, userEmail } = mergeViewerUserFieldsForPlayer({
+        playerUserId: r.player.user_id,
+        dbUserName: r.userName,
+        dbUserEmail: r.userEmail,
+        viewer,
+      });
+      return mapPlayerRow(
+        r.player,
+        r.character,
+        resolvePlayerDisplayName({
+          characterName: r.character?.name,
+          userName,
+          userEmail,
+        }),
+      );
+    })
+    .sort((a, b) => a.seatIndex - b.seatIndex);
+
+  const npcNamesMap = new Map(
+    (
+      await db
+        .select({ id: npcStates.id, name: npcStates.name })
+        .from(npcStates)
+        .where(eq(npcStates.session_id, sessionId))
+    ).map((r) => [r.id, r.name]),
+  );
+
+  const turnRoundById = new Map(
+    (
+      await db
+        .select({ id: turns.id, round_number: turns.round_number })
+        .from(turns)
+        .where(eq(turns.session_id, sessionId))
+    ).map((t) => [t.id, t.round_number]),
+  );
+
+  const traceRows = await db
+    .select()
+    .from(orchestrationTraces)
+    .where(
+      and(
+        eq(orchestrationTraces.session_id, sessionId),
+        inArray(orchestrationTraces.step_name, ["state_delta"]),
+      ),
+    )
+    .orderBy(desc(orchestrationTraces.created_at))
+    .limit(STAT_DELTA_TRACE_LAZY_LIMIT);
+
+  return buildStatDeltaTraceFeedEntries(
+    traceRows,
+    mappedPlayers,
+    npcNamesMap,
+    turnRoundById,
+  );
+}
+
 function statEffectsToFeedText(effects: StatEffect[]): string {
   const parts: string[] = [];
   for (const e of effects) {
@@ -263,26 +566,19 @@ export async function loadSessionStatePayload(
     .orderBy(desc(narrativeEvents.created_at))
     .limit(20);
 
-  const snapshotRows = await db
+  const snapshotRowsDesc = await db
     .select()
     .from(sceneSnapshots)
     .where(eq(sceneSnapshots.session_id, sessionId))
-    .orderBy(asc(sceneSnapshots.created_at));
+    .orderBy(desc(sceneSnapshots.created_at))
+    .limit(SCENE_SNAPSHOT_FEED_LIMIT);
+
+  const snapshotRows = [...snapshotRowsDesc].reverse();
 
   const latestScene =
     snapshotRows.length > 0
       ? snapshotRows[snapshotRows.length - 1]!
       : undefined;
-
-  function sceneImageServingUrl(
-    snap: typeof sceneSnapshots.$inferSelect,
-  ): string | undefined {
-    const raw = snap.image_url;
-    if (!raw?.trim()) return undefined;
-    return raw.startsWith("data:")
-      ? `/api/sessions/${sessionId}/scene-image/${snap.id}`
-      : raw;
-  }
 
   const chronological = [...narrativeRows].reverse();
   const narrationFeed: FeedEntry[] = chronological.map(({ ev, turn_round }) => {
@@ -292,7 +588,9 @@ export async function loadSessionStatePayload(
         typeof s.image_url === "string" &&
         s.image_url.trim().length > 0,
     );
-    const imageUrl = snap ? sceneImageServingUrl(snap) : undefined;
+    const imageUrl = snap
+      ? sceneImageServingUrlForSession(sessionId, snap)
+      : undefined;
     return {
       id: ev.id,
       type: "narration" as const,
@@ -317,7 +615,7 @@ export async function loadSessionStatePayload(
     .innerJoin(turns, eq(turns.id, actions.turn_id))
     .where(eq(turns.session_id, sessionId))
     .orderBy(desc(actions.created_at))
-    .limit(120);
+    .limit(FEED_ACTIONS_LIMIT);
 
   const actionIds = actionTurnRows.map((r) => r.action.id);
   const diceQuery =
@@ -379,70 +677,15 @@ export async function loadSessionStatePayload(
     };
   });
 
-  const npcNamesMap = new Map(
-    (
-      await db
-        .select({ id: npcStates.id, name: npcStates.name })
-        .from(npcStates)
-        .where(eq(npcStates.session_id, sessionId))
-    ).map((r) => [r.id, r.name]),
-  );
-
-  const turnRoundById = new Map(
-    (
-      await db
-        .select({ id: turns.id, round_number: turns.round_number })
-        .from(turns)
-        .where(eq(turns.session_id, sessionId))
-    ).map((t) => [t.id, t.round_number]),
-  );
-
-  const traceRows = await db
+  const npcRows = await db
     .select()
-    .from(orchestrationTraces)
-    .where(
-      and(
-        eq(orchestrationTraces.session_id, sessionId),
-        inArray(orchestrationTraces.step_name, ["state_delta"]),
-      ),
-    )
-    .orderBy(desc(orchestrationTraces.created_at))
-    .limit(300);
-
-  const traceFeed: FeedEntry[] = [];
-  for (const row of [...traceRows].reverse()) {
-    const out = row.output_summary;
-    if (!out || typeof out !== "object") continue;
-    const summary = out as Record<string, unknown>;
-
-    if (row.step_name === "state_delta") {
-      const effects = rawToStatEffects(
-        summary.consequence_effects,
-        mappedPlayers,
-        npcNamesMap,
-      );
-      if (effects.length === 0) continue;
-      const text = statEffectsToFeedText(effects);
-      if (!text.trim()) continue;
-      traceFeed.push({
-        id: `trace:stat:${row.id}`,
-        type: "stat_change",
-        text,
-        timestamp: row.created_at.toISOString(),
-        statEffects: effects,
-        turnId: row.turn_id ?? undefined,
-        roundNumber: row.turn_id
-          ? turnRoundById.get(row.turn_id)
-          : undefined,
-      });
-    }
-  }
+    .from(npcStates)
+    .where(eq(npcStates.session_id, sessionId));
 
   const feed: FeedEntry[] = [
     ...actionEntries,
     ...diceRollingEntries,
     ...diceEntries,
-    ...traceFeed,
     ...narrationFeed,
   ].sort((a, b) => {
     const ta = new Date(a.timestamp).getTime();
@@ -452,85 +695,13 @@ export async function loadSessionStatePayload(
   });
 
   const latestNarrative = narrativeRows[0];
-  let narrativeText = latestNarrative?.ev.scene_text ?? null;
-
-  const rawSceneImage = latestScene?.image_url ?? null;
-  let sceneImage =
-    rawSceneImage?.startsWith("data:") && latestScene
-      ? `/api/sessions/${sessionId}/scene-image/${latestScene.id}`
-      : rawSceneImage;
-  const sceneStatusPending =
-    latestScene?.image_status === "pending" ||
-    latestScene?.image_status === "generating";
-  let scenePending = Boolean(rawSceneImage) ? false : sceneStatusPending;
-
-  if (sessionRow.game_kind === "party") {
-    const p = PartyConfigV1Schema.safeParse(sessionRow.party_config);
-    if (p.success) {
-      const pc = p.data;
-      if (
-        (pc.party_phase === "vote" ||
-          pc.party_phase === "forgery_guess" ||
-          pc.party_phase === "reveal" ||
-          pc.party_phase === "tiebreak_vote" ||
-          pc.party_phase === "finale_tie_vote") &&
-        pc.merged_beat?.trim()
-      ) {
-        narrativeText = pc.merged_beat.trim();
-      } else if (
-        pc.party_phase === "submit" ||
-        pc.party_phase === "tiebreak_submit"
-      ) {
-        narrativeText = buildPartySessionNarrativeText({
-          partyPhase: pc.party_phase,
-          sessionRow: {
-            adventure_prompt: sessionRow.adventure_prompt,
-            adventure_tags: sessionRow.adventure_tags,
-            world_bible: sessionRow.world_bible,
-            art_direction: sessionRow.art_direction,
-          },
-          partyConfig: pc,
-        });
-      } else if (pc.party_phase === "ended") {
-        narrativeText =
-          pc.merged_beat?.trim() ||
-          pc.carry_forward?.trim() ||
-          narrativeText;
-      }
-      const art =
-        pc.scene_image_by_round?.[String(pc.round_index)]?.trim() ??
-        pc.scene_image_url?.trim();
-      if (art) {
-        sceneImage = art;
-        scenePending = false;
-      } else if (
-        (pc.party_phase === "vote" ||
-          pc.party_phase === "forgery_guess" ||
-          pc.party_phase === "reveal" ||
-          pc.party_phase === "tiebreak_vote" ||
-          pc.party_phase === "finale_tie_vote") &&
-        pc.merged_beat?.trim()
-      ) {
-        scenePending = true;
-      } else if (
-        (pc.party_phase === "submit" || pc.party_phase === "tiebreak_submit") &&
-        pc.round_scene_beat?.trim()
-      ) {
-        /** Round art is scheduled from hydrate; poll clients so the hero updates without reload. */
-        scenePending = true;
-      }
-    }
-  }
-  let sceneTitle =
-    sessionRow.campaign_title?.trim() ||
-    latestScene?.summary.split("\n")[0]?.trim() ||
-    null;
-  if (sessionRow.game_kind === "party") {
-    const pr = PartyConfigV1Schema.safeParse(sessionRow.party_config);
-    if (pr.success) {
-      sceneTitle = `Party · Round ${pr.data.round_index} / ${pr.data.total_rounds}`;
-    }
-  }
+  const sceneSlice = deriveSceneDisplaySlice({
+    sessionRow,
+    sessionId,
+    latestScene,
+    latestNarrativeText: latestNarrative?.ev.scene_text ?? null,
+  });
+  let { narrativeText, sceneImage, scenePending, sceneTitle } = sceneSlice;
 
   const [dmAwaitingRow] = await db
     .select({
@@ -633,10 +804,6 @@ export async function loadSessionStatePayload(
       createdAt: r.created_at.toISOString(),
     }));
 
-  const npcRows = await db
-    .select()
-    .from(npcStates)
-    .where(eq(npcStates.session_id, sessionId));
   const npcs: NpcCombatantView[] = npcRows.map(mapNpcRowToCombatantView);
 
   return {

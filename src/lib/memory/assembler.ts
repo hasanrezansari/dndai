@@ -100,6 +100,18 @@ async function buildCanonicalState(sessionId: string): Promise<string> {
   return truncateToTokenBudget(parts.join("\n"), TOKEN_BUDGET.canonicalState);
 }
 
+/** Last narrator-committed situation line (location + circumstance) for the next turn. */
+export async function fetchLatestSituationAnchor(sessionId: string): Promise<string | null> {
+  const [row] = await db
+    .select({ situation_anchor: narrativeEvents.situation_anchor })
+    .from(narrativeEvents)
+    .where(eq(narrativeEvents.session_id, sessionId))
+    .orderBy(desc(narrativeEvents.created_at))
+    .limit(1);
+  const a = typeof row?.situation_anchor === "string" ? row.situation_anchor.trim() : "";
+  return a.length >= 8 ? a : null;
+}
+
 async function buildRecentEventWindow(sessionId: string): Promise<string> {
   const rows = await db
     .select({ scene_text: narrativeEvents.scene_text })

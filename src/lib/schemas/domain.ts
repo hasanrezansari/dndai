@@ -44,6 +44,14 @@ export const SessionSchema = z.object({
   acquisition_source: z.string().max(64).nullable().optional(),
   party_config: z.record(z.string(), z.unknown()).nullable().optional(),
   party_secrets: z.record(z.string(), z.unknown()).nullable().optional(),
+  visual_rhythm_preset: z.enum(["standard", "cinematic"]).default("standard"),
+  chapter_start_round: z.number().int().min(1).default(1),
+  chapter_index: z.number().int().min(1).default(1),
+  chapter_max_turns: z.number().int().min(1).default(30),
+  chapter_system_image_budget: z.number().int().min(0).default(3),
+  chapter_system_images_used: z.number().int().min(0).default(0),
+  last_manual_scene_image_at: iso.nullable().optional(),
+  spark_pool_balance: z.number().int().min(0).default(0),
   created_at: iso,
   updated_at: iso,
 });
@@ -275,6 +283,7 @@ export const NarrativeEventSchema = z.object({
   tone: z.string(),
   next_actor_id: z.string().uuid().nullable(),
   image_hint: NarrativeImageHintSchema,
+  situation_anchor: z.string().nullable().optional(),
   created_at: iso,
 });
 export type NarrativeEvent = output<typeof NarrativeEventSchema>;

@@ -2,6 +2,7 @@
 
 import { useMemo } from "react";
 
+import { isChapterTurnCapExceeded } from "@/lib/chapter/chapter-config";
 import {
   isQuestFinaleThreshold,
   questProgressBarWidth,
@@ -22,6 +23,10 @@ export interface QuestPillProps {
   currentPlayerId: string | null;
   voteBusy: boolean;
   chapterBusy: boolean;
+  /** Host-only: advance chapter window + recap. */
+  chapterContinueBusy?: boolean;
+  isHost?: boolean;
+  onContinueChapter?: () => void;
   onEndingVote: (choice: "end_now" | "continue") => void;
   onGenerateFinalChapter: () => void;
 }
@@ -39,6 +44,9 @@ export function QuestPill({
   currentPlayerId,
   voteBusy,
   chapterBusy,
+  chapterContinueBusy = false,
+  isHost = false,
+  onContinueChapter,
   onEndingVote,
   onGenerateFinalChapter,
 }: QuestPillProps) {
@@ -48,6 +56,14 @@ export function QuestPill({
   const primaryProgress = questProgressPrimaryLine(quest);
 
   const currentRound = session?.currentRound ?? 1;
+  const chapterTurnCapHit =
+    session?.gameKind === "campaign" &&
+    session.mode === "ai_dm" &&
+    isChapterTurnCapExceeded({
+      currentRound: session.currentRound,
+      chapterStartRound: session.chapterStartRound ?? 1,
+      chapterMaxTurns: session.chapterMaxTurns ?? 30,
+    });
   const liveLeads = useMemo(
     () =>
       (quest.objectiveLeads ?? [])
@@ -64,6 +80,48 @@ export function QuestPill({
 
   return (
     <div className="space-y-3">
+      <div>
+        <p className="text-fantasy text-sm font-bold leading-snug text-[var(--color-silver-muted)]">
+          {quest.objective}
+        </p>
+        <p className="mt-1 text-[9px] leading-snug text-[var(--outline)]">
+          Progress is <span className="font-bold text-[var(--color-silver-dim)]">mission momentum</span> from
+          dice and actions — not the same as reaching a place in the story.
+        </p>
+      </div>
+      {session?.gameKind === "campaign" && session.status === "active" ? (
+        <div className="rounded-[var(--radius-card)] border border-[var(--border-ui)] bg-[var(--surface-high)]/40 px-3 py-2">
+          <p className="text-[9px] font-black uppercase tracking-[0.15em] text-[var(--color-gold-rare)]">
+            Chapter {session.chapterIndex ?? 1}
+          </p>
+          <p className="mt-1 text-[10px] font-bold text-[var(--outline)]">
+            {session.chapterTurnsElapsed ?? 1} / {session.chapterMaxTurns ?? 30}{" "}
+            turns · {session.chapterImagesUsed ?? 0} /{" "}
+            {session.chapterImageBudget ?? 3} scene images
+            {session.visualRhythmPreset ? (
+              <span className="ml-1 text-[9px] uppercase tracking-wider text-[var(--outline)]">
+                · {session.visualRhythmPreset}
+              </span>
+            ) : null}
+          </p>
+          {chapterTurnCapHit ? (
+            <p className="mt-1.5 text-[10px] font-bold text-[var(--color-failure)]">
+              Turn limit reached — the host must continue the chapter for the table
+              to keep playing.
+            </p>
+          ) : null}
+          {isHost && onContinueChapter ? (
+            <button
+              type="button"
+              disabled={chapterContinueBusy}
+              onClick={() => onContinueChapter()}
+              className="mt-2 min-h-[40px] w-full rounded-[var(--radius-card)] border border-[var(--color-gold-rare)]/35 bg-[var(--color-deep-void)] text-[10px] font-black uppercase tracking-wider text-[var(--color-gold-rare)] disabled:opacity-30"
+            >
+              {chapterContinueBusy ? "Continuing…" : "Continue chapter"}
+            </button>
+          ) : null}
+        </div>
+      ) : null}
       {liveLeads.length > 0 ? (
         <div className="rounded-[var(--radius-card)] bg-[var(--color-deep-void)]/40 px-3 py-2">
           <p className="text-[10px] font-bold text-[var(--outline)] uppercase tracking-wider">
@@ -108,6 +166,12 @@ export function QuestPill({
           {risk.label} ({quest.risk}%)
         </span>
       </div>
+      {quest.progress >= 100 && session?.status === "active" ? (
+        <p className="text-[9px] leading-snug text-[var(--outline)]">
+          100% means the table <span className="font-bold text-[var(--color-silver-dim)]">may</span> end the
+          adventure — narration can still get darker or messier until you vote or keep playing.
+        </p>
+      ) : null}
       {quest.endingVote?.open && currentPlayerId ? (
         <div className="rounded-[var(--radius-card)] border border-[var(--color-gold-rare)]/20 bg-[var(--surface-high)] p-3">
           <p className="mb-2 flex items-center gap-2 text-[9px] font-black uppercase tracking-[0.15em] text-[var(--color-gold-rare)]">
@@ -202,6 +266,9 @@ export function QuestDock({ quest, onOpen }: QuestDockProps) {
         <div className="min-w-0 flex-1">
           <p className="line-clamp-1 text-fantasy text-xs font-bold tracking-tight text-[var(--color-silver-muted)]">
             {quest.objective}
+          </p>
+          <p className="mt-0.5 line-clamp-2 text-[8px] font-medium normal-case tracking-normal text-[var(--outline)]">
+            Momentum from play, not map position.
           </p>
           <p className="mt-0.5 text-[9px] font-bold uppercase tracking-wider text-[var(--outline)]">
             <span style={{ color: risk.color }}>{risk.label}</span>

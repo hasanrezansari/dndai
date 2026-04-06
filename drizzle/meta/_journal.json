@@ -134,6 +134,27 @@
       "when": 1775465784324,
       "tag": "0018_parallel_gambit",
       "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1775500000000,
+      "tag": "0019_chapter_caps",
+      "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "7",
+      "when": 1775600000000,
+      "tag": "0020_session_spark_pool",
+      "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "7",
+      "when": 1775494135307,
+      "tag": "0021_swift_eddie_brock",
+      "breakpoints": true
     }
   ]
 }

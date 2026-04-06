@@ -91,7 +91,7 @@ NEVER instantiate providers directly in business logic. Always: `const provider 
 | Rules Interpreter | `workers/rules-interpreter.ts` | `RulesInterpreterOutputSchema` | light |
 | Consequence Interpreter | `workers/consequence-interpreter.ts` | `ConsequenceOutputSchema` | light |
 | Narrator | `workers/narrator.ts` | `NarratorOutputSchema` | heavy |
-| Visual Delta | `workers/visual-delta.ts` | `VisualDeltaOutputSchema` | light |
+| Visual Delta | `workers/visual-delta.ts` | `VisualDeltaOutputSchema` | deterministic (heuristics + `situation_anchor` + `narrative_beat`) |
 
 ## Fallback Requirements
 Every worker MUST have a fallback that returns valid schema-conforming data:

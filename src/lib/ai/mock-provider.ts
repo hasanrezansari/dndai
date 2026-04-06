@@ -23,6 +23,13 @@ const FIXTURE_NARRATOR = {
   tone: "dramatic",
   next_actor_id: null as string | null,
   image_hint: { subjects: [], avoid: [] },
+  situation_anchor:
+    "The party remains in the torchlit stone chamber after the strike, tension high, awaiting the next move.",
+  narrative_beat: {
+    rhythm: "ongoing",
+    setting_change: "texture",
+    warrants_establishing_shot: false,
+  },
 };
 
 const FIXTURE_INTENT = {

@@ -113,10 +113,17 @@ export function useSessionChannel(
     const stateUrl = displayTokenOpt
       ? `/api/sessions/${sessionId}/display-state?t=${encodeURIComponent(displayTokenOpt)}`
       : `/api/sessions/${sessionId}/state`;
+    const sceneStatusUrl = displayTokenOpt
+      ? `/api/sessions/${sessionId}/display-scene-status?t=${encodeURIComponent(displayTokenOpt)}`
+      : `/api/sessions/${sessionId}/scene-status`;
     const channel = pusherClient?.subscribe(channelName) ?? null;
 
     let accessForbidden = false;
     let scenePollTimer: ReturnType<typeof setInterval> | null = null;
+    let presenceHeartbeatTimer: ReturnType<typeof setInterval> | null = null;
+
+    const SCENE_FALLBACK_POLL_MS = 30_000;
+    const PRESENCE_HEARTBEAT_MS = 45_000;
 
     function stopScenePoll() {
       if (scenePollTimer) {
@@ -125,10 +132,26 @@ export function useSessionChannel(
       }
     }
 
+    function stopPresenceHeartbeat() {
+      if (presenceHeartbeatTimer) {
+        clearInterval(presenceHeartbeatTimer);
+        presenceHeartbeatTimer = null;
+      }
+    }
+
+    function shouldPollSceneFallback(): boolean {
+      if (displayTokenOpt) return true;
+      const s = useGameStore.getState();
+      const pid = s.currentPlayerId;
+      if (!pid) return false;
+      return Boolean(s.players.find((p) => p.id === pid)?.isHost);
+    }
+
     function markAccessForbidden() {
       if (accessForbidden) return;
       accessForbidden = true;
       stopScenePoll();
+      stopPresenceHeartbeat();
       if (pusherClient) {
         try {
           pusherClient.unsubscribe(channelName);
@@ -154,10 +177,18 @@ export function useSessionChannel(
       return (await res.json()) as SessionStatePayload;
     }
 
-    function maybeStartPartyScenePoll(data: SessionStatePayload | null) {
-      if (data?.session?.gameKind === "party" && data.scenePending) {
-        startScenePoll();
+    /** Pusher is primary; one host (or room display) may poll a minimal endpoint if events are missed. */
+    function maybeStartSceneFallbackPoll(data: SessionStatePayload | null) {
+      if (data?.scenePending) {
+        startSceneFallbackPoll();
       }
+    }
+
+    function startSceneFallbackPoll() {
+      stopScenePoll();
+      if (!shouldPollSceneFallback()) return;
+      scenePollTimer = setInterval(pollSceneImage, SCENE_FALLBACK_POLL_MS);
+      void pollSceneImage();
     }
 
     /** Pusher-driven deltas: keep client feed / overlays; align everything else to DB. */
@@ -165,7 +196,7 @@ export function useSessionChannel(
       const data = await fetchSessionState();
       if (!data?.session) return;
       useGameStore.getState().patchSessionFromStateApi(data);
-      maybeStartPartyScenePoll(data);
+      maybeStartSceneFallbackPoll(data);
     }
 
     let fullResyncInFlight: Promise<void> | null = null;
@@ -183,7 +214,7 @@ export function useSessionChannel(
           if (!data?.session || accessForbidden) return;
           const store = useGameStore.getState();
           store.patchSessionFromStateApi(data);
-          maybeStartPartyScenePoll(data);
+          maybeStartSceneFallbackPoll(data);
           store.setIsThinking(false);
           store.hideDiceOverlay();
           channelOptionsRef.current?.onFullResyncComplete?.();
@@ -510,23 +541,41 @@ export function useSessionChannel(
         stopScenePoll();
         return;
       }
+      if (!shouldPollSceneFallback()) {
+        stopScenePoll();
+        return;
+      }
       try {
-        const data = await fetchSessionState();
-        if (!data?.session) return;
+        const res = await fetch(sceneStatusUrl);
+        if (res.status === 401 || res.status === 403) {
+          markAccessForbidden();
+          return;
+        }
+        if (!res.ok) return;
+        const data = (await res.json()) as {
+          scenePending: boolean;
+          sceneImage: string | null;
+          narrativeText: string | null;
+          sceneTitle: string | null;
+          stateVersion: number;
+        };
         const img = data.sceneImage ?? null;
         if (img && img !== before.sceneImage) {
           useGameStore.getState().attachImageToLatestNarration(img);
         }
-        useGameStore.getState().patchSessionFromStateApi(data);
+        useGameStore.getState().patchSceneHydrateFromMinimalApi({
+          sceneImage: data.sceneImage,
+          scenePending: data.scenePending,
+          narrativeText: data.narrativeText,
+          sceneTitle: data.sceneTitle,
+          stateVersion: data.stateVersion,
+        });
         if (!data.scenePending) {
           stopScenePoll();
         }
-      } catch { /* best effort */ }
-    }
-
-    function startScenePoll() {
-      stopScenePoll();
-      scenePollTimer = setInterval(pollSceneImage, 5_000);
+      } catch {
+        /* best effort */
+      }
     }
 
     const onSceneImagePending = (raw: unknown) => {
@@ -543,7 +592,7 @@ export function useSessionChannel(
           round_number: parsed.data.round_number,
         }),
       });
-      startScenePoll();
+      startSceneFallbackPoll();
     };
 
     const onSceneImageReady = (raw: unknown) => {
@@ -613,6 +662,13 @@ export function useSessionChannel(
       scheduleFullResyncFromServer();
     };
 
+    if (participateInPresence && !displayTokenOpt) {
+      void fetch(`/api/sessions/${sessionId}/presence`, { method: "PATCH" });
+      presenceHeartbeatTimer = setInterval(() => {
+        void fetch(`/api/sessions/${sessionId}/presence`, { method: "PATCH" });
+      }, PRESENCE_HEARTBEAT_MS);
+    }
+
     if (channel) {
       channel.bind("player-joined", onPlayerJoined);
       channel.bind("player-ready", onPlayerReady);
@@ -679,6 +735,7 @@ export function useSessionChannel(
         window.removeEventListener("pagehide", signalDisconnect);
       }
       stopScenePoll();
+      stopPresenceHeartbeat();
       if (channel) {
         channel.unbind("player-joined", onPlayerJoined);
         channel.unbind("player-ready", onPlayerReady);

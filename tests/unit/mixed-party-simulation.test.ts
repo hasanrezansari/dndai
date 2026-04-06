@@ -176,6 +176,13 @@ describe("mixed-party simulation", () => {
             tone: "tense",
             next_actor_id: null,
             image_hint: { subjects: [], avoid: [] },
+            situation_anchor:
+              "Kade remains in the rain-slick alley after the slash, bots still pressing the space.",
+            narrative_beat: {
+              rhythm: "ongoing",
+              setting_change: "texture",
+              warrants_establishing_shot: false,
+            },
           },
           usage: { inputTokens: 0, outputTokens: 0, model: "probe" },
         };

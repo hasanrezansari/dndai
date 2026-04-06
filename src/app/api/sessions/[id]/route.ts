@@ -15,6 +15,7 @@ import {
   SessionLobbyUpdateError,
   SessionNotFoundError,
   updateSessionLobbyPremise,
+  updateSessionVisualRhythmPreset,
 } from "@/server/services/session-service";
 
 const PatchSessionBodySchema = z
@@ -25,6 +26,7 @@ const PatchSessionBodySchema = z
     art_direction: z.string().max(2000).nullable().optional(),
     adventure_tags: z.array(z.string().max(64)).max(24).optional(),
     party_shared_role_label: z.string().max(200).nullable().optional(),
+    visual_rhythm_preset: z.enum(["standard", "cinematic"]).optional(),
   })
   .refine(
     (d) =>
@@ -33,7 +35,8 @@ const PatchSessionBodySchema = z
       d.world_bible !== undefined ||
       d.art_direction !== undefined ||
       d.adventure_tags !== undefined ||
-      d.party_shared_role_label !== undefined,
+      d.party_shared_role_label !== undefined ||
+      d.visual_rhythm_preset !== undefined,
     { message: "At least one field required" },
   );
 
@@ -90,6 +93,19 @@ export async function PATCH(
       return apiError("Invalid body", 400);
     }
     const data = parsed.data;
+
+    if (data.visual_rhythm_preset !== undefined) {
+      await updateSessionVisualRhythmPreset({
+        sessionId: id,
+        actingUserId: user.id,
+        preset: data.visual_rhythm_preset,
+      });
+      try {
+        await broadcastToSession(id, "session-premise-updated", {});
+      } catch (err) {
+        console.error(err);
+      }
+    }
 
     if (
       data.adventure_prompt !== undefined ||

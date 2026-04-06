@@ -45,6 +45,8 @@ export interface TurnContext {
     campaignTitle: string | null;
     adventurePrompt: string | null;
     currentRound: number;
+    /** Narrative chapter index (campaign); used for quest roll budget per chapter. */
+    chapterIndex: number;
     campaignMode: string;
     moduleKey: string | null;
     adventureTags: string[] | null;
@@ -290,6 +292,7 @@ export async function buildTurnContext({
       campaignTitle: sessionRow.campaign_title,
       adventurePrompt: sessionRow.adventure_prompt,
       currentRound: sessionRow.current_round,
+      chapterIndex: sessionRow.chapter_index ?? 1,
       campaignMode: sessionRow.campaign_mode,
       moduleKey: sessionRow.module_key,
       adventureTags,

@@ -4,6 +4,7 @@ import { useSession } from "next-auth/react";
 import { useParams, useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
+import { SparkBalanceHud } from "@/components/game/spark-balance-hud";
 import { ConnectionStatus } from "@/components/ui/connection-status";
 import { GhostButton } from "@/components/ui/ghost-button";
 import {
@@ -36,9 +37,12 @@ import { PartyPlayPanel } from "@/components/game/party-play-panel";
 import { SessionViewModeToggle } from "@/components/game/session-view-mode-toggle";
 import { useGuidedTurnUi } from "@/hooks/use-guided-turn-ui";
 import { useSessionUiMode } from "@/hooks/use-session-ui-mode";
+import { COPY } from "@/lib/copy/ashveil";
+import { mergeChronicleFeedEntries } from "@/lib/feed/merge-chronicle-feed";
 import { useSessionChannel } from "@/lib/socket/use-session-channel";
 import {
   useGameStore,
+  type FeedEntry,
   type SessionStatePayload,
 } from "@/lib/state/game-store";
 import { useToast } from "@/components/ui/toast";
@@ -159,11 +163,33 @@ export default function SessionGameplayPage() {
 
   const { data: authSession, status: authStatus } = useSession();
   const { toast } = useToast();
+
+  const refetchWallet = useCallback(async () => {
+    try {
+      const r = await fetch("/api/wallet");
+      if (r.ok) {
+        const j = (await r.json()) as { balance?: number };
+        if (typeof j.balance === "number") setSparkBalance(j.balance);
+      }
+    } catch {
+      // ignore
+    }
+  }, []);
+
+  useEffect(() => {
+    if (authStatus !== "authenticated") {
+      setSparkBalance(null);
+      return;
+    }
+    void refetchWallet();
+  }, [authStatus, refetchWallet]);
   const [saveBusy, setSaveBusy] = useState(false);
   const [hydrated, setHydrated] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [voteBusy, setVoteBusy] = useState(false);
   const [chapterBusy, setChapterBusy] = useState(false);
+  const [chapterContinueBusy, setChapterContinueBusy] = useState(false);
+  const [sparkBalance, setSparkBalance] = useState<number | null>(null);
   const [sceneTransitionTrigger, setSceneTransitionTrigger] = useState(false);
   /** First beat vs later location changes (copy on the intro overlay). */
   const [sceneTransitionKind, setSceneTransitionKind] = useState<
@@ -172,6 +198,7 @@ export default function SessionGameplayPage() {
   /** Last scene title we saw — ref avoids a second effect syncing state that cancelled the dismiss timer. */
   const prevSceneTitleRef = useRef<string | null>(null);
   const [chronicleOpen, setChronicleOpen] = useState(false);
+  const [traceFeedExtra, setTraceFeedExtra] = useState<FeedEntry[]>([]);
   const [displayLinkHint, setDisplayLinkHint] = useState<string | null>(null);
   const [sceneDetailOpen, setSceneDetailOpen] = useState(false);
   const [questOpen, setQuestOpen] = useState(false);
@@ -183,6 +210,35 @@ export default function SessionGameplayPage() {
   );
   const { mode: sessionUiMode, setMode: setSessionUiMode } = useSessionUiMode();
   const { guidedTurnUi, toggleGuidedTurnUi } = useGuidedTurnUi();
+
+  const needsChronicleTraces =
+    chronicleOpen || sessionUiMode === "chronicle";
+
+  useEffect(() => {
+    if (!sessionId || !needsChronicleTraces) return;
+    let cancelled = false;
+    void (async () => {
+      try {
+        const res = await fetch(`/api/sessions/${sessionId}/feed-traces`);
+        if (!res.ok || cancelled) return;
+        const data = (await res.json()) as { entries?: FeedEntry[] };
+        if (!cancelled) {
+          setTraceFeedExtra(Array.isArray(data.entries) ? data.entries : []);
+        }
+      } catch {
+        if (!cancelled) setTraceFeedExtra([]);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [sessionId, needsChronicleTraces]);
+
+  const chronicleEntries = useMemo(
+    () => mergeChronicleFeedEntries(feed, traceFeedExtra),
+    [feed, traceFeedExtra],
+  );
+
   const myActionCount = useMemo(() => {
     if (!currentPlayerId) return 0;
     return feed.filter(
@@ -194,6 +250,23 @@ export default function SessionGameplayPage() {
     () => formatPhaseLabel(session?.phase),
     [session?.phase],
   );
+
+  const isHost = useMemo(
+    () => Boolean(players.find((p) => p.id === currentPlayerId)?.isHost),
+    [players, currentPlayerId],
+  );
+
+  const showInsufficientSparksToast = useCallback(() => {
+    void refetchWallet();
+    toast(
+      isHost ? COPY.spark.pauseHost : COPY.spark.pauseGuest,
+      "info",
+      {
+        duration: 9000,
+        action: { label: COPY.spark.buySparksCta, href: "/shop" },
+      },
+    );
+  }, [isHost, refetchWallet, toast]);
 
   const partyInspectTitle = useMemo(() => {
     if (!partyInspectPlayerId) return "Party member";
@@ -341,20 +414,45 @@ export default function SessionGameplayPage() {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ playerId: pid, text }),
         });
-        const body = (await res.json().catch(() => ({}))) as { error?: string };
+        const body = (await res.json().catch(() => ({}))) as {
+          error?: string;
+          code?: string;
+        };
         if (!res.ok) {
           setIsThinking(false);
-          window.alert(body.error ?? "Action failed");
+          if (res.status === 402 && body.code === "insufficient_sparks") {
+            showInsufficientSparksToast();
+            return;
+          }
+          if (res.status === 409 && body.code === "chapter_turn_cap") {
+            toast(
+              isHost
+                ? `${body.error ?? "Chapter turn limit reached."} Open Quest to continue the chapter.`
+                : (body.error ?? "Chapter turn limit reached."),
+              "error",
+              { duration: 8000 },
+            );
+            return;
+          }
+          toast(body.error ?? "Action failed", "error");
           return;
         }
         setIsThinking(false);
         setQuestOpen(false);
+        void refetchWallet();
       } catch {
         setIsThinking(false);
-        window.alert("Action failed");
+        toast("Action failed", "error");
       }
     },
-    [sessionId, setIsThinking],
+    [
+      sessionId,
+      setIsThinking,
+      showInsufficientSparksToast,
+      toast,
+      refetchWallet,
+      isHost,
+    ],
   );
 
   const handleDmNarrate = useCallback(
@@ -375,15 +473,22 @@ export default function SessionGameplayPage() {
         });
         const body = (await res.json().catch(() => ({}))) as {
           error?: string;
+          code?: string;
         };
         if (!res.ok) {
-          window.alert(body.error ?? "Narration failed");
+          if (res.status === 402 && body.code === "insufficient_sparks") {
+            showInsufficientSparksToast();
+            return;
+          }
+          toast(body.error ?? "Narration failed", "error");
+          return;
         }
+        void refetchWallet();
       } catch {
-        window.alert("Narration failed");
+        toast("Narration failed", "error");
       }
     },
-    [sessionId],
+    [sessionId, showInsufficientSparksToast, toast, refetchWallet],
   );
 
   const handleDmSetDc = useCallback(
@@ -398,17 +503,23 @@ export default function SessionGameplayPage() {
         });
         const body = (await res.json().catch(() => ({}))) as {
           error?: string;
+          code?: string;
         };
         if (!res.ok) {
-          window.alert(body.error ?? "Could not set DC");
+          if (res.status === 402 && body.code === "insufficient_sparks") {
+            showInsufficientSparksToast();
+            return;
+          }
+          toast(body.error ?? "Could not set DC", "error");
           return;
         }
         setDmDc(dc);
+        void refetchWallet();
       } catch {
-        window.alert("Could not set DC");
+        toast("Could not set DC", "error");
       }
     },
-    [sessionId, setDmDc],
+    [sessionId, setDmDc, showInsufficientSparksToast, toast, refetchWallet],
   );
 
   const handleDmAdvanceTurn = useCallback(async () => {
@@ -422,14 +533,23 @@ export default function SessionGameplayPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ playerId: pid, turnId }),
       });
-      const body = (await res.json().catch(() => ({}))) as { error?: string };
+      const body = (await res.json().catch(() => ({}))) as {
+        error?: string;
+        code?: string;
+      };
       if (!res.ok) {
-        window.alert(body.error ?? "Could not advance turn");
+        if (res.status === 402 && body.code === "insufficient_sparks") {
+          showInsufficientSparksToast();
+          return;
+        }
+        toast(body.error ?? "Could not advance turn", "error");
+        return;
       }
+      void refetchWallet();
     } catch {
-      window.alert("Could not advance turn");
+      toast("Could not advance turn", "error");
     }
-  }, [sessionId]);
+  }, [sessionId, showInsufficientSparksToast, toast, refetchWallet]);
 
   const handleDmTriggerEvent = useCallback(
     async (eventText: string) => {
@@ -443,15 +563,22 @@ export default function SessionGameplayPage() {
         });
         const body = (await res.json().catch(() => ({}))) as {
           error?: string;
+          code?: string;
         };
         if (!res.ok) {
-          window.alert(body.error ?? "Event failed");
+          if (res.status === 402 && body.code === "insufficient_sparks") {
+            showInsufficientSparksToast();
+            return;
+          }
+          toast(body.error ?? "Event failed", "error");
+          return;
         }
+        void refetchWallet();
       } catch {
-        window.alert("Event failed");
+        toast("Event failed", "error");
       }
     },
-    [sessionId],
+    [sessionId, showInsufficientSparksToast, toast, refetchWallet],
   );
 
   const handleLeaveSession = useCallback(() => {
@@ -472,7 +599,7 @@ export default function SessionGameplayPage() {
         error?: string;
       };
       if (!res.ok) {
-        window.alert(body.error ?? "Could not open room display");
+        toast(body.error ?? "Could not open room display", "error");
         return;
       }
       if (!body.path) return;
@@ -482,9 +609,9 @@ export default function SessionGameplayPage() {
         "noopener,noreferrer",
       );
     } catch {
-      window.alert("Could not open room display");
+      toast("Could not open room display", "error");
     }
-  }, [sessionId]);
+  }, [sessionId, toast]);
 
   const copyRoomDisplayLink = useCallback(async () => {
     if (!sessionId || typeof window === "undefined") return;
@@ -522,17 +649,33 @@ export default function SessionGameplayPage() {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ playerId: currentPlayerId, choice }),
         });
-        const body = (await res.json().catch(() => ({}))) as { error?: string };
+        const body = (await res.json().catch(() => ({}))) as {
+          error?: string;
+          code?: string;
+        };
         if (!res.ok) {
-          window.alert(body.error ?? "Could not submit vote");
+          if (res.status === 402 && body.code === "insufficient_sparks") {
+            showInsufficientSparksToast();
+            return;
+          }
+          toast(body.error ?? "Could not submit vote", "error");
+          return;
         }
+        void refetchWallet();
       } catch {
-        window.alert("Could not submit vote");
+        toast("Could not submit vote", "error");
       } finally {
         setVoteBusy(false);
       }
     },
-    [sessionId, currentPlayerId, voteBusy],
+    [
+      sessionId,
+      currentPlayerId,
+      voteBusy,
+      showInsufficientSparksToast,
+      toast,
+      refetchWallet,
+    ],
   );
 
   const handleGenerateFinalChapter = useCallback(async () => {
@@ -544,16 +687,83 @@ export default function SessionGameplayPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ playerId: currentPlayerId }),
       });
-      const body = (await res.json().catch(() => ({}))) as { error?: string };
+      const body = (await res.json().catch(() => ({}))) as {
+        error?: string;
+        code?: string;
+      };
       if (!res.ok) {
-        window.alert(body.error ?? "Could not generate final chapter");
+        if (res.status === 402 && body.code === "insufficient_sparks") {
+          showInsufficientSparksToast();
+          return;
+        }
+        toast(body.error ?? "Could not generate final chapter", "error");
+        return;
       }
+      void refetchWallet();
     } catch {
-      window.alert("Could not generate final chapter");
+      toast("Could not generate final chapter", "error");
     } finally {
       setChapterBusy(false);
     }
-  }, [sessionId, currentPlayerId, chapterBusy]);
+  }, [
+    sessionId,
+    currentPlayerId,
+    chapterBusy,
+    showInsufficientSparksToast,
+    toast,
+    refetchWallet,
+  ]);
+
+  const handleContinueChapter = useCallback(async () => {
+    if (!sessionId || !currentPlayerId || chapterContinueBusy) return;
+    setChapterContinueBusy(true);
+    try {
+      const res = await fetch(`/api/sessions/${sessionId}/chapter/continue`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ playerId: currentPlayerId }),
+      });
+      const body = (await res.json().catch(() => ({}))) as {
+        error?: string;
+        code?: string;
+      };
+      if (!res.ok) {
+        if (res.status === 402 && body.code === "insufficient_sparks") {
+          showInsufficientSparksToast();
+          return;
+        }
+        toast(body.error ?? "Could not continue chapter", "error");
+        return;
+      }
+      toast("Next chapter opened.", "success");
+      setQuestOpen(false);
+      void refetchWallet();
+    } catch {
+      toast("Could not continue chapter", "error");
+    } finally {
+      setChapterContinueBusy(false);
+    }
+  }, [
+    sessionId,
+    currentPlayerId,
+    chapterContinueBusy,
+    showInsufficientSparksToast,
+    toast,
+    refetchWallet,
+  ]);
+
+  const sessionChrome = (
+    <>
+      <ConnectionStatus />
+      {authStatus === "authenticated" ? (
+        <SparkBalanceHud
+          variant={isHost ? "host" : "guest"}
+          balance={sparkBalance}
+          tablePoolBalance={session?.sparkPoolBalance ?? null}
+        />
+      ) : null}
+    </>
+  );
 
   if (!sessionId) {
     return (
@@ -567,14 +777,15 @@ export default function SessionGameplayPage() {
     return (
       <>
         <SessionPlaySkeleton />
-        <ConnectionStatus />
+        {sessionChrome}
       </>
     );
   }
 
   if (loadError) {
     return (
-      <div className="flex min-h-dvh flex-col items-center justify-center gap-4 bg-[var(--color-obsidian)] px-6 text-center">
+      <div className="relative flex min-h-dvh flex-col items-center justify-center gap-4 bg-[var(--color-obsidian)] px-6 text-center">
+        {sessionChrome}
         <p className="text-sm text-[var(--color-silver-muted)]">{loadError}</p>
         <button
           type="button"
@@ -594,7 +805,7 @@ export default function SessionGameplayPage() {
     if (!session.party) {
       return (
         <div className="flex min-h-dvh flex-col items-center justify-center gap-3 bg-[var(--color-obsidian)] px-6">
-          <ConnectionStatus />
+          {sessionChrome}
           <p className="text-sm text-[var(--color-silver-muted)]">
             Party state unavailable — try refresh.
           </p>
@@ -617,7 +828,7 @@ export default function SessionGameplayPage() {
           kind={sceneTransitionKind}
           onDismiss={() => setSceneTransitionTrigger(false)}
         />
-        <ConnectionStatus />
+        {sessionChrome}
         <header className="relative z-[1] h-[min(40vh,300px)] w-full shrink-0 overflow-hidden border-b border-[var(--border-divide)] sm:h-[min(36vh,320px)]">
           <button
             type="button"
@@ -640,6 +851,10 @@ export default function SessionGameplayPage() {
             showTapHint={false}
             showTurnWhenNoTeaser={false}
           />
+          <p className="border-b border-[var(--border-divide)] px-3 py-1.5 text-[9px] text-[var(--outline)] sm:px-4">
+            Automatic scene images this session: {session.chapterImagesUsed ?? 0} /{" "}
+            {session.chapterImageBudget ?? 3}
+          </p>
         </header>
         {narrativeText?.trim() ? (
           <div className="relative z-[2] max-h-[min(24vh,200px)] shrink-0 overflow-y-auto border-b border-[var(--border-divide)] bg-[color-mix(in_srgb,var(--color-deep-void)_35%,transparent)] px-3 pb-1 pt-0.5 backdrop-blur-[4px] sm:max-h-[min(32vh,260px)] sm:px-4 sm:pt-1">
@@ -688,7 +903,7 @@ export default function SessionGameplayPage() {
         kind={sceneTransitionKind}
         onDismiss={() => setSceneTransitionTrigger(false)}
       />
-      <ConnectionStatus />
+      {sessionChrome}
       <TutorialOverlay
         moduleKey={session?.moduleKey}
         myActionCount={myActionCount}
@@ -774,7 +989,7 @@ export default function SessionGameplayPage() {
         fullHeight
       >
         <div className="flex h-full min-h-0 flex-1 flex-col overflow-hidden">
-          <ChronicleFeed entries={feed} className="min-h-0 flex-1" />
+          <ChronicleFeed entries={chronicleEntries} className="min-h-0 flex-1" />
         </div>
       </BottomSheet>
       <BottomSheet
@@ -789,6 +1004,9 @@ export default function SessionGameplayPage() {
             currentPlayerId={currentPlayerId}
             voteBusy={voteBusy}
             chapterBusy={chapterBusy}
+            chapterContinueBusy={chapterContinueBusy}
+            isHost={isHost}
+            onContinueChapter={() => void handleContinueChapter()}
             onEndingVote={(choice) => void handleEndingVote(choice)}
             onGenerateFinalChapter={() => void handleGenerateFinalChapter()}
           />
@@ -897,7 +1115,7 @@ export default function SessionGameplayPage() {
             <div className="min-h-0 flex-1" aria-hidden />
           </div>
         ) : sessionUiMode === "chronicle" ? (
-          <ChronicleFeed entries={feed} className="min-h-0 flex-1" />
+          <ChronicleFeed entries={chronicleEntries} className="min-h-0 flex-1" />
         ) : (
           <FeedList entries={feed} className="min-h-0 flex-1" />
         )}

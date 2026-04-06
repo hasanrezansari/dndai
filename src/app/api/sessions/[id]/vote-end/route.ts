@@ -11,9 +11,11 @@ import {
 import { db } from "@/lib/db";
 import { sessions } from "@/lib/db/schema";
 import { broadcastToSession } from "@/lib/socket/server";
+import { rollChapterWindowAfterVoteCooldown } from "@/server/services/chapter-runtime-service";
 import {
   castEndingVote,
   finalizeSessionEnd,
+  QUEST_ENDING_VOTE_COOLDOWN_MESSAGE,
 } from "@/server/services/quest-service";
 
 const BodySchema = z.object({
@@ -86,12 +88,16 @@ export async function POST(
         console.error(err);
       }
     } else {
-      const [fresh] = await db
-        .select({ stateVersion: sessions.state_version })
-        .from(sessions)
-        .where(eq(sessions.id, sessionId))
-        .limit(1);
-      stateVersion = fresh?.stateVersion ?? 0;
+      if (vote.message === QUEST_ENDING_VOTE_COOLDOWN_MESSAGE) {
+        stateVersion = await rollChapterWindowAfterVoteCooldown(sessionId);
+      } else {
+        const [fresh] = await db
+          .select({ stateVersion: sessions.state_version })
+          .from(sessions)
+          .where(eq(sessions.id, sessionId))
+          .limit(1);
+        stateVersion = fresh?.stateVersion ?? 0;
+      }
       try {
         await broadcastToSession(sessionId, "dm-notice", {
           message: vote.message,

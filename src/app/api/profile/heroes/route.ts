@@ -10,6 +10,7 @@ import { CharacterStatsSchema } from "@/lib/schemas/domain";
 import { SPARK_COST_EXTRA_HERO_SLOT } from "@/lib/spark-pricing";
 import {
   decrementPurchasedHeroSlots,
+  FREE_PROFILE_HERO_SLOTS,
   getOrCreateProfileSettings,
   incrementPurchasedHeroSlots,
   listProfileHeroesForUser,
@@ -44,10 +45,13 @@ export async function GET() {
       listProfileHeroesForUser(user.id),
       getOrCreateProfileSettings(user.id),
     ]);
+    const maxHeroSlots =
+      FREE_PROFILE_HERO_SLOTS + settings.purchasedHeroSlots;
     return NextResponse.json({
       heroes,
       publicProfileEnabled: settings.publicProfileEnabled,
-      freeSlots: 1,
+      /** Total hero slots (free + purchased). Client compares to `heroes.length`. */
+      freeSlots: maxHeroSlots,
     });
   } catch (e) {
     return handleApiError(e);

@@ -33,6 +33,112 @@ function isNpcAlive(status: string): boolean {
   return status.trim().toLowerCase() === "alive";
 }
 
+function isNpcThreat(n: NpcCombatantView): boolean {
+  const a = n.attitude?.trim().toLowerCase() ?? "";
+  const r = n.role?.trim().toLowerCase() ?? "";
+  return a === "hostile" || r === "hostile";
+}
+
+/** Friendly / allied NPCs (not hostile). */
+function isNpcAlly(n: NpcCombatantView): boolean {
+  if (isNpcThreat(n)) return false;
+  const a = n.attitude?.trim().toLowerCase() ?? "";
+  const r = n.role?.trim().toLowerCase() ?? "";
+  return (
+    a === "friendly" ||
+    a === "ally" ||
+    a === "allied" ||
+    a === "helpful" ||
+    r === "ally" ||
+    r === "friendly"
+  );
+}
+
+function NpcStripCell({
+  n,
+  onInspectEnemy,
+  combatStyle,
+}: {
+  n: NpcCombatantView;
+  onInspectEnemy?: (npcId: string) => void;
+  combatStyle: boolean;
+}) {
+  const alive = isNpcAlive(n.status);
+  const hpPct =
+    n.hp !== undefined && n.maxHp !== undefined && n.maxHp > 0
+      ? Math.min(100, Math.round((n.hp / n.maxHp) * 100))
+      : null;
+
+  const frameClass = combatStyle
+    ? "border-[color-mix(in_srgb,var(--atmosphere-combat)_40%,transparent)] bg-[var(--color-deep-void)] text-[var(--color-silver-dim)] hover:border-[var(--atmosphere-combat)]/55 focus-visible:ring-2 focus-visible:ring-[var(--atmosphere-combat)]"
+    : "border-[var(--border-ui)] bg-[var(--color-midnight)] text-[var(--color-silver-dim)] hover:border-[var(--border-ui-strong)] focus-visible:ring-2 focus-visible:ring-[var(--color-gold-rare)]";
+
+  const hpBarClass = combatStyle
+    ? "bg-gradient-to-r from-[var(--atmosphere-combat)] to-[var(--color-failure)]"
+    : "bg-gradient-to-r from-[var(--color-silver-dim)] to-[var(--outline)]";
+
+  return (
+    <div
+      className={`flex w-14 shrink-0 flex-col items-center gap-1.5 ${alive ? "" : "opacity-40"}`}
+      title={n.name}
+    >
+      {onInspectEnemy ? (
+        <button
+          type="button"
+          onClick={() => onInspectEnemy(n.id)}
+          className={`relative flex h-12 w-12 items-center justify-center rounded-[var(--radius-avatar)] border text-sm font-black transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--color-obsidian)] ${frameClass}`}
+          aria-label={`Open details for ${n.name}`}
+        >
+          {n.portraitStatus === "ready" && n.portraitUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={n.portraitUrl}
+              alt={`${n.name} portrait`}
+              className="h-full w-full rounded-[var(--radius-avatar)] object-cover"
+            />
+          ) : (
+            <span className="opacity-65 grayscale">{avatarLetterNpc(n)}</span>
+          )}
+        </button>
+      ) : (
+        <div
+          className={`relative flex h-12 w-12 items-center justify-center rounded-[var(--radius-avatar)] border text-sm font-black ${frameClass}`}
+        >
+          {n.portraitStatus === "ready" && n.portraitUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={n.portraitUrl}
+              alt={`${n.name} portrait`}
+              className="h-full w-full rounded-[var(--radius-avatar)] object-cover"
+            />
+          ) : (
+            <span className="opacity-65 grayscale">{avatarLetterNpc(n)}</span>
+          )}
+        </div>
+      )}
+      {hpPct !== null ? (
+        <div
+          className="h-1.5 w-full max-w-[2.75rem] overflow-hidden rounded-sm bg-[var(--color-deep-void)]"
+          aria-hidden
+        >
+          <div
+            className={`h-full min-w-0 rounded-sm transition-[width] duration-300 ${hpBarClass}`}
+            style={{ width: `${hpPct}%` }}
+          />
+        </div>
+      ) : (
+        <div
+          className="h-1.5 w-full max-w-[2.75rem] rounded-sm bg-[var(--color-deep-void)]/80"
+          aria-hidden
+        />
+      )}
+      <p className="line-clamp-1 max-w-[3.5rem] text-center text-[9px] font-bold leading-tight uppercase tracking-wider text-[var(--outline)]">
+        {n.name}
+      </p>
+    </div>
+  );
+}
+
 export function CombatStrip({
   players,
   npcs,
@@ -41,6 +147,9 @@ export function CombatStrip({
   onInspectEnemy,
 }: CombatStripProps) {
   const hpFlash = useGameStore((s) => s.hpFlash);
+  const foeNpcs = npcs.filter(isNpcThreat);
+  const allyNpcs = npcs.filter((n) => !isNpcThreat(n) && isNpcAlly(n));
+  const neutralNpcs = npcs.filter((n) => !isNpcThreat(n) && !isNpcAlly(n));
 
   return (
     <div className="h-[6rem] shrink-0">
@@ -146,86 +255,82 @@ export function CombatStrip({
               className="mb-2 h-10 w-px shrink-0 self-end bg-[var(--outline-variant)]/35"
               aria-hidden
             />
-            <div className="flex shrink-0 flex-col gap-1.5">
-              <span className="pl-0.5 text-[8px] font-black uppercase tracking-[0.18em] text-[color-mix(in_srgb,var(--atmosphere-combat)_70%,var(--outline))]">
-                Foes
-              </span>
-              <div className="flex gap-4">
-                {npcs.map((n) => {
-                  const alive = isNpcAlive(n.status);
-                  const hpPct =
-                    n.hp !== undefined &&
-                    n.maxHp !== undefined &&
-                    n.maxHp > 0
-                      ? Math.min(100, Math.round((n.hp / n.maxHp) * 100))
-                      : null;
-
-                  return (
-                    <div
+            {foeNpcs.length > 0 ? (
+              <div className="flex shrink-0 flex-col gap-1.5">
+                <span
+                  className="pl-0.5 text-[8px] font-black uppercase tracking-[0.18em] text-[color-mix(in_srgb,var(--atmosphere-combat)_70%,var(--outline))]"
+                  title="Hostile NPCs — combat threats"
+                >
+                  Foes
+                </span>
+                <div className="flex gap-4">
+                  {foeNpcs.map((n) => (
+                    <NpcStripCell
                       key={n.id}
-                      className={`flex w-14 shrink-0 flex-col items-center gap-1.5 ${alive ? "" : "opacity-40"}`}
-                      title={n.name}
-                    >
-                      {onInspectEnemy ? (
-                        <button
-                          type="button"
-                          onClick={() => onInspectEnemy(n.id)}
-                          className="relative flex h-12 w-12 items-center justify-center rounded-[var(--radius-avatar)] border border-[color-mix(in_srgb,var(--atmosphere-combat)_40%,transparent)] bg-[var(--color-deep-void)] text-sm font-black text-[var(--color-silver-dim)] transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--atmosphere-combat)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--color-obsidian)] hover:border-[var(--atmosphere-combat)]/55"
-                          aria-label={`Open details for ${n.name}`}
-                        >
-                          {n.portraitStatus === "ready" && n.portraitUrl ? (
-                            // eslint-disable-next-line @next/next/no-img-element
-                            <img
-                              src={n.portraitUrl}
-                              alt={`${n.name} portrait`}
-                              className="h-full w-full rounded-[var(--radius-avatar)] object-cover"
-                            />
-                          ) : (
-                            <span className="opacity-65 grayscale">
-                              {avatarLetterNpc(n)}
-                            </span>
-                          )}
-                        </button>
-                      ) : (
-                        <div className="relative flex h-12 w-12 items-center justify-center rounded-[var(--radius-avatar)] border border-[color-mix(in_srgb,var(--atmosphere-combat)_40%,transparent)] bg-[var(--color-deep-void)] text-sm font-black text-[var(--color-silver-dim)]">
-                          {n.portraitStatus === "ready" && n.portraitUrl ? (
-                            // eslint-disable-next-line @next/next/no-img-element
-                            <img
-                              src={n.portraitUrl}
-                              alt={`${n.name} portrait`}
-                              className="h-full w-full rounded-[var(--radius-avatar)] object-cover"
-                            />
-                          ) : (
-                            <span className="opacity-65 grayscale">
-                              {avatarLetterNpc(n)}
-                            </span>
-                          )}
-                        </div>
-                      )}
-                      {hpPct !== null ? (
-                        <div
-                          className="h-1.5 w-full max-w-[2.75rem] overflow-hidden rounded-sm bg-[var(--color-deep-void)]"
-                          aria-hidden
-                        >
-                          <div
-                            className="h-full min-w-0 rounded-sm bg-gradient-to-r from-[var(--atmosphere-combat)] to-[var(--color-failure)] transition-[width] duration-300"
-                            style={{ width: `${hpPct}%` }}
-                          />
-                        </div>
-                      ) : (
-                        <div
-                          className="h-1.5 w-full max-w-[2.75rem] rounded-sm bg-[var(--color-deep-void)]/80"
-                          aria-hidden
-                        />
-                      )}
-                      <p className="line-clamp-1 max-w-[3.5rem] text-center text-[9px] font-bold leading-tight uppercase tracking-wider text-[var(--outline)]">
-                        {n.name}
-                      </p>
-                    </div>
-                  );
-                })}
+                      n={n}
+                      onInspectEnemy={onInspectEnemy}
+                      combatStyle
+                    />
+                  ))}
+                </div>
               </div>
-            </div>
+            ) : null}
+            {allyNpcs.length > 0 ? (
+              <>
+                {foeNpcs.length > 0 ? (
+                  <div
+                    className="mb-2 h-10 w-px shrink-0 self-end bg-[var(--outline-variant)]/35"
+                    aria-hidden
+                  />
+                ) : null}
+                <div className="flex shrink-0 flex-col gap-1.5">
+                  <span
+                    className="pl-0.5 text-[8px] font-black uppercase tracking-[0.18em] text-[var(--color-gold-support)]"
+                    title="Friendly NPCs on your side"
+                  >
+                    Allies
+                  </span>
+                  <div className="flex gap-4">
+                    {allyNpcs.map((n) => (
+                      <NpcStripCell
+                        key={n.id}
+                        n={n}
+                        onInspectEnemy={onInspectEnemy}
+                        combatStyle={false}
+                      />
+                    ))}
+                  </div>
+                </div>
+              </>
+            ) : null}
+            {neutralNpcs.length > 0 ? (
+              <>
+                {foeNpcs.length > 0 || allyNpcs.length > 0 ? (
+                  <div
+                    className="mb-2 h-10 w-px shrink-0 self-end bg-[var(--outline-variant)]/35"
+                    aria-hidden
+                  />
+                ) : null}
+                <div className="flex shrink-0 flex-col gap-1.5">
+                  <span
+                    className="pl-0.5 text-[8px] font-black uppercase tracking-[0.18em] text-[var(--outline)]"
+                    title="Neutral or unknown NPCs — still named characters in the scene"
+                  >
+                    NPCs
+                  </span>
+                  <div className="flex gap-4">
+                    {neutralNpcs.map((n) => (
+                      <NpcStripCell
+                        key={n.id}
+                        n={n}
+                        onInspectEnemy={onInspectEnemy}
+                        combatStyle={false}
+                      />
+                    ))}
+                  </div>
+                </div>
+              </>
+            ) : null}
           </>
         ) : null}
       </div>

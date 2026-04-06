@@ -140,9 +140,15 @@ export function PartyPlayPanel({
     };
   }, [sessionId, party.partyPhase, party.roundIndex, party.tiebreakContenderIds]);
 
+  const isTableHost = Boolean(
+    currentPlayerId &&
+      players.find((p) => p.id === currentPlayerId)?.isHost,
+  );
+
   useEffect(() => {
     const phase = party.partyPhase;
     if (
+      !isTableHost ||
       (phase !== "submit" &&
         phase !== "vote" &&
         phase !== "forgery_guess" &&
@@ -154,13 +160,21 @@ export function PartyPlayPanel({
     ) {
       return;
     }
+    void fetch(`/api/sessions/${sessionId}/party/phase-tick`, {
+      method: "POST",
+    });
     const id = window.setInterval(() => {
       void fetch(`/api/sessions/${sessionId}/party/phase-tick`, {
         method: "POST",
       });
-    }, 10_000);
+    }, 30_000);
     return () => window.clearInterval(id);
-  }, [sessionId, party.partyPhase, party.phaseDeadlineIso]);
+  }, [
+    sessionId,
+    party.partyPhase,
+    party.phaseDeadlineIso,
+    isTableHost,
+  ]);
 
   const phase = party.partyPhase;
   const mySubmission = currentPlayerId

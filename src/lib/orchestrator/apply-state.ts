@@ -190,6 +190,32 @@ export async function commitStatePatches(
             .where(eq(npcStates.id, patch.npcId));
         }
       }
+    } else if (patch.op === "npc_mark_hostile") {
+      const [npc] = await db
+        .select()
+        .from(npcStates)
+        .where(
+          and(
+            eq(npcStates.session_id, sessionId),
+            eq(npcStates.id, patch.npcId),
+          ),
+        )
+        .limit(1);
+      if (npc) {
+        const tag = patch.reason?.trim() || "hostile_action";
+        await db
+          .update(npcStates)
+          .set({
+            role: "hostile",
+            attitude: "hostile",
+            notes:
+              npc.notes?.trim().length
+                ? `${npc.notes} | Marked hostile: ${tag}`
+                : `Marked hostile: ${tag}`,
+            updated_at: new Date(),
+          })
+          .where(eq(npcStates.id, patch.npcId));
+      }
     } else if (patch.op === "inventory_add") {
       const rows = await db
         .select({ character: characters })

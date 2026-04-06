@@ -65,4 +65,33 @@ export const COPY = {
     creatingStory: "Creating your story…",
     backToCreate: "Back",
   },
+  /** Monetization / Sparks — in-session and lobby. */
+  spark: {
+    buySparksCta: "Buy Sparks",
+    hudHost: "Your Sparks",
+    hudGuest: "Host funds AI & images",
+    pauseHost:
+      "The tale pauses — you need more Sparks for this moment. Add Sparks to keep the story moving.",
+    pauseGuest:
+      "The tale pauses — the host needs more Sparks for this moment. They can add Sparks or adjust the table.",
+    shopTitle: "Sparks",
+    shopStub:
+      "Purchasing Sparks will land here soon. Until then, balances are managed by your team.",
+    shopConfigureHint:
+      "Purchases are not configured yet. Add Stripe, Razorpay, and SPARK_PACKS_JSON (see .env.example). Checkout routes India automatically; other regions use the global provider.",
+    shopSignIn: "Sign in to buy Sparks",
+    /** @deprecated use shopPaySecureCta */
+    shopBuyCta: "Pay securely",
+    shopPaySecureCta: "Pay securely",
+    shopPaySecureBusy: "Opening secure checkout…",
+    shopBusy: "Opening secure checkout…",
+    shopErrorGeneric: "Something went wrong — try again.",
+    shopSuccessTitle: "Thank you",
+    shopBackPlay: "Back to adventures",
+    /** Profile / character builder — payer is the signed-in user. */
+    profileInsufficient:
+      "You need more Sparks for that. Add Sparks to continue, or use a free portrait use if you still have one.",
+    portraitRerollHint:
+      "Free portrait uses apply first; after that, each generate or reroll costs Sparks.",
+  },
 } as const;

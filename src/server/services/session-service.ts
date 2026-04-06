@@ -14,6 +14,7 @@ import {
   DEFAULT_PARTY_TOTAL_ROUNDS,
   getDefaultPartyTemplateKeyForBrand,
 } from "@/lib/party/party-templates";
+import { CHAPTER_PRESETS } from "@/lib/chapter/chapter-config";
 import {
   mergeViewerUserFieldsForPlayer,
   resolvePlayerDisplayName,
@@ -51,6 +52,10 @@ function mapSessionRow(row: typeof sessions.$inferSelect): Session {
     ...row,
     created_at: row.created_at.toISOString(),
     updated_at: row.updated_at.toISOString(),
+    last_manual_scene_image_at:
+      row.last_manual_scene_image_at instanceof Date
+        ? row.last_manual_scene_image_at.toISOString()
+        : row.last_manual_scene_image_at ?? null,
   } as Session;
 }
 
@@ -144,6 +149,7 @@ export async function createSession(params: {
 }): Promise<{ sessionId: string; joinCode: string }> {
   const joinCode = await allocateUniqueJoinCode();
   const gameKind: GameKind = params.gameKind ?? "campaign";
+  const chapterCaps = CHAPTER_PRESETS.standard;
   const partyConfig =
     gameKind === "party"
       ? createInitialPartyConfig(
@@ -176,6 +182,9 @@ export async function createSession(params: {
       world_id: params.worldFork?.worldId ?? null,
       world_revision: params.worldFork?.revision ?? null,
       world_snapshot: params.worldFork?.snapshot ?? null,
+      visual_rhythm_preset: "standard",
+      chapter_max_turns: chapterCaps.chapterMaxTurns,
+      chapter_system_image_budget: chapterCaps.chapterSystemImageBudget,
     })
     .returning();
   if (!session) {
@@ -447,6 +456,41 @@ export async function updateSessionLobbyPremise(params: {
             : null,
       }),
       ...(nextPartyConfig !== undefined && { party_config: nextPartyConfig }),
+    })
+    .where(and(eq(sessions.id, params.sessionId), eq(sessions.status, "lobby")))
+    .returning({ id: sessions.id });
+  if (!updated) {
+    throw new SessionLobbyUpdateError("Could not update session", 409);
+  }
+}
+
+/** Host-only lobby: switch Standard vs Cinematic chapter caps. */
+export async function updateSessionVisualRhythmPreset(params: {
+  sessionId: string;
+  actingUserId: string;
+  preset: "standard" | "cinematic";
+}): Promise<void> {
+  const [row] = await db
+    .select()
+    .from(sessions)
+    .where(eq(sessions.id, params.sessionId))
+    .limit(1);
+  if (!row) throw new SessionNotFoundError();
+  if (row.host_user_id !== params.actingUserId) {
+    throw new SessionLobbyUpdateError("Forbidden", 403);
+  }
+  if (row.status !== "lobby") {
+    throw new SessionLobbyUpdateError("Session already started", 409);
+  }
+  const caps = CHAPTER_PRESETS[params.preset];
+  const [updated] = await db
+    .update(sessions)
+    .set({
+      visual_rhythm_preset: params.preset,
+      chapter_max_turns: caps.chapterMaxTurns,
+      chapter_system_image_budget: caps.chapterSystemImageBudget,
+      state_version: sql`${sessions.state_version} + 1`,
+      updated_at: new Date(),
     })
     .where(and(eq(sessions.id, params.sessionId), eq(sessions.status, "lobby")))
     .returning({ id: sessions.id });

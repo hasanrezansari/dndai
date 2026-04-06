@@ -39,8 +39,8 @@ import {
 import {
   InsufficientSparksError,
   isMonetizationSpendEnabled,
-  tryCreditSparks,
-  tryDebitSparks,
+  tryDebitSparksWithSessionPool,
+  tryRefundSessionSparkDebit,
 } from "@/server/services/spark-economy-service";
 
 import { dealPartySecretsIfNeeded } from "@/server/services/party-secret-service";
@@ -77,9 +77,10 @@ async function runPartyJudgePickWinner(
 
   const judgeIdem = `party_judge:${sessionId}:${lineSource}:${[...playerIds].sort().join(",")}`;
   let judgeDebited = false;
+  let judgePoolUsed = 0;
   if (isMonetizationSpendEnabled()) {
     try {
-      const r = await tryDebitSparks({
+      const r = await tryDebitSparksWithSessionPool({
         payerUserId: sessionRow.host_user_id,
         amount: SPARK_COST_PARTY_JUDGE,
         idempotencyKey: judgeIdem,
@@ -87,6 +88,7 @@ async function runPartyJudgePickWinner(
         reason: "party_vote_judge",
       });
       judgeDebited = r.applied;
+      judgePoolUsed = r.fromPool;
     } catch (e) {
       if (e instanceof InsufficientSparksError) {
         console.warn("[party] insufficient Sparks for vote judge; using fallback", sessionId);
@@ -113,12 +115,13 @@ async function runPartyJudgePickWinner(
     console.error("[party] vote judge failed", sessionId, e);
     if (judgeDebited && isMonetizationSpendEnabled()) {
       try {
-        await tryCreditSparks({
-          userId: sessionRow.host_user_id,
-          amount: SPARK_COST_PARTY_JUDGE,
-          idempotencyKey: `refund:${judgeIdem}`,
+        await tryRefundSessionSparkDebit({
+          hostUserId: sessionRow.host_user_id,
           sessionId,
+          totalAmount: SPARK_COST_PARTY_JUDGE,
+          idempotencyKey: `refund:${judgeIdem}`,
           reason: "refund_party_vote_judge_failed",
+          sparkPoolUsed: judgePoolUsed,
         });
       } catch (refundErr) {
         console.error("[sparks] judge refund failed", refundErr);
@@ -560,10 +563,11 @@ async function hydratePartyRoundSceneBeat(sessionId: string): Promise<void> {
 
   const openerIdem = `party_round_opener:${sessionId}:${cfg.round_index}`;
   let openerDebited = false;
+  let openerPoolUsed = 0;
   let openerSkipAi = false;
   if (isMonetizationSpendEnabled()) {
     try {
-      const r = await tryDebitSparks({
+      const r = await tryDebitSparksWithSessionPool({
         payerUserId: row.host_user_id,
         amount: SPARK_COST_PARTY_ROUND_OPENER,
         idempotencyKey: openerIdem,
@@ -571,6 +575,7 @@ async function hydratePartyRoundSceneBeat(sessionId: string): Promise<void> {
         reason: "party_round_opener",
       });
       openerDebited = r.applied;
+      openerPoolUsed = r.fromPool;
     } catch (e) {
       if (e instanceof InsufficientSparksError) {
         openerSkipAi = true;
@@ -612,12 +617,13 @@ async function hydratePartyRoundSceneBeat(sessionId: string): Promise<void> {
       console.error("[party] round opener failed", sessionId, e);
       if (openerDebited && isMonetizationSpendEnabled()) {
         try {
-          await tryCreditSparks({
-            userId: row.host_user_id,
-            amount: SPARK_COST_PARTY_ROUND_OPENER,
-            idempotencyKey: `refund:${openerIdem}`,
+          await tryRefundSessionSparkDebit({
+            hostUserId: row.host_user_id,
             sessionId,
+            totalAmount: SPARK_COST_PARTY_ROUND_OPENER,
+            idempotencyKey: `refund:${openerIdem}`,
             reason: "refund_party_round_opener_failed",
+            sparkPoolUsed: openerPoolUsed,
           });
         } catch (refundErr) {
           console.error("[sparks] opener refund failed", refundErr);

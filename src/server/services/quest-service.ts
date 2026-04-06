@@ -10,6 +10,12 @@ const QUEST_KIND = "quest_state_v1";
 const MAX_PROGRESS = 100;
 const MAX_RISK = 100;
 
+/** Max quest % that can come from dice rolls within one narrative chapter (resets on chapter advance). */
+export const CHAPTER_ROLL_PROGRESS_CAP = 36;
+
+/** After this many turns at 100% without AI closure_ready, allow ending vote eligibility anyway. */
+export const TURNS_AT_FULL_BEFORE_READY = 3;
+
 export type QuestStatus = "active" | "ready_to_end" | "failed";
 export type EndingVoteChoice = "end_now" | "continue";
 
@@ -40,6 +46,12 @@ export type QuestState = {
   status: QuestStatus;
   endingVote: EndingVoteState | null;
   recentActions?: string[];
+  /** Progress points from rolls in the current narrative chapter (see `CHAPTER_ROLL_PROGRESS_CAP`). */
+  progressEarnedThisChapter?: number;
+  /** Last aligned `sessions.chapter_index` for roll-budget accounting. */
+  questChapterAnchor?: number;
+  /** Counts turns spent at max progress while waiting for narrative closure. */
+  turnsAtFullProgress?: number;
   updatedAt: string;
 };
 
@@ -65,6 +77,11 @@ function isQuestState(value: unknown): value is QuestState {
   const endingVote =
     v.endingVote === null ||
     (typeof v.endingVote === "object" && v.endingVote !== null);
+  const optNums =
+    (v.progressEarnedThisChapter === undefined ||
+      typeof v.progressEarnedThisChapter === "number") &&
+    (v.questChapterAnchor === undefined || typeof v.questChapterAnchor === "number") &&
+    (v.turnsAtFullProgress === undefined || typeof v.turnsAtFullProgress === "number");
   return (
     typeof v.objective === "string" &&
     typeof v.progress === "number" &&
@@ -72,7 +89,8 @@ function isQuestState(value: unknown): value is QuestState {
     objectiveLeadsValid &&
     (v.status === "active" || v.status === "ready_to_end" || v.status === "failed") &&
     endingVote &&
-    typeof v.updatedAt === "string"
+    typeof v.updatedAt === "string" &&
+    optNums
   );
 }
 
@@ -501,6 +519,10 @@ export function maybeOpenEndingVote(
   };
 }
 
+/** Emitted when all votes cast / expired without ending — table keeps playing; chapter window may roll. */
+export const QUEST_ENDING_VOTE_COOLDOWN_MESSAGE =
+  "Ending vote failed; cooldown started" as const;
+
 export function evaluateEndingVote(
   state: QuestState,
   round: number,
@@ -554,7 +576,7 @@ export function evaluateEndingVote(
       changed: true,
       message: shouldForceEnd
         ? "Ending forced after repeated stalemate"
-        : "Ending vote failed; cooldown started",
+        : QUEST_ENDING_VOTE_COOLDOWN_MESSAGE,
     };
   }
 
@@ -567,15 +589,15 @@ export function scoreFromRoll(result: DiceRoll["result"] | undefined): {
 } {
   switch (result) {
     case "critical_success":
-      return { progressDelta: 12, riskDelta: -3 };
+      return { progressDelta: 9, riskDelta: -3 };
     case "success":
-      return { progressDelta: 8, riskDelta: -1 };
+      return { progressDelta: 6, riskDelta: -1 };
     case "critical_failure":
       return { progressDelta: 1, riskDelta: 10 };
     case "failure":
       return { progressDelta: 2, riskDelta: 6 };
     default:
-      return { progressDelta: 3, riskDelta: 2 };
+      return { progressDelta: 2, riskDelta: 2 };
   }
 }
 
@@ -600,6 +622,7 @@ export async function applyTurnQuestProgress(params: {
   sessionId: string;
   turnId?: string | null;
   round: number;
+  chapterIndex: number;
   objectiveFallback: string;
   actionType: string;
   diceRolls: DiceRoll[];
@@ -615,6 +638,13 @@ export async function applyTurnQuestProgress(params: {
     (await getQuestState(params.sessionId)) ??
     defaultQuestState(params.objectiveFallback);
 
+  const chapterIndex = params.chapterIndex;
+  let earnedInChapter = current.progressEarnedThisChapter ?? 0;
+  const prevAnchor = current.questChapterAnchor;
+  if (prevAnchor !== undefined && prevAnchor !== chapterIndex) {
+    earnedInChapter = 0;
+  }
+
   const recentActions = Array.isArray(current.recentActions)
     ? [...current.recentActions]
     : [];
@@ -625,7 +655,10 @@ export async function applyTurnQuestProgress(params: {
 
   const primary = scoreFromRoll(params.diceRolls[0]?.result);
   const weight = intentWeight(params.actionType) * diminishing;
-  const progressDelta = Math.max(1, Math.round(primary.progressDelta * weight));
+  const rawProgressDelta = Math.max(1, Math.round(primary.progressDelta * weight));
+  const room = Math.max(0, CHAPTER_ROLL_PROGRESS_CAP - earnedInChapter);
+  const progressDelta = Math.min(rawProgressDelta, room);
+  earnedInChapter += progressDelta;
   const riskDelta = Math.round(primary.riskDelta);
 
   recentActions.push(params.actionType);
@@ -635,8 +668,12 @@ export async function applyTurnQuestProgress(params: {
   let risk = clamp(current.risk + riskDelta, 0, MAX_RISK);
   let status: QuestStatus = current.status;
 
+  let turnsAtFull = current.turnsAtFullProgress ?? 0;
   if (progress >= MAX_PROGRESS) {
-    status = "ready_to_end";
+    turnsAtFull =
+      current.progress >= MAX_PROGRESS ? turnsAtFull + 1 : 1;
+  } else {
+    turnsAtFull = 0;
   }
 
   const partyDown = await allPartyMembersIncapacitated(params.sessionId);
@@ -644,6 +681,8 @@ export async function applyTurnQuestProgress(params: {
     status = "failed";
     risk = MAX_RISK;
   }
+
+  const trimmedByChapterCap = rawProgressDelta > progressDelta;
 
   const contextLead = buildContextAwareLead({
     objective: current.objective,
@@ -658,6 +697,7 @@ export async function applyTurnQuestProgress(params: {
         text: string;
         confidence: number;
         suggestedSubObjective?: string;
+        closureReady: boolean;
       }
     | undefined;
   if (params.provider) {
@@ -678,8 +718,21 @@ export async function applyTurnQuestProgress(params: {
       text: ai.data.signal_text,
       confidence: ai.data.confidence,
       suggestedSubObjective: ai.data.suggested_sub_objective,
+      closureReady: ai.data.closure_ready ?? false,
     };
   }
+
+  if (status !== "failed" && progress >= MAX_PROGRESS) {
+    if (current.status === "ready_to_end") {
+      status = "ready_to_end";
+    } else {
+      const narrativeGate =
+        (aiSignal?.closureReady === true) ||
+        turnsAtFull >= TURNS_AT_FULL_BEFORE_READY;
+      status = narrativeGate ? "ready_to_end" : "active";
+    }
+  }
+
   const nextState: QuestState = {
     objective: current.objective,
     subObjectives: updateSubObjectivesFromSignal({
@@ -711,6 +764,9 @@ export async function applyTurnQuestProgress(params: {
     status,
     endingVote: current.endingVote ?? null,
     recentActions,
+    progressEarnedThisChapter: earnedInChapter,
+    questChapterAnchor: chapterIndex,
+    turnsAtFullProgress: turnsAtFull,
     updatedAt: new Date().toISOString(),
   };
 
@@ -728,6 +784,9 @@ export async function applyTurnQuestProgress(params: {
     `Quest progress ${finalState.progress}%`,
     `Danger ${finalState.risk}%`,
   ];
+  if (trimmedByChapterCap) {
+    visibleChanges.push("Chapter momentum cap — progress from this turn was trimmed");
+  }
   if (finalState.status === "ready_to_end" && current.status !== "ready_to_end") {
     visibleChanges.push("Objective threshold reached");
   }
@@ -795,6 +854,25 @@ export async function castEndingVote(params: {
         ? "Vote recorded: end now"
         : "Vote recorded: continue"),
   };
+}
+
+/**
+ * Resets per-chapter roll progress budget when the narrative chapter advances.
+ */
+export async function syncQuestStateAfterChapterAdvance(params: {
+  sessionId: string;
+  chapterIndex: number;
+  round: number;
+}): Promise<void> {
+  const current = await getQuestState(params.sessionId);
+  if (!current) return;
+  await persistQuestState(params.sessionId, params.round, {
+    ...current,
+    progressEarnedThisChapter: 0,
+    questChapterAnchor: params.chapterIndex,
+    turnsAtFullProgress: 0,
+    updatedAt: new Date().toISOString(),
+  });
 }
 
 export async function finalizeSessionEnd(sessionId: string): Promise<number> {

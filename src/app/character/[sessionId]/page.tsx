@@ -11,6 +11,11 @@ import { GhostButton } from "@/components/ui/ghost-button";
 import { SkeletonCard } from "@/components/ui/loading-skeleton";
 import { PillSelect } from "@/components/ui/pill-select";
 import { useToast } from "@/components/ui/toast";
+import { COPY } from "@/lib/copy/ashveil";
+import {
+  insufficientSparksToastOptions,
+  isInsufficientSparksApi,
+} from "@/lib/monetization/insufficient-sparks-ui";
 import {
   ClassProfileSchema,
   type CharacterStats,
@@ -25,6 +30,7 @@ import {
   type CharacterClass,
   type CharacterRace,
 } from "@/lib/rules/character";
+import { SPARK_COST_PORTRAIT_GENERATION } from "@/lib/spark-pricing";
 
 const CUSTOM_RACE_PILL = "__custom__" as const;
 type RacePillValue = CharacterRace | typeof CUSTOM_RACE_PILL;
@@ -422,10 +428,6 @@ export default function CharacterCreationPage() {
 
   async function handleGeneratePortrait() {
     if (portraitBusy) return;
-    if (portraitUrl) {
-      toast("Portrait reroll costs Sparks (coming soon).", "info");
-      return;
-    }
     if (!name.trim()) {
       toast("Enter a name first", "error");
       return;
@@ -450,11 +452,24 @@ export default function CharacterCreationPage() {
           race: portraitRace.value,
           concept: classMode === "custom" ? customConcept.trim() : undefined,
           appearance: appearance.trim() || undefined,
+          reroll: Boolean(portraitUrl),
         }),
       });
-      const j = (await res.json().catch(() => ({}))) as { portraitUrl?: string; error?: string };
+      const j = (await res.json().catch(() => ({}))) as {
+        portraitUrl?: string;
+        error?: string;
+        code?: string;
+      };
       if (!res.ok) {
-        toast(j.error ?? "Could not generate portrait", "error");
+        if (isInsufficientSparksApi(res.status, j)) {
+          toast(
+            COPY.spark.profileInsufficient,
+            "info",
+            insufficientSparksToastOptions(),
+          );
+        } else {
+          toast(j.error ?? "Could not generate portrait", "error");
+        }
         return;
       }
       if (!j.portraitUrl) {
@@ -679,7 +694,11 @@ export default function CharacterCreationPage() {
               onClick={() => void handleGeneratePortrait()}
               className="w-full"
             >
-              {portraitBusy ? "Generating…" : portraitUrl ? "Reroll (Sparks)" : "Generate portrait"}
+              {portraitBusy
+                ? "Generating…"
+                : portraitUrl
+                  ? `Reroll (${SPARK_COST_PORTRAIT_GENERATION} Sparks)`
+                  : "Generate portrait"}
             </GhostButton>
             {portraitUrl ? (
               <GhostButton

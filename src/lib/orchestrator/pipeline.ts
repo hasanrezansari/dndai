@@ -14,7 +14,12 @@ import { interpretRules } from "@/lib/orchestrator/workers/rules-interpreter";
 import { interpretConsequences, consequenceToPatches } from "@/lib/orchestrator/workers/consequence-interpreter";
 import { buildNarratorSystemPrompt, generateNarration } from "@/lib/orchestrator/workers/narrator";
 import { checkVisualDelta } from "@/lib/orchestrator/workers/visual-delta";
-import { buildMemoryBundle, shouldSummarize, runSummarizer } from "@/lib/memory";
+import {
+  buildMemoryBundle,
+  fetchLatestSituationAnchor,
+  shouldSummarize,
+  runSummarizer,
+} from "@/lib/memory";
 
 import type { ActionIntent, ConsequenceEffect, NarratorOutput } from "@/lib/schemas/ai-io";
 import type { DiceRoll, NarrativeEvent } from "@/lib/schemas/domain";
@@ -77,6 +82,58 @@ export async function scheduleSessionImageGeneration(
   }
 }
 
+const NPC_LABEL_STOPWORDS = new Set([
+  "the",
+  "a",
+  "an",
+  "of",
+  "and",
+  "or",
+  "head",
+  "mini",
+  "lesser",
+  "greater",
+  "elder",
+  "young",
+]);
+
+function npcSignificantTokens(name: string): string[] {
+  return sanitizeNpcName(name)
+    .toLowerCase()
+    .split(/\s+/)
+    .map((w) => w.trim())
+    .filter((w) => w.length > 1 && !NPC_LABEL_STOPWORDS.has(w));
+}
+
+function npcLabelsShareToken(a: string, b: string): boolean {
+  const A = new Set(npcSignificantTokens(a));
+  const B = new Set(npcSignificantTokens(b));
+  if (A.size === 0 || B.size === 0) return false;
+  for (const t of A) {
+    if (B.has(t)) return true;
+  }
+  return false;
+}
+
+/** Match intent label to an existing row: exact name, shared “creature” tokens, or substring. */
+function matchNpcRowByLabel(
+  labelRaw: string,
+  npcIds: Array<{ id: string; name: string }>,
+): { id: string; name: string } | null {
+  const label = sanitizeNpcName(labelRaw);
+  if (!label) return null;
+  const ll = label.toLowerCase();
+  const exact = npcIds.find((n) => n.name.trim().toLowerCase() === ll);
+  if (exact) return exact;
+  const token = npcIds.find((n) => npcLabelsShareToken(label, n.name));
+  if (token) return token;
+  return (
+    npcIds.find((n) => ll.includes(n.name.toLowerCase())) ??
+    npcIds.find((n) => n.name.toLowerCase().includes(ll)) ??
+    null
+  );
+}
+
 function resolveNpcTarget(
   intent: ActionIntent,
   npcIds: Array<{ id: string; name: string }>,
@@ -89,10 +146,7 @@ function resolveNpcTarget(
   }
   const first = npcTargets[0];
   if (!first?.label) return null;
-  const label = first.label.toLowerCase();
-  return npcIds.find((n) => n.name.toLowerCase() === label) ??
-    npcIds.find((n) => label.includes(n.name.toLowerCase())) ??
-    null;
+  return matchNpcRowByLabel(first.label, npcIds);
 }
 
 function sanitizeNpcName(label: string): string {
@@ -126,17 +180,15 @@ async function ensureNpcTargetsExist(params: {
     if (t.label) {
       const label = sanitizeNpcName(t.label);
       if (!shouldCreateNpcTarget(params.intent, label)) continue;
-      const existingByName = params.npcIds.find(
-        (n) => n.name.trim().toLowerCase() === label.toLowerCase(),
-      );
-      if (existingByName) continue;
+      const existing = matchNpcRowByLabel(label, params.npcIds);
+      if (existing) continue;
       const [inserted] = await db
         .insert(npcStates)
         .values({
           session_id: params.sessionId,
           name: label,
-          role: "hostile",
-          attitude: "hostile",
+          role: "neutral",
+          attitude: "neutral",
           status: "alive",
           location: "Current scene",
           hp: 12,
@@ -329,6 +381,7 @@ function mapNarrativeRow(row: typeof narrativeEvents.$inferSelect): NarrativeEve
     tone: row.tone,
     next_actor_id: row.next_actor_id,
     image_hint: row.image_hint as NarrativeEvent["image_hint"],
+    situation_anchor: row.situation_anchor ?? undefined,
     created_at: row.created_at.toISOString(),
   };
 }
@@ -678,6 +731,11 @@ export async function runTurnPipeline(params: {
         level: r === "critical_success" ? "full" : "partial",
       });
     }
+    statePatches.push({
+      op: "npc_mark_hostile",
+      npcId: npcTarget.id,
+      reason: intent.action_type,
+    });
   }
 
   const questUpdate = actionDenied
@@ -696,6 +754,7 @@ export async function runTurnPipeline(params: {
       sessionId,
       turnId,
       round: ctx.session.currentRound,
+      chapterIndex: ctx.session.chapterIndex,
       objectiveFallback:
         ctx.session.adventurePrompt?.trim() ||
         ctx.session.campaignTitle?.trim() ||
@@ -783,7 +842,10 @@ export async function runTurnPipeline(params: {
   const actorName = ctx.character.name;
   const nextActorName = resolvedNextActor.nextPlayerDisplayName;
 
-  const memoryBundle = await buildMemoryBundle("narrator", sessionId);
+  const [memoryBundle, establishedSituation] = await Promise.all([
+    buildMemoryBundle("narrator", sessionId),
+    fetchLatestSituationAnchor(sessionId),
+  ]);
 
   const sceneContext =
     ctx.currentSceneDescription?.trim() ||
@@ -847,6 +909,7 @@ export async function runTurnPipeline(params: {
       facilitatorSystemPrompt,
       worldBibleExcerpt: worldBibleExcerpt || undefined,
       fallbackPremiseHint: fallbackPremiseHint || undefined,
+      establishedSituation,
       provider,
     });
 
@@ -857,6 +920,14 @@ export async function runTurnPipeline(params: {
       tone: "neutral",
       next_actor_id: expectedNextPlayerId,
       image_hint: { subjects: [], avoid: [] },
+      situation_anchor:
+        establishedSituation ??
+        "The fiction holds; no new location or circumstance was established this beat.",
+      narrative_beat: {
+        rhythm: "ongoing",
+        setting_change: "none",
+        warrants_establishing_shot: false,
+      },
     }
     : {
       ...narr0!.data,
@@ -877,6 +948,7 @@ export async function runTurnPipeline(params: {
       tone: narration.tone,
       next_actor_id: narration.next_actor_id,
       image_hint: narration.image_hint as Record<string, unknown>,
+      situation_anchor: narration.situation_anchor,
     })
     .returning();
 
@@ -918,6 +990,9 @@ export async function runTurnPipeline(params: {
       turnId,
       narrativeText: narration.scene_text,
       currentSceneDescription: ctx.currentSceneDescription,
+      priorSituationAnchor: establishedSituation,
+      newSituationAnchor: narration.situation_anchor,
+      narrativeBeat: narration.narrative_beat,
     });
   const imageNeeded = visualDeltaResult?.data.image_needed ?? false;
 
@@ -926,7 +1001,11 @@ export async function runTurnPipeline(params: {
     turnId,
     stepName: "visual_delta",
     input: { narrative_len: narration.scene_text.length },
-    output: { image_needed: imageNeeded, reasons: visualDeltaResult?.data.reasons ?? [] },
+    output: {
+      image_needed: imageNeeded,
+      reasons: visualDeltaResult?.data.reasons ?? [],
+      beat: narration.narrative_beat,
+    },
     modelUsed: "deterministic",
     tokensIn: 0,
     tokensOut: 0,

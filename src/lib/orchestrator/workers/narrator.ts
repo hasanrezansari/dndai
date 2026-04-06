@@ -39,6 +39,21 @@ MEMORY CONTEXT:
 - "rolling_summary" (if present) is a compressed memory of earlier events: key events, active plot hooks, NPC relationships, world changes. Weave relevant details naturally — do NOT dump facts.
 - "style_rules" (if present) provides additional narration style guidance specific to this campaign.
 - "world_bible_excerpt" (if non-empty) is host-supplied premise or setting write-up—treat as canon for tone and facts unless contradicted by newer narrative.
+- "established_situation" (if non-empty) is the last locked-in fiction state from the prior beat: where the party is, travel vs arrival, environment. It OVERRIDES vague impulses to "reset" the scene.
+
+SCENE CONTINUITY (NON-NEGOTIABLE):
+- Treat "established_situation" as TRUE until this turn's resolved action and dice clearly change it. Do not contradict it.
+- Examples of forbidden jumps: narrating dry land or a mine interior if the anchor still places the party at sea, in open water, or mid-voyage—unless this turn's success clearly completes the crossing or arrival.
+- On failure or mixed success, pressure, delay, partial progress, or complication is fine; do not teleport the fiction to a new venue without earned cause.
+- "scene_context" is often a static module blurb; when it conflicts with "established_situation" or "recent_narrative", prefer the newer established fiction and recent beats.
+- After narrating, set "situation_anchor" to ONE short factual sentence (max ~25 words) stating the truth for the NEXT turn: location, travel state if any, and immediate circumstance. It must match your "scene_text" outcome.
+
+STORY BEAT & PACING (like an author):
+- Fill "narrative_beat" every turn — it is how the table’s limited scene art chooses moments that deserve a new “establishing shot.”
+- "rhythm": ongoing = same scene stretch (dialogue, small actions); transition = travel, entering a new space, time skip; setpiece = big fight, ritual, storm, reveal; denouement = aftermath, quiet resolution.
+- "setting_change": none = same venue; texture = same place but meaningfully different light/weather/damage (usually no new image); new_venue = they are somewhere the camera would re-frame (shore after sea, mine after trail); world_shaking = disaster, realm shift, massive spectacle.
+- "warrants_establishing_shot": true only when a director would plausibly cut to a wide new frame — new_venue or world_shaking, or a setpiece that re-places the cast. Keep false for texture-only or ongoing beats so art budget is not wasted.
+- Align beat with "situation_anchor": if you claim a new place, setting_change should reflect that.
 
 RULES:
 - 60-140 words STRICTLY
@@ -56,7 +71,9 @@ RULES:
   - "visible_changes": array of brief world changes (can be empty [])
   - "tone": mood of the scene (e.g. "tense", "triumphant", "ominous")
   - "next_actor_id": always set to null
-  - "image_hint": {"subjects": ["key visual subjects in the scene"], "environment": "environment description", "mood": "visual mood", "avoid": ["things to avoid"]} (scene hints for image generation)`;
+  - "image_hint": {"subjects": ["key visual subjects in the scene"], "environment": "environment description", "mood": "visual mood", "avoid": ["things to avoid"]} (scene hints for image generation)
+  - "situation_anchor": one factual sentence (8-280 chars) — location + immediate truth for the next player, aligned with this beat's outcome
+  - "narrative_beat": {"rhythm": "ongoing"|"transition"|"setpiece"|"denouement", "setting_change": "none"|"texture"|"new_venue"|"world_shaking", "warrants_establishing_shot": boolean}`;
 
 export function buildNarratorSystemPrompt(facilitatorRoleLine: string): string {
   return `${facilitatorRoleLine.trim()}\n\n${NARRATOR_INSTRUCTIONS_CORE}`;
@@ -281,12 +298,25 @@ export function buildNarratorFallback(
     critical_failure: "ominous",
   };
 
+  const sceneText = text.slice(0, 4000);
+  const anchorBase = sceneText.replace(/\s+/g, " ").trim().slice(0, 280);
+  const situation_anchor =
+    anchorBase.length >= 8
+      ? anchorBase
+      : "The scene continues from the prior moment with no new place established.";
+
   return NarratorOutputSchema.parse({
-    scene_text: text.slice(0, 4000),
+    scene_text: sceneText,
     visible_changes: [],
     tone: toneMap[rollResult ?? ""] ?? "neutral",
     next_actor_id: nextActorId,
     image_hint: { subjects: [], avoid: [] },
+    situation_anchor,
+    narrative_beat: {
+      rhythm: "ongoing",
+      setting_change: "none",
+      warrants_establishing_shot: false,
+    },
   });
 }
 
@@ -319,6 +349,8 @@ export async function generateNarration(params: {
   worldBibleExcerpt?: string;
   /** Short bundle for narrator fallback atmosphere (tags + prompt + bible slice). */
   fallbackPremiseHint?: string;
+  /** Prior turn's locked situation line; empty when session has no anchor yet. */
+  establishedSituation?: string | null;
   provider: AIProvider;
 }): Promise<OrchestrationStepResult<NarratorOutput>> {
   const normalizedDisplayClass = (params.characterClassIdentity ?? "").trim();
@@ -348,6 +380,9 @@ export async function generateNarration(params: {
     rolling_summary: params.rollingSummary ?? "",
     style_rules: params.stylePolicy ?? "",
     world_bible_excerpt: params.worldBibleExcerpt ?? "",
+    established_situation:
+      params.establishedSituation?.trim() ||
+      "(none yet — infer only from scene_context, recent_narrative, and canonical_state)",
   });
 
   const rollResult = params.diceResults[0]?.result as DiceRoll["result"] | undefined;

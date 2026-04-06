@@ -99,6 +99,46 @@ describe("orchestration workers", () => {
     expect(r.data.reasons.length).toBeGreaterThan(0);
   });
 
+  it("visual delta: narrator beat can request establishing shot without two heuristics", async () => {
+    const r = await checkVisualDelta({
+      sessionId: SESSION_ID,
+      turnId: TURN_ID,
+      narrativeText:
+        "Silence holds; dust motes drift in the slatted light, and nothing commits yet.",
+      currentSceneDescription: "A quiet sandstone cell with one barred window.",
+      narrativeBeat: {
+        rhythm: "transition",
+        setting_change: "new_venue",
+        warrants_establishing_shot: true,
+      },
+    });
+    expect(r.data.image_needed).toBe(true);
+    expect(r.data.reasons.some((x) => x.includes("Narrator"))).toBe(true);
+  });
+
+  it("visual delta: anchor geography shift plus venue beat triggers image", async () => {
+    const r = await checkVisualDelta({
+      sessionId: SESSION_ID,
+      turnId: TURN_ID,
+      narrativeText:
+        "Spray turns to grit underfoot as the hull kisses sand; the party staggers onto the shingle, lungs burning.",
+      currentSceneDescription: "Open ocean under bruised skies.",
+      priorSituationAnchor:
+        "The party is still at sea in rough swell, the coast a thin line astern.",
+      newSituationAnchor:
+        "The party stands on a rocky shore, waves receding behind them, the inland cliff rising sheer.",
+      narrativeBeat: {
+        rhythm: "transition",
+        setting_change: "new_venue",
+        warrants_establishing_shot: true,
+      },
+    });
+    expect(r.data.image_needed).toBe(true);
+    expect(
+      r.data.reasons.some((x) => x.includes("Situation anchor")),
+    ).toBe(true);
+  });
+
   it("narrator output stays within word bounds via mock fixture", async () => {
     const provider = new MockProvider();
     const intent = ActionIntentSchema.parse({

@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { create } from "zustand";
 
 export interface Toast {
@@ -7,6 +8,7 @@ export interface Toast {
   message: string;
   type: "success" | "error" | "info";
   duration?: number;
+  action?: { label: string; href: string };
 }
 
 interface ToastStore {
@@ -31,15 +33,29 @@ export const useToastStore = create<ToastStore>((set, get) => ({
     set((s) => ({ toasts: s.toasts.filter((x) => x.id !== id) })),
 }));
 
+export type ToastOptions = {
+  duration?: number;
+  action?: { label: string; href: string };
+};
+
 export function useToast(): {
-  toast: (message: string, type?: Toast["type"]) => void;
+  toast: (
+    message: string,
+    type?: Toast["type"],
+    options?: ToastOptions,
+  ) => void;
   dismiss: (id: string) => void;
 } {
   const push = useToastStore((s) => s.push);
   const dismiss = useToastStore((s) => s.dismiss);
   return {
-    toast: (message, type = "info") => {
-      push({ message, type });
+    toast: (message, type = "info", options) => {
+      push({
+        message,
+        type,
+        duration: options?.duration,
+        action: options?.action,
+      });
     },
     dismiss,
   };
@@ -65,14 +81,28 @@ export function ToastContainer() {
       aria-live="polite"
     >
       {toasts.map((t) => (
-        <button
+        <div
           key={t.id}
-          type="button"
-          onClick={() => dismiss(t.id)}
-          className={`pointer-events-auto text-left w-full min-h-[44px] rounded-[var(--radius-card)] glass px-4 py-3 text-sm text-[var(--color-silver-muted)] border animate-slide-up flex items-center ${toastAccent(t.type)}`}
+          role="status"
+          className={`pointer-events-auto text-left w-full rounded-[var(--radius-card)] glass px-4 py-3 text-sm text-[var(--color-silver-muted)] border animate-slide-up flex flex-col gap-2 ${toastAccent(t.type)}`}
         >
-          {t.message}
-        </button>
+          <button
+            type="button"
+            onClick={() => dismiss(t.id)}
+            className="text-left w-full"
+          >
+            {t.message}
+          </button>
+          {t.action ? (
+            <Link
+              href={t.action.href}
+              className="text-xs font-medium text-[var(--color-gold-rare)] underline underline-offset-2 hover:text-[var(--color-gold-support)] self-start"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {t.action.label}
+            </Link>
+          ) : null}
+        </div>
       ))}
     </div>
   );

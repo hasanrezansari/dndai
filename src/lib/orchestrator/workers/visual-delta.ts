@@ -1,6 +1,7 @@
 import type { OrchestrationStepResult } from "@/lib/ai/types";
 import {
   VisualDeltaOutputSchema,
+  type NarrativeBeat,
   type VisualDeltaOutput,
 } from "@/lib/schemas/ai-io";
 
@@ -13,7 +14,7 @@ const SCENE_SHIFT_WORDS =
 
 function extractLocationNouns(text: string): string[] {
   const pattern =
-    /\b(cave|forest|dungeon|castle|tower|village|temple|tomb|chamber|hall|throne|river|mountain|cliff|bridge|tavern|market|cathedral|ruins|camp|shore|clearing|library|prison|crypt|garden|arena|palace|swamp|desert|canyon|hangar|corridor|lobby|airlock|cockpit|warehouse|office|subway|alley|bunker|laboratory|studio|apartment|penthouse|cabin|dock|clinic|cafeteria|runway|tarmac|elevator|sidewalk|highway|skyscraper|starship|shuttle|station)\b/gi;
+    /\b(cave|forest|dungeon|castle|tower|village|temple|tomb|chamber|hall|throne|river|mountain|cliff|bridge|tavern|market|cathedral|ruins|camp|shore|coast|harbour|harbor|clearing|library|prison|crypt|garden|arena|palace|swamp|desert|canyon|hangar|corridor|lobby|airlock|cockpit|warehouse|office|subway|alley|bunker|laboratory|studio|apartment|penthouse|cabin|dock|clinic|cafeteria|runway|tarmac|elevator|sidewalk|highway|skyscraper|starship|shuttle|station|sea|ocean|vessel|boat|ship|deck)\b/gi;
   const matches = text.match(pattern) ?? [];
   return [...new Set(matches.map((m) => m.toLowerCase()))];
 }
@@ -27,11 +28,80 @@ function computeLocationOverlap(
   return shared.length / narrativeLocations.length;
 }
 
+function anchorGeographyReasons(
+  prior: string | null | undefined,
+  next: string | null | undefined,
+): string[] {
+  const a = prior?.trim() ?? "";
+  const b = next?.trim() ?? "";
+  if (a.length < 8 || b.length < 8) return [];
+  const nounsA = extractLocationNouns(a);
+  const nounsB = extractLocationNouns(b);
+  if (nounsA.length === 0 || nounsB.length === 0) return [];
+  const overlap = computeLocationOverlap(nounsA, nounsB);
+  if (overlap < 0.42) {
+    return ["Situation anchor moved to a different place"];
+  }
+  return [];
+}
+
+function decideImageFromSignals(params: {
+  heuristicReasons: string[];
+  anchorReasons: string[];
+  narrativeBeat: NarrativeBeat | null | undefined;
+}): { image_needed: boolean; reasons: string[]; priority: VisualDeltaOutput["priority"] } {
+  const beat = params.narrativeBeat;
+  const merged = [...new Set([...params.heuristicReasons, ...params.anchorReasons])];
+
+  const authorEstablishing =
+    beat?.warrants_establishing_shot === true &&
+    (beat.setting_change === "new_venue" || beat.setting_change === "world_shaking");
+
+  const anchorBackedVenueShift =
+    params.anchorReasons.length > 0 &&
+    (beat?.setting_change === "new_venue" || beat?.setting_change === "world_shaking");
+
+  const worldShakeWithCue =
+    beat?.setting_change === "world_shaking" && params.heuristicReasons.length >= 1;
+
+  const image_needed =
+    merged.length >= 2 ||
+    authorEstablishing ||
+    anchorBackedVenueShift ||
+    worldShakeWithCue;
+
+  let priority: VisualDeltaOutput["priority"] = "low";
+  if (authorEstablishing || worldShakeWithCue || beat?.setting_change === "world_shaking") {
+    priority = "high";
+  } else if (merged.length >= 3) {
+    priority = "high";
+  } else if (merged.length >= 1) {
+    priority = "normal";
+  }
+
+  const outReasons = [...merged];
+  if (authorEstablishing) {
+    outReasons.push("Narrator: establishing shot warranted for this beat");
+  }
+
+  return {
+    image_needed,
+    reasons: [...new Set(outReasons)],
+    priority,
+  };
+}
+
 export async function checkVisualDelta(params: {
   sessionId: string;
   turnId: string;
   narrativeText: string;
   currentSceneDescription: string | null;
+  /** Prior turn’s situation line — compared to the new anchor for geography shifts. */
+  priorSituationAnchor?: string | null;
+  /** This turn’s situation line (after narration). */
+  newSituationAnchor?: string | null;
+  /** Author pacing from the narrator — aligns limited scene art with story beats. */
+  narrativeBeat?: NarrativeBeat | null;
 }): Promise<OrchestrationStepResult<VisualDeltaOutput>> {
   const t0 = Date.now();
   const text = params.narrativeText;
@@ -71,12 +141,20 @@ export async function checkVisualDelta(params: {
   }
 
   const uniqueReasons = [...new Set(reasons)];
-  const imageNeeded = uniqueReasons.length > 0;
-  const priority = uniqueReasons.length >= 3 ? "high" : uniqueReasons.length >= 1 ? "normal" : "low";
+  const anchorReasons = anchorGeographyReasons(
+    params.priorSituationAnchor,
+    params.newSituationAnchor,
+  );
+
+  const { image_needed, reasons: allReasons, priority } = decideImageFromSignals({
+    heuristicReasons: uniqueReasons,
+    anchorReasons,
+    narrativeBeat: params.narrativeBeat,
+  });
 
   const data = VisualDeltaOutputSchema.parse({
-    image_needed: imageNeeded,
-    reasons: uniqueReasons,
+    image_needed,
+    reasons: allReasons,
     priority,
   });
 

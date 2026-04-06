@@ -12,9 +12,15 @@ import { sessions } from "@/lib/db/schema";
 import { SPARK_COST_SCENE_IMAGE } from "@/lib/spark-pricing";
 import { runImagePipeline } from "@/lib/orchestrator/image-worker";
 import {
+  assertChapterImageBudget,
+  assertManualImageCooldown,
+  incrementChapterSystemImageUsage,
+  touchManualSceneImageTimestamp,
+} from "@/server/services/chapter-runtime-service";
+import {
   InsufficientSparksError,
   isMonetizationSpendEnabled,
-  tryDebitSparks,
+  tryDebitSparksWithSessionPool,
 } from "@/server/services/spark-economy-service";
 import { broadcastToSession } from "@/lib/socket/server";
 
@@ -47,6 +53,27 @@ export async function POST(
       }
     }
 
+    const budget = await assertChapterImageBudget({ sessionId });
+    if (!budget.ok) {
+      return NextResponse.json(
+        { error: budget.error, code: budget.code },
+        { status: budget.status },
+      );
+    }
+
+    if (!internalOk) {
+      const cooldown = await assertManualImageCooldown({
+        sessionId,
+        internalRequest: false,
+      });
+      if (!cooldown.ok) {
+        return NextResponse.json(
+          { error: cooldown.error, code: "scene_image_cooldown" },
+          { status: cooldown.status },
+        );
+      }
+    }
+
     let json: unknown;
     try {
       json = await request.json();
@@ -66,6 +93,7 @@ export async function POST(
       .select({
         state_version: sessions.state_version,
         host_user_id: sessions.host_user_id,
+        game_kind: sessions.game_kind,
       })
       .from(sessions)
       .where(eq(sessions.id, sessionId))
@@ -75,7 +103,7 @@ export async function POST(
 
     if (isMonetizationSpendEnabled() && sessionRow?.host_user_id) {
       try {
-        await tryDebitSparks({
+        await tryDebitSparksWithSessionPool({
           payerUserId: sessionRow.host_user_id,
           amount: SPARK_COST_SCENE_IMAGE,
           idempotencyKey: `scene_image:${sessionId}:${parsed.data.scene_id}`,
@@ -108,6 +136,12 @@ export async function POST(
     }
 
     if (imageUrl) {
+      if ((sessionRow?.game_kind ?? "campaign") === "campaign") {
+        await incrementChapterSystemImageUsage(sessionId);
+        if (!internalOk) {
+          await touchManualSceneImageTimestamp(sessionId);
+        }
+      }
       try {
         await broadcastToSession(sessionId, "scene-image-ready", {
           scene_id,

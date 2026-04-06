@@ -64,6 +64,18 @@ export interface GameSessionView {
   gameKind?: string;
   /** Present when `gameKind === "party"`; sanitized server state. */
   party?: PartyConfigClientView | null;
+  /** Campaign chapter pacing (Standard / Cinematic). */
+  visualRhythmPreset?: "standard" | "cinematic";
+  chapterStartRound?: number;
+  chapterIndex?: number;
+  chapterTurnsElapsed?: number;
+  chapterMaxTurns?: number;
+  chapterImagesUsed?: number;
+  chapterImageBudget?: number;
+  /** Rough host Sparks hint per chapter (`ai_dm` campaign only). */
+  estimatedHostSparksPerChapter?: number;
+  /** Table-funded Sparks (session pool); spent before host wallet on AI charges. */
+  sparkPoolBalance?: number;
 }
 
 export interface QuestProgressView {
@@ -164,6 +176,15 @@ export interface DiceOverlayData {
   result: string;
 }
 
+/** Partial sync from `GET .../scene-status` (host / room display fallback poll). */
+export type SceneStatusHydratePatch = {
+  sceneImage?: string | null;
+  scenePending?: boolean;
+  narrativeText?: string | null;
+  sceneTitle?: string | null;
+  stateVersion?: number;
+};
+
 /** Body shape from `GET /api/sessions/[id]/state` — used for hydrate and incremental sync. */
 export type SessionStatePayload = {
   session: GameSessionView;
@@ -235,6 +256,7 @@ interface GameState {
    * slices (`isThinking`, overlays). Used after Pusher `state-update` and scene polls.
    */
   patchSessionFromStateApi: (data: SessionStatePayload) => void;
+  patchSceneHydrateFromMinimalApi: (data: SceneStatusHydratePatch) => void;
   reset: () => void;
   openSheet: (sheet: ActiveSheet) => void;
   closeSheet: () => void;
@@ -416,6 +438,38 @@ export const useGameStore = create<GameState>((set) => ({
         rollingMemories: data.rollingMemories ?? [],
         activeTurnId:
           data.activeTurnId === undefined ? null : data.activeTurnId,
+      };
+    }),
+
+  patchSceneHydrateFromMinimalApi: (data) =>
+    set((s) => {
+      if (!s.session) return s;
+      const nextImg =
+        data.sceneImage !== undefined ? data.sceneImage : s.sceneImage;
+      const partyCrossfade =
+        s.session.gameKind === "party" &&
+        Boolean(
+          nextImg &&
+            s.sceneImage &&
+            nextImg !== s.sceneImage &&
+            typeof nextImg === "string",
+        );
+      return {
+        ...s,
+        session:
+          data.stateVersion !== undefined
+            ? { ...s.session, stateVersion: data.stateVersion }
+            : s.session,
+        sceneImage: nextImg ?? null,
+        previousSceneImage: partyCrossfade ? s.sceneImage : s.previousSceneImage,
+        sceneTitle:
+          data.sceneTitle !== undefined ? data.sceneTitle : s.sceneTitle,
+        narrativeText:
+          data.narrativeText !== undefined
+            ? data.narrativeText
+            : s.narrativeText,
+        scenePending:
+          data.scenePending !== undefined ? data.scenePending : s.scenePending,
       };
     }),
 

@@ -14,7 +14,7 @@ import {
 describe("scoreFromRoll", () => {
   it("returns high progress and negative risk for critical success", () => {
     const { progressDelta, riskDelta } = scoreFromRoll("critical_success");
-    expect(progressDelta).toBeGreaterThanOrEqual(10);
+    expect(progressDelta).toBeGreaterThanOrEqual(7);
     expect(riskDelta).toBeLessThan(0);
   });
 
@@ -27,6 +27,7 @@ describe("scoreFromRoll", () => {
   it("returns low progress and high risk for failure", () => {
     const { progressDelta, riskDelta } = scoreFromRoll("failure");
     expect(progressDelta).toBeLessThanOrEqual(3);
+    expect(progressDelta).toBeGreaterThan(0);
     expect(riskDelta).toBeGreaterThan(0);
   });
 

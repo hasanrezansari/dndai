@@ -1,6 +1,6 @@
 # Ashveil — Monetization implementation plan
 
-Single source of truth for **phase-by-phase** engineering: **Sparks** (internal economy), **Dodo** (fiat → Sparks only), **no creator cash-out** in this scope. Assumes **greenfield**: no obligation to preserve legacy user balances or sessions; you may reset or clear data when introducing the wallet.
+Single source of truth for **phase-by-phase** engineering: **Sparks** (internal economy), **fiat → Sparks** via **Stripe** (global) and **Razorpay** (India; routed server-side), **no creator cash-out** in this scope. **Legacy Dodo** webhooks remain optional for old payments only. Assumes **greenfield**: no obligation to preserve legacy user balances or sessions; you may reset or clear data when introducing the wallet.
 
 **Related:** Product rules and deeper analysis live in the Cursor plan (`monetization_analysis_plan_*.plan.md` under `.cursor/plans/`). This doc is the **execution checklist** for the repo.
 
@@ -11,7 +11,7 @@ Single source of truth for **phase-by-phase** engineering: **Sparks** (internal 
 | In scope | Out of scope (later) |
 | -------- | -------------------- |
 | Internal **Sparks** ledger in Postgres | Creator **fiat** payout, cash-out, creator KYC |
-| **Dodo**: checkout + **webhook → credit** Sparks | Dodo per-turn / deep billing coupling |
+| **Stripe / Razorpay**: checkout + **webhook → credit** Sparks | Per-turn / deep PSP coupling in gameplay |
 | Gating **before** every paid AI/image call | “Unlimited” subscriptions that bypass caps |
 | **Host** as default payer for session AI | Per-player-per-turn billing (deferred) |
 
@@ -19,7 +19,7 @@ Single source of truth for **phase-by-phase** engineering: **Sparks** (internal 
 
 - **Ledger 1 — Players:** `user_wallets` + `spark_transactions` (append-only semantics; balance derived or locked row).
 - **Ledger 2 — Infra:** OpenRouter + image providers; **never** tied 1:1 to Spark display.
-- **Dodo:** Money in only; gameplay never calls Dodo on each turn.
+- **Payments:** Money in only via checkout + webhooks; gameplay never calls Stripe/Razorpay on each turn.
 
 **Greenfield note:** New users start with **0** Sparks unless you grant a **signup bonus** via migration or application logic. No grandfathering or migration from a pre-wallet era.
 
@@ -30,7 +30,7 @@ Single source of truth for **phase-by-phase** engineering: **Sparks** (internal 
 ### 2.1 Sparks and payments
 
 - **1 Spark** = primary unit for UX; calibrate costs from measured text/image COGS (see §8).
-- **Dodo:** shallow — products/payment links, server-verified webhook, idempotent credit.
+- **Stripe / Razorpay:** shallow — pack catalog in `SPARK_PACKS_JSON`, server-verified webhooks, idempotent credit. **India (`IN`) → Razorpay; otherwise → Stripe** (see [`checkout-region.ts`](../src/lib/monetization/checkout-region.ts)). UI must not name the PSP (“Pay securely” only).
 - Sparks are **non-redeemable** virtual currency (wording for Terms of Service).
 
 ### 2.2 Session payer
@@ -160,19 +160,31 @@ Audit and tick when each route is wired to the economy service.
 
 ---
 
-### Phase 5 — Dodo (shallow)
+### Phase 5 — Checkout: Stripe + Razorpay (shallow)
 
 **Deliverables**
 
-- Server route: create checkout session / payment link for Spark packs
-- Webhook route: verify signature, **idempotent** event storage, `credit` transaction + wallet update
-- [`.env.example`](../.env.example): Dodo keys, webhook secret, product IDs
+- [x] Server: `GET|POST /api/checkout/sparks` — creates **Stripe Checkout Session** (redirect) or **Razorpay order** (embedded Checkout.js) from [`SPARK_PACKS_JSON`](../src/lib/monetization/spark-packs.ts)
+- [x] Webhooks: `POST /api/webhooks/stripe` (`checkout.session.completed`), `POST /api/webhooks/razorpay` (`payment.captured`) — verify signatures, idempotent credit via [`spark-purchase-credit`](../src/server/services/spark-purchase-credit.ts)
+- [x] Confirm fallback: `POST /api/checkout/sparks/confirm` when webhooks are delayed (localhost / return URL)
+- [x] [`.env.example`](../.env.example): `STRIPE_*`, `RAZORPAY_*`, `NEXT_PUBLIC_RAZORPAY_KEY_ID`, `SPARK_PACKS_JSON`, optional `CHECKOUT_REGION_OVERRIDE`
+- [x] Shop UI: neutral CTA only — [`src/app/shop/page.tsx`](../src/app/shop/page.tsx)
+
+**Key implementation files**
+
+| Concern | Location |
+| ------- | -------- |
+| Region (`IN` vs global) | [`src/lib/monetization/checkout-region.ts`](../src/lib/monetization/checkout-region.ts) |
+| Pack catalog + env | [`src/lib/monetization/spark-packs.ts`](../src/lib/monetization/spark-packs.ts) |
+| Stripe session | [`src/lib/monetization/stripe-checkout.ts`](../src/lib/monetization/stripe-checkout.ts) |
+| Razorpay order | [`src/lib/monetization/razorpay-order.ts`](../src/lib/monetization/razorpay-order.ts) |
 
 **Phase 5 checklist**
 
-- [ ] Staging E2E: pay → webhook → balance increases → spend in game
-- [ ] Never credit from browser callback alone
-- [ ] Log `external_payment_id` on credit rows
+- [ ] **Staging E2E:** global (Stripe) + India (Razorpay) — pay → webhook → balance increases → spend in game (`CHECKOUT_REGION_OVERRIDE=in` | `global` for local tests)
+- [x] Never credit from browser callback alone (webhooks or server-side confirm with provider APIs)
+- [x] Persist `external_payment_id` on credit rows (`tryCreditSparks` ← `creditSparksForPackPurchase`)
+- [ ] Ops: dashboards or queries that reconcile PSP payment IDs vs `spark_transactions` (recommended for prod)
 
 ---
 
@@ -185,8 +197,10 @@ Audit and tick when each route is wired to the economy service.
 
 **Phase 6 checklist**
 
-- [ ] UI copy matches constants
-- [ ] Tests or manual QA on profile flows
+- [x] UI copy matches [`spark-pricing`](../src/lib/spark-pricing.ts) (`SPARK_COST_EXTRA_HERO_SLOT`, `SPARK_COST_PORTRAIT_GENERATION`)
+- [x] `GET /api/profile/heroes` returns total slot count (free + `purchased_hero_slots`); client can save a paid extra hero when full
+- [x] Profile + session character portrait reroll wired; insufficient Sparks → toast + **Buy Sparks** link
+- [ ] Tests or manual QA on profile flows (recommended before prod)
 
 ---
 
@@ -200,8 +214,10 @@ Audit and tick when each route is wired to the economy service.
 
 **Phase 7 checklist**
 
-- [ ] No unbounded turns per chapter
-- [ ] Cinematic preset respects image caps
+- [x] No unbounded turns per chapter (`assertCampaignChapterAllowsAiTurn` on `actions`; host `POST …/chapter/continue` + template recap in `continueChapterNarrative`)
+- [x] Cinematic preset respects image caps (lobby PATCH `visual_rhythm_preset`; `assertChapterImageBudget` on `/image`, `start` opening `after()`, and `actions` image `after()`)
+- [x] Lobby ~Sparks / chapter estimate (Standard vs Cinematic) + vote-fail chapter roll (`QUEST_ENDING_VOTE_COOLDOWN_MESSAGE` → `rollChapterWindowAfterVoteCooldown`)
+- [x] Manual scene-image cooldown on non-internal `POST …/image` (`assertManualImageCooldown` + timestamp touch)
 
 ---
 
@@ -213,7 +229,10 @@ Audit and tick when each route is wired to the economy service.
 
 **Phase 8 checklist**
 
-- [ ] Multiplayer QA: two users contribute; depletion behavior
+- [x] `sessions.spark_pool_balance` + `tryDebitSparksWithSessionPool` / `tryRefundSessionSparkDebit` (pool-aware refunds)
+- [x] `POST /api/sessions/[id]/spark-pool/contribute` (members; bumps `state_version`, `state-update`)
+- [x] Lobby + HUD surface pool; guests see pool when non-zero
+- [ ] Multiplayer QA: two users contribute; depletion behavior (manual)
 
 ---
 
@@ -265,10 +284,10 @@ Use this alongside per-phase lists above.
 - [ ] Phase 2 — Economy service + `actions` pilot
 - [ ] Phase 3 — Full server coverage + 402 + host payer
 - [ ] Phase 4 — Client HUD + pause + Buy entry
-- [ ] Phase 5 — Dodo checkout + webhook
+- [x] Phase 5 — Stripe/Razorpay checkout + webhooks (staging E2E still recommended)
 - [ ] Phase 6 — Profile slots + portrait
-- [ ] Phase 7 — Chapters + estimates
-- [ ] Phase 8 — Session pool (optional)
+- [x] Phase 7 — Chapters + estimates
+- [x] Phase 8 — Session pool (optional)
 - [ ] Phase 9 — Usage logs + OR alerts + treasury gate
 - [ ] Phase 10 — UGC metrics dashboard
 - [ ] Phase 11 — Creator accrual (optional, internal only)
@@ -277,13 +296,26 @@ Use this alongside per-phase lists above.
 
 ## 7. External checklist (non-code)
 
-### Dodo
+### Stripe (global checkout)
 
-- [ ] Merchant account live; category fits digital goods / game
-- [ ] Spark pack products + IDs in config
-- [ ] Production webhook URL (HTTPS) + signing secret + idempotent event store
-- [ ] Test mode E2E on staging (public URL for webhooks)
-- [ ] Refund/chargeback process understood; support contact published
+- [ ] Account live; **Spark packs** as Products with **Price** IDs referenced in `SPARK_PACKS_JSON` (`stripePriceId`)
+- [ ] Webhook endpoint: `https://<domain>/api/webhooks/stripe` — event `checkout.session.completed`; secret matches `STRIPE_WEBHOOK_SECRET`
+- [ ] Test mode E2E on a **public** staging URL (webhooks must reach the server)
+
+### Razorpay (India)
+
+- [ ] Account live; orders created server-side; amounts in **paise** in `SPARK_PACKS_JSON` (`razorpayAmountPaise`)
+- [ ] `NEXT_PUBLIC_RAZORPAY_KEY_ID` matches dashboard Key ID (Checkout.js)
+- [ ] Webhook endpoint: `https://<domain>/api/webhooks/razorpay` — e.g. `payment.captured`; secret matches `RAZORPAY_WEBHOOK_SECRET`
+- [ ] Test E2E with `CHECKOUT_REGION_OVERRIDE=in` or traffic from `IN`
+
+### Legacy Dodo (optional)
+
+- [ ] Only if old payments still need crediting: `DODO_*` + `POST /api/webhooks/dodo` documented in `.env.example`
+
+### Refunds / support
+
+- [ ] Refund/chargeback process understood for each PSP; support contact published
 
 ### Infra
 
@@ -329,7 +361,7 @@ Store in one module (e.g. `spark-pricing.ts` next to economy service). Revisit a
 
 1. Measure avg USD per text turn and per image (7d rolling).
 2. Set target gross margin after MoR fees.
-3. Ensure implied **$/Spark** from Dodo packs > worst-case **COGS/Spark** for heaviest preset.
+3. Ensure implied **$/Spark** from Spark pack prices (after Stripe/Razorpay fees) > worst-case **COGS/Spark** for heaviest preset.
 
 ---
 
@@ -338,5 +370,6 @@ Store in one module (e.g. `spark-pricing.ts` next to economy service). Revisit a
 | Version | Date | Notes |
 | ------- | ---- | ----- |
 | 1.0 | 2026-04-06 | Initial implementation plan; greenfield; no legacy grandfathering |
+| 1.1 | 2026-04-06 | Phase 5: Stripe + Razorpay; India routing; Dodo legacy optional |
 
 Update this file when phases complete or scope changes.

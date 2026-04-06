@@ -56,12 +56,26 @@ export const NarratorImageHintSchema = z.object({
   avoid: z.array(z.string()).default([]),
 });
 
+/** Author-style pacing for this beat — drives scene-image when the “camera” would reset. */
+export const NarrativeBeatSchema = z.object({
+  /** Story rhythm: ongoing = same stretch of scene; transition = crossing space/time; setpiece = big visual moment; denouement = exhale / aftermath */
+  rhythm: z.enum(["ongoing", "transition", "setpiece", "denouement"]),
+  /** How the visible world changed — be honest; "none" means same room/space, lighting tweaks only */
+  setting_change: z.enum(["none", "texture", "new_venue", "world_shaking"]),
+  /** True if a film would cut to a new establishing shot (new location, disaster, portal, etc.) */
+  warrants_establishing_shot: z.boolean(),
+});
+export type NarrativeBeat = output<typeof NarrativeBeatSchema>;
+
 export const NarratorOutputSchema = z.object({
   scene_text: z.string().min(20).max(4000),
   visible_changes: z.array(z.string()).default([]),
   tone: z.string().default("neutral"),
   next_actor_id: z.string().nullable().default(null),
   image_hint: NarratorImageHintSchema.default({ subjects: [], avoid: [] }),
+  /** Factual one-liner for continuity: where the party is and what is true before the next action. */
+  situation_anchor: z.string().min(8).max(280),
+  narrative_beat: NarrativeBeatSchema,
 });
 export type NarratorOutput = output<typeof NarratorOutputSchema>;
 
@@ -77,6 +91,8 @@ export const QuestSignalOutputSchema = z.object({
   focus_term: z.string().min(2).max(40),
   suggested_sub_objective: z.string().min(6).max(80).optional(),
   confidence: z.number().min(0).max(1).default(0.65),
+  /** True only when objective + narration suggest the table could credibly end the adventure now. */
+  closure_ready: z.boolean().optional().default(false),
 });
 export type QuestSignalOutput = output<typeof QuestSignalOutputSchema>;
 

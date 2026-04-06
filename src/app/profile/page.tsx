@@ -13,7 +13,16 @@ import { useToast } from "@/components/ui/toast";
 import { HeroKitPreview } from "@/components/character/hero-kit-preview";
 import { PillSelect } from "@/components/ui/pill-select";
 import { runGuestGoogleUpgradeFlow } from "@/lib/auth/guest-google-upgrade-client";
+import { COPY } from "@/lib/copy/ashveil";
+import {
+  insufficientSparksToastOptions,
+  isInsufficientSparksApi,
+} from "@/lib/monetization/insufficient-sparks-ui";
 import { CHARACTER_RACE_MAX_LEN } from "@/lib/rules/character";
+import {
+  SPARK_COST_EXTRA_HERO_SLOT,
+  SPARK_COST_PORTRAIT_GENERATION,
+} from "@/lib/spark-pricing";
 import {
   ClassProfileSchema,
   type ClassProfile,
@@ -460,14 +469,22 @@ export default function ProfilePage() {
           race: heroRace.trim(),
           concept: heroConcept.trim() || undefined,
           appearance: heroAppearance.trim() || undefined,
+          reroll: Boolean(heroPortraitUrl.trim()),
         }),
       });
       const j = (await res.json().catch(() => ({}))) as {
         portraitUrl?: string;
         error?: string;
+        code?: string;
       };
       if (!res.ok) {
-        if (res.status === 402) {
+        if (isInsufficientSparksApi(res.status, j)) {
+          toast(
+            COPY.spark.profileInsufficient,
+            "info",
+            insufficientSparksToastOptions(),
+          );
+        } else if (res.status === 402) {
           toast(j.error ?? "Portrait generation costs Sparks", "error");
         } else {
           toast(j.error ?? "Could not generate portrait", "error");
@@ -489,10 +506,6 @@ export default function ProfilePage() {
 
   async function handleCreateHero() {
     if (heroBusy) return;
-    if (slotsFull) {
-      toast("Hero slot is full. Unlock a new slot to create another hero.", "error");
-      return;
-    }
     if (!heroName.trim()) {
       toast("Enter a hero name", "error");
       return;
@@ -537,8 +550,19 @@ export default function ProfilePage() {
         }),
       });
       if (!res.ok) {
-        const j = (await res.json().catch(() => ({}))) as { error?: string };
-        toast(j.error ?? "Could not create hero", "error");
+        const j = (await res.json().catch(() => ({}))) as {
+          error?: string;
+          code?: string;
+        };
+        if (isInsufficientSparksApi(res.status, j)) {
+          toast(
+            COPY.spark.profileInsufficient,
+            "info",
+            insufficientSparksToastOptions(),
+          );
+        } else {
+          toast(j.error ?? "Could not create hero", "error");
+        }
         return;
       }
       const created = (await res.json().catch(() => ({}))) as {
@@ -579,12 +603,24 @@ export default function ProfilePage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ concept: heroConcept.trim() }),
       });
+      const kitJson = (await res.json().catch(() => ({}))) as {
+        error?: string;
+        code?: string;
+        classProfile?: unknown;
+      };
       if (!res.ok) {
-        const j = (await res.json().catch(() => ({}))) as { error?: string };
-        toast(j.error ?? "Could not generate kit", "error");
+        if (isInsufficientSparksApi(res.status, kitJson)) {
+          toast(
+            COPY.spark.profileInsufficient,
+            "info",
+            insufficientSparksToastOptions(),
+          );
+        } else {
+          toast(kitJson.error ?? "Could not generate kit", "error");
+        }
         return;
       }
-      const data = (await res.json()) as { classProfile?: unknown };
+      const data = kitJson;
       if (!data.classProfile) {
         toast("Could not generate kit", "error");
         return;
@@ -615,9 +651,16 @@ export default function ProfilePage() {
       const j = (await res.json().catch(() => ({}))) as {
         portraitUrl?: string;
         error?: string;
+        code?: string;
       };
       if (!res.ok) {
-        if (res.status === 402) {
+        if (isInsufficientSparksApi(res.status, j)) {
+          toast(
+            COPY.spark.profileInsufficient,
+            "info",
+            insufficientSparksToastOptions(),
+          );
+        } else if (res.status === 402) {
           toast(j.error ?? "Portrait reroll costs Sparks", "error");
         } else {
           toast(j.error ?? "Could not generate portrait", "error");
@@ -1101,13 +1144,13 @@ export default function ProfilePage() {
                         ) : (
                           <GhostButton
                             size="sm"
-                            disabled
-                            onClick={() =>
-                              toast("Portrait reroll costs Sparks (coming soon).", "info")
-                            }
+                            disabled={heroBusy || heroAiPortraitBusy}
+                            onClick={() => void handleGenerateHeroPortraitAI(h.id)}
                             className="col-span-2"
                           >
-                            Reroll (Sparks)
+                            {heroAiPortraitBusy
+                              ? "Generating…"
+                              : `Reroll portrait (${SPARK_COST_PORTRAIT_GENERATION} Sparks)`}
                           </GhostButton>
                         )}
 
@@ -1164,25 +1207,32 @@ export default function ProfilePage() {
                 )}
 
                 {slotsFull ? (
-                  <div className="rounded-[var(--radius-card)] border border-white/10 bg-black/10 p-4 flex flex-col items-center justify-center gap-2 min-h-[10.5rem] relative overflow-hidden">
+                  <button
+                    type="button"
+                    onClick={() => setHeroBuilderOpen(true)}
+                    className="rounded-[var(--radius-card)] border border-white/10 bg-black/10 p-4 flex flex-col items-center justify-center gap-2 min-h-[10.5rem] relative overflow-hidden text-left transition-colors hover:border-[rgba(212,175,55,0.25)] hover:bg-[var(--surface-container)]/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-gold-rare)]/45"
+                  >
                     <div className="pointer-events-none absolute inset-0 opacity-70">
                       <div className="absolute -top-10 -left-16 h-40 w-40 rounded-full bg-[rgba(212,175,55,0.08)] blur-2xl" />
                       <div className="absolute -bottom-12 -right-16 h-44 w-44 rounded-full bg-[rgba(120,74,32,0.16)] blur-2xl" />
                     </div>
                     <span className="relative material-symbols-outlined text-[var(--outline)]">
-                      lock
+                      add
                     </span>
                     <p className="relative text-[10px] font-black uppercase tracking-[0.2em] text-[var(--outline)] text-center">
-                      + New slot (locked)
+                      Extra hero slot
                     </p>
-                    <p className="relative text-xs text-[var(--color-silver-dim)] text-center max-w-[24ch]">
-                      Unlock with <span className="text-[var(--color-gold-rare)] font-bold">10 Sparks</span>{" "}
-                      (coming soon).
+                    <p className="relative text-xs text-[var(--color-silver-dim)] text-center max-w-[26ch]">
+                      Open the builder and save a new hero —{" "}
+                      <span className="text-[var(--color-gold-rare)] font-bold">
+                        {SPARK_COST_EXTRA_HERO_SLOT} Sparks
+                      </span>{" "}
+                      are charged when the hero is created.
                     </p>
                     <p className="relative text-[10px] uppercase tracking-[0.18em] text-[var(--outline)] text-center">
-                      Or delete your hero to replace it.
+                      Or delete a hero to free a slot.
                     </p>
-                  </div>
+                  </button>
                 ) : null}
               </div>
 
@@ -1213,7 +1263,7 @@ export default function ProfilePage() {
                     <p className="mt-1 text-sm text-[var(--color-silver-dim)]">
                       Generate a kit (class, abilities, gear) and an AI portrait, then save.
                       {slotsFull
-                        ? " Your free slot is full — unlock another slot (10 Sparks) or delete your hero to replace."
+                        ? ` Your slot is full — save a new hero from the builder to purchase another slot (${SPARK_COST_EXTRA_HERO_SLOT} Sparks on save), or delete a hero.`
                         : ""}
                     </p>
                   </div>
@@ -1222,10 +1272,7 @@ export default function ProfilePage() {
                     disabled={heroBusy}
                     onClick={() => {
                       if (slotsFull) {
-                        toast(
-                          "Hero slot is full. Unlock a new slot (10 Sparks) or delete your hero to replace it.",
-                          "error",
-                        );
+                        setHeroBuilderOpen(true);
                         return;
                       }
                       setHeroBuilderOpen((v) => !v);
@@ -1236,7 +1283,7 @@ export default function ProfilePage() {
                 </div>
               </div>
 
-              {heroBuilderOpen && !slotsFull ? (
+              {heroBuilderOpen ? (
                 <div className="space-y-3">
               <div className="grid grid-cols-2 gap-3">
                 <div className="col-span-2">
@@ -1626,7 +1673,8 @@ export default function ProfilePage() {
                         Generate one portrait from your concept.
                       </p>
                       <p className="mt-1 text-[10px] uppercase tracking-[0.18em] text-[var(--outline)]">
-                        Rerolls cost Sparks later.
+                        {COPY.spark.portraitRerollHint} (
+                        {SPARK_COST_PORTRAIT_GENERATION} Sparks each.)
                       </p>
                     </div>
                   </div>

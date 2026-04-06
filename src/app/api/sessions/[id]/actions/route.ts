@@ -24,9 +24,14 @@ import { SPARK_COST_AI_TEXT_TURN } from "@/lib/spark-pricing";
 import {
   InsufficientSparksError,
   isMonetizationSpendEnabled,
-  tryCreditSparks,
-  tryDebitSparks,
+  tryDebitSparksWithSessionPool,
+  tryRefundSessionSparkDebit,
 } from "@/server/services/spark-economy-service";
+import {
+  assertCampaignChapterAllowsAiTurn,
+  assertChapterImageBudget,
+  incrementChapterSystemImageUsage,
+} from "@/server/services/chapter-runtime-service";
 import {
   advanceTurn,
   NotYourTurnError,
@@ -73,8 +78,17 @@ export async function POST(
     return apiError("Forbidden", 403);
   }
 
+  const chapterGate = await assertCampaignChapterAllowsAiTurn({ sessionId });
+  if (!chapterGate.ok) {
+    return NextResponse.json(
+      { error: chapterGate.error, code: chapterGate.code },
+      { status: chapterGate.status },
+    );
+  }
+
   let lockHeld = false;
   let aiTurnSparkDebited = false;
+  let sparkPoolUsedForRefund = 0;
   let sparkPayerUserId: string | null = null;
   let sparkActionIdForRefund = "";
 
@@ -104,7 +118,7 @@ export async function POST(
       sparkPayerUserId
     ) {
       try {
-        const r = await tryDebitSparks({
+        const r = await tryDebitSparksWithSessionPool({
           payerUserId: sparkPayerUserId,
           amount: SPARK_COST_AI_TEXT_TURN,
           idempotencyKey: `campaign_action:${actionId}`,
@@ -112,6 +126,7 @@ export async function POST(
           reason: "ai_text_turn",
         });
         aiTurnSparkDebited = r.applied;
+        sparkPoolUsedForRefund = r.fromPool;
       } catch (sparkErr) {
         if (sparkErr instanceof InsufficientSparksError) {
           await releaseTurnLock(sessionId);
@@ -352,6 +367,13 @@ export async function POST(
       after(async () => {
         try {
           console.log("[image-after] starting image generation for action turn");
+          const budget = await assertChapterImageBudget({ sessionId });
+          if (!budget.ok) {
+            await broadcastToSession(sessionId, "scene-image-failed", {
+              scene_id: sceneImageId,
+            });
+            return;
+          }
           const result = await runImagePipeline({
             sessionId,
             turnId: imgPayload.turnId,
@@ -362,6 +384,7 @@ export async function POST(
           });
           console.log("[image-after] pipeline done, imageUrl:", result.imageUrl ?? "null");
           if (result.imageUrl) {
+            await incrementChapterSystemImageUsage(sessionId);
             await broadcastToSession(sessionId, "scene-image-ready", {
               scene_id: sceneImageId,
               image_url: result.imageUrl,
@@ -396,12 +419,13 @@ export async function POST(
       isMonetizationSpendEnabled()
     ) {
       try {
-        await tryCreditSparks({
-          userId: sparkPayerUserId,
-          amount: SPARK_COST_AI_TEXT_TURN,
-          idempotencyKey: `refund:campaign_action:${sparkActionIdForRefund}`,
+        await tryRefundSessionSparkDebit({
+          hostUserId: sparkPayerUserId,
           sessionId,
+          totalAmount: SPARK_COST_AI_TEXT_TURN,
+          idempotencyKey: `refund:campaign_action:${sparkActionIdForRefund}`,
           reason: "refund_failed_ai_turn",
+          sparkPoolUsed: sparkPoolUsedForRefund,
         });
       } catch (refundErr) {
         console.error("[sparks] refund failed after pipeline error", refundErr);

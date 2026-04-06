@@ -39,9 +39,13 @@ import { SPARK_COST_CAMPAIGN_SESSION_START } from "@/lib/spark-pricing";
 import {
   InsufficientSparksError,
   isMonetizationSpendEnabled,
-  tryCreditSparks,
-  tryDebitSparks,
+  tryDebitSparksWithSessionPool,
+  tryRefundSessionSparkDebit,
 } from "@/server/services/spark-economy-service";
+import {
+  assertChapterImageBudget,
+  incrementChapterSystemImageUsage,
+} from "@/server/services/chapter-runtime-service";
 import { createFirstTurn } from "@/server/services/turn-service";
 
 const BodySchema = z.object({
@@ -209,13 +213,14 @@ export async function POST(
     }
 
     let sessionStartDebited = false;
+    let sessionStartPoolUsed = 0;
     if (
       sessionRow.game_kind !== "party" &&
       sessionRow.mode === "ai_dm" &&
       isMonetizationSpendEnabled()
     ) {
       try {
-        const r = await tryDebitSparks({
+        const r = await tryDebitSparksWithSessionPool({
           payerUserId: sessionRow.host_user_id,
           amount: SPARK_COST_CAMPAIGN_SESSION_START,
           idempotencyKey: `campaign_session_start:${sessionId}`,
@@ -223,6 +228,7 @@ export async function POST(
           reason: "campaign_session_start",
         });
         sessionStartDebited = r.applied;
+        sessionStartPoolUsed = r.fromPool;
       } catch (sparkErr) {
         if (sparkErr instanceof InsufficientSparksError) {
           return insufficientSparksResponse({
@@ -238,12 +244,13 @@ export async function POST(
     if (!started) {
       if (sessionStartDebited && isMonetizationSpendEnabled()) {
         try {
-          await tryCreditSparks({
-            userId: sessionRow.host_user_id,
-            amount: SPARK_COST_CAMPAIGN_SESSION_START,
-            idempotencyKey: `refund:campaign_session_start:${sessionId}`,
+          await tryRefundSessionSparkDebit({
+            hostUserId: sessionRow.host_user_id,
             sessionId,
+            totalAmount: SPARK_COST_CAMPAIGN_SESSION_START,
+            idempotencyKey: `refund:campaign_session_start:${sessionId}`,
             reason: "refund_session_start_failed",
+            sparkPoolUsed: sessionStartPoolUsed,
           });
         } catch (refundErr) {
           console.error("[sparks] refund after start failure", refundErr);
@@ -491,6 +498,13 @@ export async function POST(
     after(async () => {
       try {
         console.log("[image-after] starting image generation for opening scene");
+        const budget = await assertChapterImageBudget({ sessionId });
+        if (!budget.ok) {
+          await broadcastToSession(sessionId, "scene-image-failed", {
+            scene_id: sceneImageId,
+          });
+          return;
+        }
         const result = await runImagePipeline({
           sessionId,
           turnId: firstTurnId,
@@ -500,6 +514,7 @@ export async function POST(
         });
         console.log("[image-after] pipeline done, imageUrl:", !!result.imageUrl);
         if (result.imageUrl) {
+          await incrementChapterSystemImageUsage(sessionId);
           await broadcastToSession(sessionId, "scene-image-ready", {
             scene_id: sceneImageId,
             image_url: result.imageUrl,

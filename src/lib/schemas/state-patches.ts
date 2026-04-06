@@ -22,6 +22,13 @@ export const NpcRevealPatchSchema = z.object({
   level: z.enum(["none", "partial", "full"]),
 });
 
+/** Marks an NPC as a combat threat after a hostile action targets them. */
+export const NpcMarkHostilePatchSchema = z.object({
+  op: z.literal("npc_mark_hostile"),
+  npcId: z.string(),
+  reason: z.string().optional(),
+});
+
 export const PlayerHpPatchSchema = z.object({
   op: z.literal("player_hp"),
   playerId: z.string(),
@@ -72,6 +79,7 @@ export const LocationSetPatchSchema = z.object({
 export const StatePatchSchema = z.discriminatedUnion("op", [
   NpcHpPatchSchema,
   NpcRevealPatchSchema,
+  NpcMarkHostilePatchSchema,
   PlayerHpPatchSchema,
   PlayerManaPatchSchema,
   ConditionAddPatchSchema,
