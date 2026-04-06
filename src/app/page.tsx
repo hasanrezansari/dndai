@@ -738,39 +738,33 @@ export default function Home() {
         aria-hidden
       />
       <div className="flex flex-col gap-[var(--void-gap)] w-full max-w-lg pt-6 sm:pt-8">
-        {/* Hero — compact; full pitch lives under “How it works” */}
-        <header className="relative overflow-hidden rounded-[var(--radius-card)] border border-[var(--border-ui)] bg-[var(--surface-container)]/45 backdrop-blur-[12px] px-5 py-6 sm:px-6 sm:py-7 shadow-[0_20px_60px_rgba(0,0,0,0.35)]">
+        {/* Hero — brand-forward, minimal copy; detail in “How it works” */}
+        <header className="relative overflow-hidden rounded-[var(--radius-card)] border border-[var(--border-ui)] bg-[var(--surface-container)]/45 backdrop-blur-[12px] px-4 py-10 sm:px-8 sm:py-14 shadow-[0_20px_60px_rgba(0,0,0,0.35)]">
           <div className="pointer-events-none absolute inset-0 opacity-90">
-            <div className="absolute -top-16 -left-24 h-56 w-56 rounded-full bg-[color-mix(in_srgb,var(--color-gold-rare)_16%,transparent)] blur-3xl" />
-            <div className="absolute -bottom-20 -right-28 h-72 w-72 rounded-full bg-[color-mix(in_srgb,var(--atmosphere-mystery)_22%,transparent)] blur-3xl" />
-            <div className="absolute top-1/3 right-0 h-40 w-40 rounded-full bg-[color-mix(in_srgb,var(--accent-cyan)_08%,transparent)] blur-3xl" />
-            <div className="absolute inset-0 bg-gradient-to-b from-transparent via-transparent to-[var(--color-obsidian)]/88" />
+            <div className="absolute -top-16 left-1/2 h-64 w-64 -translate-x-1/2 rounded-full bg-[color-mix(in_srgb,var(--color-gold-rare)_18%,transparent)] blur-3xl" />
+            <div className="absolute -bottom-24 -right-20 h-72 w-72 rounded-full bg-[color-mix(in_srgb,var(--atmosphere-mystery)_20%,transparent)] blur-3xl" />
+            <div className="absolute inset-0 bg-gradient-to-b from-transparent via-transparent to-[var(--color-obsidian)]/75" />
           </div>
 
-          <div className="relative flex flex-col gap-3 text-left">
-            <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
-              <p className="pl-3 border-l-2 border-[var(--accent-cyan-muted)] text-[10px] uppercase tracking-[0.22em] text-[var(--text-tertiary)] sm:min-w-0 sm:flex-1">
-                {COPY.landing.eyebrow}
-              </p>
-              {authStatus === "authenticated" ? (
-                <SparkBalanceInline
-                  balance={sparkBalance}
-                  loading={sparkBalanceLoading}
-                  isGuest={isGuest}
-                />
-              ) : null}
+          {authStatus === "authenticated" ? (
+            <div className="relative z-10 flex justify-end mb-2 sm:absolute sm:top-4 sm:right-4 sm:mb-0">
+              <SparkBalanceInline
+                balance={sparkBalance}
+                loading={sparkBalanceLoading}
+                isGuest={isGuest}
+              />
             </div>
-            <h1 className="text-[1.85rem] sm:text-4xl font-black text-[var(--color-gold-rare)] leading-[1.1] tracking-tight">
+          ) : null}
+
+          <div className="relative z-[1] flex flex-col items-center text-center gap-6 sm:gap-8">
+            <h1 className="text-[clamp(2.75rem,12vw,5.5rem)] font-black leading-[0.95] tracking-[-0.02em] text-[var(--color-gold-rare)] drop-shadow-[0_2px_24px_rgba(0,0,0,0.45)]">
               {getBrandName(brand)}
             </h1>
-            <p className="text-lg sm:text-xl font-bold text-[var(--color-silver-muted)] leading-snug tracking-tight font-[family-name:var(--font-gameplay)]">
+            <p className="max-w-[22rem] text-sm sm:text-base text-[var(--color-silver-dim)] leading-snug font-[family-name:var(--font-gameplay)] px-2">
               {COPY.landing.heroTitle}
             </p>
-            <p className="text-[15px] sm:text-base text-[var(--text-secondary)] leading-relaxed max-w-[28rem] font-[family-name:var(--font-gameplay)]">
-              {COPY.landing.heroSub}
-            </p>
 
-            <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:flex-wrap">
+            <div className="flex w-full max-w-md flex-col gap-3 sm:flex-row sm:flex-wrap sm:justify-center">
               <GoldButton
                 type="button"
                 size="lg"
@@ -799,7 +793,7 @@ export default function Home() {
               </Link>
             </div>
 
-            <div className="mt-4 flex flex-wrap items-center justify-start gap-2">
+            <div className="flex flex-wrap items-center justify-center gap-2">
               {HOME_NAV_CHIPS.map((item) => (
                 <Link
                   key={item.href}
@@ -817,33 +811,30 @@ export default function Home() {
             </div>
 
             {authSession?.user?.name ? (
-              <div className="mt-2 flex flex-col items-stretch gap-2">
-                <p className="text-[10px] text-[var(--outline)] uppercase tracking-[0.18em] text-left">
+              <div className="flex w-full max-w-md flex-col items-center gap-3 pt-1">
+                <p className="text-[11px] text-[var(--outline)]">
                   {isGuest ? (
                     <>
-                      Playing as{" "}
-                      <span className="text-[var(--color-silver-muted)] normal-case tracking-normal">
+                      <span className="uppercase tracking-[0.14em]">Playing as</span>{" "}
+                      <span className="text-[var(--color-silver-muted)]">
                         {authSession.user.name}
                       </span>
-                      <span className="block mt-1 normal-case tracking-normal text-[var(--color-silver-dim)]">
-                        Guest session · progress stays on this browser until you link
-                        Google
+                      <span className="text-[var(--color-silver-dim)]">
+                        {" "}
+                        · guest — link Google to keep progress
                       </span>
                     </>
                   ) : (
-                    <>
-                      Signed in with Google
+                    <span className="text-[var(--color-silver-dim)]">
                       {typeof authSession.user.email === "string" &&
-                      !authSession.user.email.endsWith("@ashveil.guest") ? (
-                        <span className="block mt-1 normal-case tracking-normal text-[var(--color-silver-dim)]">
-                          {authSession.user.email}
-                        </span>
-                      ) : null}
-                    </>
+                      !authSession.user.email.endsWith("@ashveil.guest")
+                        ? authSession.user.email
+                        : "Signed in"}
+                    </span>
                   )}
                 </p>
                 {isGuest ? (
-                  <div className="w-full max-w-[280px] flex flex-col gap-2">
+                  <div className="flex w-full max-w-[280px] flex-col items-center gap-2">
                     <GoogleSignInButton
                       disabled={upgradeBusy}
                       onClick={() => void handleUpgradeToGoogle()}
@@ -851,13 +842,8 @@ export default function Home() {
                         upgradeBusy ? "Saving…" : "Save progress with Google"
                       }
                     />
-                    <p className="text-[9px] text-[var(--outline)] text-left leading-relaxed">
-                      Opens Google once, then attaches this guest&apos;s games to
-                      that login. You don&apos;t need Sign out first — we clear the
-                      guest session as part of this.
-                    </p>
                     {upgradeError ? (
-                      <p className="text-xs text-[var(--color-failure)] text-left leading-relaxed">
+                      <p className="text-xs text-[var(--color-failure)] text-center">
                         {upgradeError}
                       </p>
                     ) : null}
