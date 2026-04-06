@@ -1,10 +1,19 @@
+import { createHash } from "crypto";
+
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 
-import { apiError, handleApiError } from "@/lib/api/errors";
+import { apiError, handleApiError, insufficientSparksResponse } from "@/lib/api/errors";
 import { requireUser, unauthorizedResponse } from "@/lib/auth/guards";
 import { isCustomClassesEnabled } from "@/lib/config/features";
 import { ClassProfileRoleSchema } from "@/lib/schemas/domain";
+import { SPARK_COST_CUSTOM_CLASS_GENERATION } from "@/lib/spark-pricing";
+import {
+  InsufficientSparksError,
+  isMonetizationSpendEnabled,
+  tryCreditSparks,
+  tryDebitSparks,
+} from "@/server/services/spark-economy-service";
 import { generateCustomClassProfileFromAI } from "@/server/services/custom-class-generation-service";
 
 const GenerateClassBodySchema = z.object({
@@ -31,18 +40,63 @@ export async function POST(request: NextRequest) {
       return apiError("Invalid body", 400);
     }
 
-    const profile = await generateCustomClassProfileFromAI({
-      concept: parsed.data.concept,
-      rolePreference: parsed.data.rolePreference,
-      sessionPremise: {
-        adventure_prompt: parsed.data.adventure_prompt,
-        adventure_tags: parsed.data.adventure_tags,
-        world_bible: parsed.data.world_bible,
-        art_direction: parsed.data.art_direction,
-      },
-    });
+    const idemBody = createHash("sha256")
+      .update(JSON.stringify(parsed.data))
+      .digest("hex")
+      .slice(0, 32);
+    const idempotencyKey = `generate_class:${user.id}:${idemBody}`;
 
-    return NextResponse.json({ classProfile: profile }, { status: 200 });
+    let classDebited = false;
+    if (isMonetizationSpendEnabled()) {
+      try {
+        const r = await tryDebitSparks({
+          payerUserId: user.id,
+          amount: SPARK_COST_CUSTOM_CLASS_GENERATION,
+          idempotencyKey,
+          sessionId: null,
+          reason: "custom_class_generation",
+        });
+        classDebited = r.applied;
+      } catch (e) {
+        if (e instanceof InsufficientSparksError) {
+          return insufficientSparksResponse({
+            balance: e.balance,
+            required: e.required,
+          });
+        }
+        throw e;
+      }
+    }
+
+    try {
+      const profile = await generateCustomClassProfileFromAI({
+        concept: parsed.data.concept,
+        rolePreference: parsed.data.rolePreference,
+        sessionPremise: {
+          adventure_prompt: parsed.data.adventure_prompt,
+          adventure_tags: parsed.data.adventure_tags,
+          world_bible: parsed.data.world_bible,
+          art_direction: parsed.data.art_direction,
+        },
+      });
+
+      return NextResponse.json({ classProfile: profile }, { status: 200 });
+    } catch (genErr) {
+      if (classDebited && isMonetizationSpendEnabled()) {
+        try {
+          await tryCreditSparks({
+            userId: user.id,
+            amount: SPARK_COST_CUSTOM_CLASS_GENERATION,
+            idempotencyKey: `refund:${idempotencyKey}`,
+            sessionId: null,
+            reason: "refund_custom_class_failed",
+          });
+        } catch (refundErr) {
+          console.error("[sparks] class gen refund failed", refundErr);
+        }
+      }
+      throw genErr;
+    }
   } catch (e) {
     if (e instanceof Error) {
       const msg = e.message.toLowerCase();

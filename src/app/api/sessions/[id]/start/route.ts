@@ -8,7 +8,7 @@ import { z } from "zod";
 /** Party start awaits AI round opener (up to ~45s) + secrets; keep headroom vs default 60s. */
 export const maxDuration = 120;
 
-import { apiError, handleApiError } from "@/lib/api/errors";
+import { apiError, handleApiError, insufficientSparksResponse } from "@/lib/api/errors";
 import { requireUser, unauthorizedResponse } from "@/lib/auth/guards";
 import { getAIProvider } from "@/lib/ai";
 import { isPlayRomanaModuleKey } from "@/lib/ai/narrative-session-profile";
@@ -35,6 +35,13 @@ import {
 } from "@/server/services/session-service";
 import { activatePartySessionFromLobby } from "@/server/services/party-phase-service";
 import { initializeQuestState } from "@/server/services/quest-service";
+import { SPARK_COST_CAMPAIGN_SESSION_START } from "@/lib/spark-pricing";
+import {
+  InsufficientSparksError,
+  isMonetizationSpendEnabled,
+  tryCreditSparks,
+  tryDebitSparks,
+} from "@/server/services/spark-economy-service";
 import { createFirstTurn } from "@/server/services/turn-service";
 
 const BodySchema = z.object({
@@ -201,8 +208,47 @@ export async function POST(
       return apiError("Not all players are ready", 409);
     }
 
+    let sessionStartDebited = false;
+    if (
+      sessionRow.game_kind !== "party" &&
+      sessionRow.mode === "ai_dm" &&
+      isMonetizationSpendEnabled()
+    ) {
+      try {
+        const r = await tryDebitSparks({
+          payerUserId: sessionRow.host_user_id,
+          amount: SPARK_COST_CAMPAIGN_SESSION_START,
+          idempotencyKey: `campaign_session_start:${sessionId}`,
+          sessionId,
+          reason: "campaign_session_start",
+        });
+        sessionStartDebited = r.applied;
+      } catch (sparkErr) {
+        if (sparkErr instanceof InsufficientSparksError) {
+          return insufficientSparksResponse({
+            balance: sparkErr.balance,
+            required: sparkErr.required,
+          });
+        }
+        throw sparkErr;
+      }
+    }
+
     const started = await startSession(sessionId);
     if (!started) {
+      if (sessionStartDebited && isMonetizationSpendEnabled()) {
+        try {
+          await tryCreditSparks({
+            userId: sessionRow.host_user_id,
+            amount: SPARK_COST_CAMPAIGN_SESSION_START,
+            idempotencyKey: `refund:campaign_session_start:${sessionId}`,
+            sessionId,
+            reason: "refund_session_start_failed",
+          });
+        } catch (refundErr) {
+          console.error("[sparks] refund after start failure", refundErr);
+        }
+      }
       return apiError("Could not start session", 409);
     }
 

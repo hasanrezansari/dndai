@@ -6,9 +6,9 @@ import { requireUser, unauthorizedResponse } from "@/lib/auth/guards";
 import { generatePortraitImageOpenRouter } from "@/lib/ai/openrouter-image-provider";
 import { CHARACTER_RACE_MAX_LEN, normalizeCharacterRace } from "@/lib/rules/character";
 import {
-  assertAndConsumeFreePortraitUse,
-  PortraitPaymentRequiredError,
-} from "@/server/services/profile-hero-service";
+  gatePortraitWithSparks,
+  refundPortraitSparksIfNeeded,
+} from "@/server/services/spark-portrait-gate";
 
 const BodySchema = z.object({
   name: z.string().trim().min(1).max(48),
@@ -37,17 +37,13 @@ export async function POST(request: NextRequest) {
     const raceNorm = normalizeCharacterRace(parsed.data.race);
     if (!raceNorm.ok) return apiError(raceNorm.error, 400);
 
-    if (parsed.data.reroll) {
-      return apiError("Portrait reroll costs Sparks", 402);
-    }
-
-    try {
-      await assertAndConsumeFreePortraitUse(user.id);
-    } catch (e) {
-      if (e instanceof PortraitPaymentRequiredError) {
-        return apiError("Portrait generation costs Sparks", 402);
-      }
-      throw e;
+    const gate = await gatePortraitWithSparks({
+      userId: user.id,
+      reroll: Boolean(parsed.data.reroll),
+      keyPrefix: "session_char",
+    });
+    if (!gate.ok) {
+      return gate.response;
     }
 
     const prompt = [
@@ -60,13 +56,21 @@ export async function POST(request: NextRequest) {
       .filter(Boolean)
       .join("\n");
 
-    const out = await generatePortraitImageOpenRouter({
-      prompt,
-      negativePrompt: "text, watermark, logo, UI, extra limbs, multiple faces",
-    });
+    try {
+      const out = await generatePortraitImageOpenRouter({
+        prompt,
+        negativePrompt: "text, watermark, logo, UI, extra limbs, multiple faces",
+      });
 
-    const dataUrl = `data:image/png;base64,${out.base64}`;
-    return NextResponse.json({ portraitUrl: dataUrl }, { status: 201 });
+      const dataUrl = `data:image/png;base64,${out.base64}`;
+      return NextResponse.json({ portraitUrl: dataUrl }, { status: 201 });
+    } catch (e) {
+      await refundPortraitSparksIfNeeded({
+        userId: user.id,
+        paidIdempotencyKey: gate.paidIdempotencyKey,
+      });
+      return handleApiError(e);
+    }
   } catch (e) {
     return handleApiError(e);
   }

@@ -4,12 +4,18 @@ import { z } from "zod";
 
 export const maxDuration = 120;
 
-import { apiError, handleApiError } from "@/lib/api/errors";
+import { apiError, handleApiError, insufficientSparksResponse } from "@/lib/api/errors";
 import { internalBearerAuthorized, isSessionMember } from "@/lib/auth/guards";
 import { getCurrentUser } from "@/lib/auth/session";
 import { db } from "@/lib/db";
 import { sessions } from "@/lib/db/schema";
+import { SPARK_COST_SCENE_IMAGE } from "@/lib/spark-pricing";
 import { runImagePipeline } from "@/lib/orchestrator/image-worker";
+import {
+  InsufficientSparksError,
+  isMonetizationSpendEnabled,
+  tryDebitSparks,
+} from "@/server/services/spark-economy-service";
 import { broadcastToSession } from "@/lib/socket/server";
 
 const BodySchema = z.object({
@@ -57,12 +63,35 @@ export async function POST(
       parsed.data;
 
     const [sessionRow] = await db
-      .select({ state_version: sessions.state_version })
+      .select({
+        state_version: sessions.state_version,
+        host_user_id: sessions.host_user_id,
+      })
       .from(sessions)
       .where(eq(sessions.id, sessionId))
       .limit(1);
 
     const stateVersion = sessionRow?.state_version ?? 0;
+
+    if (isMonetizationSpendEnabled() && sessionRow?.host_user_id) {
+      try {
+        await tryDebitSparks({
+          payerUserId: sessionRow.host_user_id,
+          amount: SPARK_COST_SCENE_IMAGE,
+          idempotencyKey: `scene_image:${sessionId}:${parsed.data.scene_id}`,
+          sessionId,
+          reason: "scene_image",
+        });
+      } catch (sparkErr) {
+        if (sparkErr instanceof InsufficientSparksError) {
+          return insufficientSparksResponse({
+            balance: sparkErr.balance,
+            required: sparkErr.required,
+          });
+        }
+        throw sparkErr;
+      }
+    }
 
     let imageUrl: string | null = null;
     try {

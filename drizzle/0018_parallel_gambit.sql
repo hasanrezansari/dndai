@@ -1,0 +1,1 @@
+ALTER TABLE "user_profile_settings" ADD COLUMN "purchased_hero_slots" integer DEFAULT 0 NOT NULL;

@@ -32,6 +32,8 @@ export const userProfileSettings = pgTable(
       .notNull()
       .default(false),
     free_portrait_uses: integer("free_portrait_uses").notNull().default(0),
+    /** Extra profile hero slots purchased with Sparks (beyond free tier). */
+    purchased_hero_slots: integer("purchased_hero_slots").notNull().default(0),
     created_at: timestamp("created_at", { withTimezone: true })
       .notNull()
       .defaultNow(),
@@ -647,5 +649,48 @@ export const orchestrationTraces = pgTable(
       t.session_id,
       t.created_at.desc(),
     ),
+  ],
+);
+
+/** One row per user; balance is authoritative available Sparks (non-negative). */
+export const userWallets = pgTable("user_wallets", {
+  user_id: text("user_id")
+    .primaryKey()
+    .references(() => authUsers.id, { onDelete: "cascade" }),
+  balance: integer("balance").notNull().default(0),
+  updated_at: timestamp("updated_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+});
+
+/** Append-only ledger for credits (e.g. purchases) and debits (spend); idempotency per user when set. */
+export const sparkTransactions = pgTable(
+  "spark_transactions",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    user_id: text("user_id")
+      .notNull()
+      .references(() => authUsers.id, { onDelete: "cascade" }),
+    type: text("type").notNull(),
+    amount: integer("amount").notNull(),
+    reason: text("reason").notNull(),
+    idempotency_key: text("idempotency_key"),
+    session_id: uuid("session_id").references(() => sessions.id, {
+      onDelete: "set null",
+    }),
+    external_payment_id: text("external_payment_id"),
+    metadata: jsonb("metadata")
+      .$type<Record<string, unknown>>()
+      .default(sql`'{}'::jsonb`),
+    created_at: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [
+    index("spark_transactions_user_created_idx").on(t.user_id, t.created_at),
+    index("spark_transactions_session_idx").on(t.session_id),
+    uniqueIndex("spark_transactions_user_idempotency_uidx")
+      .on(t.user_id, t.idempotency_key)
+      .where(sql`${t.idempotency_key} IS NOT NULL`),
   ],
 );

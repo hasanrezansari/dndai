@@ -1,4 +1,4 @@
-import { and, count, desc, eq } from "drizzle-orm";
+import { and, count, desc, eq, sql } from "drizzle-orm";
 
 import { db } from "@/lib/db";
 import { profileHeroes, userProfileSettings } from "@/lib/db/schema";
@@ -65,6 +65,7 @@ function mapRow(row: typeof profileHeroes.$inferSelect): ProfileHero {
 export async function getOrCreateProfileSettings(userId: string): Promise<{
   publicProfileEnabled: boolean;
   freePortraitUses: number;
+  purchasedHeroSlots: number;
 }> {
   const [row] = await db
     .select()
@@ -75,16 +76,23 @@ export async function getOrCreateProfileSettings(userId: string): Promise<{
     return {
       publicProfileEnabled: row.public_profile_enabled,
       freePortraitUses: row.free_portrait_uses ?? 0,
+      purchasedHeroSlots: row.purchased_hero_slots ?? 0,
     };
   }
   try {
     const [created] = await db
       .insert(userProfileSettings)
-      .values({ user_id: userId, public_profile_enabled: false, free_portrait_uses: 0 })
+      .values({
+        user_id: userId,
+        public_profile_enabled: false,
+        free_portrait_uses: 0,
+        purchased_hero_slots: 0,
+      })
       .returning();
     return {
       publicProfileEnabled: created?.public_profile_enabled ?? false,
       freePortraitUses: created?.free_portrait_uses ?? 0,
+      purchasedHeroSlots: created?.purchased_hero_slots ?? 0,
     };
   } catch (e: unknown) {
     const code =
@@ -101,6 +109,7 @@ export async function getOrCreateProfileSettings(userId: string): Promise<{
       return {
         publicProfileEnabled: again.public_profile_enabled,
         freePortraitUses: again.free_portrait_uses ?? 0,
+        purchasedHeroSlots: again.purchased_hero_slots ?? 0,
       };
     }
     throw new Error("Failed to create profile settings");
@@ -142,6 +151,27 @@ export async function assertAndConsumeFreePortraitUse(userId: string) {
     .update(userProfileSettings)
     .set({
       free_portrait_uses: settings.freePortraitUses + 1,
+      updated_at: new Date(),
+    })
+    .where(eq(userProfileSettings.user_id, userId));
+}
+
+export async function incrementPurchasedHeroSlots(userId: string): Promise<void> {
+  await getOrCreateProfileSettings(userId);
+  await db
+    .update(userProfileSettings)
+    .set({
+      purchased_hero_slots: sql`${userProfileSettings.purchased_hero_slots} + 1`,
+      updated_at: new Date(),
+    })
+    .where(eq(userProfileSettings.user_id, userId));
+}
+
+export async function decrementPurchasedHeroSlots(userId: string): Promise<void> {
+  await db
+    .update(userProfileSettings)
+    .set({
+      purchased_hero_slots: sql`greatest(0, ${userProfileSettings.purchased_hero_slots} - 1)`,
       updated_at: new Date(),
     })
     .where(eq(userProfileSettings.user_id, userId));
@@ -194,7 +224,9 @@ export async function upsertSingleProfileHero(params: {
   isPublic?: boolean;
 }): Promise<ProfileHero> {
   const used = await countProfileHeroSlotsUsed(params.userId);
-  if (used >= FREE_PROFILE_HERO_SLOTS) {
+  const settings = await getOrCreateProfileSettings(params.userId);
+  const maxSlots = FREE_PROFILE_HERO_SLOTS + settings.purchasedHeroSlots;
+  if (used >= maxSlots) {
     // For v1 we only allow replacing via delete, not auto-overwrite.
     throw new ProfileHeroSlotLimitError();
   }
@@ -249,7 +281,9 @@ export async function copyPublicHeroToUser(params: {
   fromHeroId: string;
 }): Promise<ProfileHero> {
   const used = await countProfileHeroSlotsUsed(params.viewerUserId);
-  if (used >= FREE_PROFILE_HERO_SLOTS) {
+  const settings = await getOrCreateProfileSettings(params.viewerUserId);
+  const maxSlots = FREE_PROFILE_HERO_SLOTS + settings.purchasedHeroSlots;
+  if (used >= maxSlots) {
     throw new ProfileHeroSlotLimitError();
   }
 

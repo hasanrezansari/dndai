@@ -3,11 +3,17 @@ import { after } from "next/server";
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 
-import { apiError, handleApiError } from "@/lib/api/errors";
+import { apiError, handleApiError, insufficientSparksResponse } from "@/lib/api/errors";
 import { internalBearerAuthorized } from "@/lib/auth/guards";
 import { db } from "@/lib/db";
 import { sessions } from "@/lib/db/schema";
+import { SPARK_COST_SCENE_IMAGE } from "@/lib/spark-pricing";
 import { runImagePipeline } from "@/lib/orchestrator/image-worker";
+import {
+  InsufficientSparksError,
+  isMonetizationSpendEnabled,
+  tryDebitSparks,
+} from "@/server/services/spark-economy-service";
 import { PartyConfigV1Schema } from "@/lib/schemas/party";
 import { broadcastPartyStateRefresh } from "@/lib/party/party-socket";
 
@@ -160,6 +166,26 @@ export async function POST(
 
     const narrativeText = parsed.data.narrative_text;
     const roundIndex = parsed.data.round_index;
+
+    if (isMonetizationSpendEnabled()) {
+      try {
+        await tryDebitSparks({
+          payerUserId: row.host_user_id,
+          amount: SPARK_COST_SCENE_IMAGE,
+          idempotencyKey: `party_scene_image:${sessionId}:${roundIndex}`,
+          sessionId,
+          reason: "party_scene_image",
+        });
+      } catch (sparkErr) {
+        if (sparkErr instanceof InsufficientSparksError) {
+          return insufficientSparksResponse({
+            balance: sparkErr.balance,
+            required: sparkErr.required,
+          });
+        }
+        throw sparkErr;
+      }
+    }
 
     after(() =>
       executePartySceneImageJob({

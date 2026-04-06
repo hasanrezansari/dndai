@@ -8,9 +8,9 @@ import { db } from "@/lib/db";
 import { profileHeroes } from "@/lib/db/schema";
 import { generatePortraitImageOpenRouter } from "@/lib/ai/openrouter-image-provider";
 import {
-  assertAndConsumeFreePortraitUse,
-  PortraitPaymentRequiredError,
-} from "@/server/services/profile-hero-service";
+  gatePortraitWithSparks,
+  refundPortraitSparksIfNeeded,
+} from "@/server/services/spark-portrait-gate";
 
 const ParamsSchema = z.object({ id: z.string().uuid() });
 
@@ -41,10 +41,8 @@ export async function POST(
         ? (row.visual_profile as Record<string, unknown>)
         : {};
     const existing = vp.portrait_url;
-    if (typeof existing === "string" && existing.trim().length > 0) {
-      // Rerolls are paid later (Sparks wallet).
-    return apiError("Portrait reroll costs Sparks", 402);
-    }
+    const hasPortrait =
+      typeof existing === "string" && existing.trim().length > 0;
 
     let json: unknown = {};
     try {
@@ -55,13 +53,13 @@ export async function POST(
     const body = BodySchema.safeParse(json);
     if (!body.success) return apiError("Invalid body", 400);
 
-    try {
-      await assertAndConsumeFreePortraitUse(user.id);
-    } catch (e) {
-      if (e instanceof PortraitPaymentRequiredError) {
-        return apiError("Portrait generation costs Sparks", 402);
-      }
-      throw e;
+    const gate = await gatePortraitWithSparks({
+      userId: user.id,
+      reroll: hasPortrait,
+      keyPrefix: `hero_${params.data.id}`,
+    });
+    if (!gate.ok) {
+      return gate.response;
     }
 
     const concept = typeof vp.concept === "string" ? vp.concept : "";
@@ -84,28 +82,36 @@ export async function POST(
       .filter(Boolean)
       .join("\n");
 
-    const out = await generatePortraitImageOpenRouter({
-      prompt,
-      negativePrompt: "text, watermark, logo, UI, extra limbs, multiple faces",
-    });
+    try {
+      const out = await generatePortraitImageOpenRouter({
+        prompt,
+        negativePrompt: "text, watermark, logo, UI, extra limbs, multiple faces",
+      });
 
-    const dataUrl = `data:image/png;base64,${out.base64}`;
-    const nextVp: Record<string, unknown> = { ...vp, portrait_url: dataUrl };
+      const dataUrl = `data:image/png;base64,${out.base64}`;
+      const nextVp: Record<string, unknown> = { ...vp, portrait_url: dataUrl };
 
-    const [updated] = await db
-      .update(profileHeroes)
-      .set({ visual_profile: nextVp, updated_at: new Date() })
-      .where(eq(profileHeroes.id, row.id))
-      .returning();
+      const [updated] = await db
+        .update(profileHeroes)
+        .set({ visual_profile: nextVp, updated_at: new Date() })
+        .where(eq(profileHeroes.id, row.id))
+        .returning();
 
-    return NextResponse.json(
-      {
-        ok: true,
-        portraitUrl: dataUrl,
-        heroId: updated?.id ?? row.id,
-      },
-      { status: 201 },
-    );
+      return NextResponse.json(
+        {
+          ok: true,
+          portraitUrl: dataUrl,
+          heroId: updated?.id ?? row.id,
+        },
+        { status: 201 },
+      );
+    } catch (e) {
+      await refundPortraitSparksIfNeeded({
+        userId: user.id,
+        paidIdempotencyKey: gate.paidIdempotencyKey,
+      });
+      return handleApiError(e);
+    }
   } catch (e) {
     return handleApiError(e);
   }

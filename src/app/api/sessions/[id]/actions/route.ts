@@ -7,7 +7,7 @@ import { z } from "zod";
 
 export const maxDuration = 120;
 
-import { apiError, handleApiError } from "@/lib/api/errors";
+import { apiError, handleApiError, insufficientSparksResponse } from "@/lib/api/errors";
 import { COPY } from "@/lib/copy/ashveil";
 import {
   isPlayerForUser,
@@ -20,6 +20,13 @@ import { runTurnPipeline } from "@/lib/orchestrator/pipeline";
 import { runImagePipeline } from "@/lib/orchestrator/image-worker";
 import { broadcastToSession } from "@/lib/socket/server";
 import { finalizeSessionEnd } from "@/server/services/quest-service";
+import { SPARK_COST_AI_TEXT_TURN } from "@/lib/spark-pricing";
+import {
+  InsufficientSparksError,
+  isMonetizationSpendEnabled,
+  tryCreditSparks,
+  tryDebitSparks,
+} from "@/server/services/spark-economy-service";
 import {
   advanceTurn,
   NotYourTurnError,
@@ -67,6 +74,9 @@ export async function POST(
   }
 
   let lockHeld = false;
+  let aiTurnSparkDebited = false;
+  let sparkPayerUserId: string | null = null;
+  let sparkActionIdForRefund = "";
 
   try {
     const { actionId, turnId } = await submitAction({
@@ -75,6 +85,45 @@ export async function POST(
       rawInput: parsed.data.text,
     });
     lockHeld = true;
+    sparkActionIdForRefund = actionId;
+
+    const [sessionForSparks] = await db
+      .select({
+        mode: sessions.mode,
+        host_user_id: sessions.host_user_id,
+      })
+      .from(sessions)
+      .where(eq(sessions.id, sessionId))
+      .limit(1);
+
+    sparkPayerUserId = sessionForSparks?.host_user_id ?? null;
+
+    if (
+      sessionForSparks?.mode === "ai_dm" &&
+      isMonetizationSpendEnabled() &&
+      sparkPayerUserId
+    ) {
+      try {
+        const r = await tryDebitSparks({
+          payerUserId: sparkPayerUserId,
+          amount: SPARK_COST_AI_TEXT_TURN,
+          idempotencyKey: `campaign_action:${actionId}`,
+          sessionId,
+          reason: "ai_text_turn",
+        });
+        aiTurnSparkDebited = r.applied;
+      } catch (sparkErr) {
+        if (sparkErr instanceof InsufficientSparksError) {
+          await releaseTurnLock(sessionId);
+          lockHeld = false;
+          return insufficientSparksResponse({
+            balance: sparkErr.balance,
+            required: sparkErr.required,
+          });
+        }
+        throw sparkErr;
+      }
+    }
 
     const [completedTurnRow] = await db
       .select({ round_number: turns.round_number })
@@ -340,6 +389,24 @@ export async function POST(
 
     return NextResponse.json({ actionId, turnId }, { status: 202 });
   } catch (e) {
+    if (
+      aiTurnSparkDebited &&
+      sparkPayerUserId &&
+      sparkActionIdForRefund &&
+      isMonetizationSpendEnabled()
+    ) {
+      try {
+        await tryCreditSparks({
+          userId: sparkPayerUserId,
+          amount: SPARK_COST_AI_TEXT_TURN,
+          idempotencyKey: `refund:campaign_action:${sparkActionIdForRefund}`,
+          sessionId,
+          reason: "refund_failed_ai_turn",
+        });
+      } catch (refundErr) {
+        console.error("[sparks] refund failed after pipeline error", refundErr);
+      }
+    }
     if (lockHeld) {
       try {
         await releaseTurnLock(sessionId);

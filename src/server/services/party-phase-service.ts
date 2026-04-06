@@ -32,6 +32,16 @@ import {
   createInitialPartyConfig,
   type PartyConfigV1,
 } from "@/lib/schemas/party";
+import {
+  SPARK_COST_PARTY_JUDGE,
+  SPARK_COST_PARTY_ROUND_OPENER,
+} from "@/lib/spark-pricing";
+import {
+  InsufficientSparksError,
+  isMonetizationSpendEnabled,
+  tryCreditSparks,
+  tryDebitSparks,
+} from "@/server/services/spark-economy-service";
 
 import { dealPartySecretsIfNeeded } from "@/server/services/party-secret-service";
 import { SessionNotFoundError } from "@/server/services/session-service";
@@ -64,6 +74,29 @@ async function runPartyJudgePickWinner(
     .filter(Boolean) as Array<{ player_id: string; text: string }>;
   if (candidates.length === 0) return playerIds.sort()[0] ?? null;
   if (candidates.length === 1) return candidates[0]!.player_id;
+
+  const judgeIdem = `party_judge:${sessionId}:${lineSource}:${[...playerIds].sort().join(",")}`;
+  let judgeDebited = false;
+  if (isMonetizationSpendEnabled()) {
+    try {
+      const r = await tryDebitSparks({
+        payerUserId: sessionRow.host_user_id,
+        amount: SPARK_COST_PARTY_JUDGE,
+        idempotencyKey: judgeIdem,
+        sessionId,
+        reason: "party_vote_judge",
+      });
+      judgeDebited = r.applied;
+    } catch (e) {
+      if (e instanceof InsufficientSparksError) {
+        console.warn("[party] insufficient Sparks for vote judge; using fallback", sessionId);
+        return candidates.sort((a, b) => a.player_id.localeCompare(b.player_id))[0]!
+          .player_id;
+      }
+      throw e;
+    }
+  }
+
   const { getAIProvider } = await import("@/lib/ai");
   const { runPartyVoteJudgeWorker } = await import(
     "@/lib/orchestrator/workers/party-vote-judge"
@@ -78,6 +111,19 @@ async function runPartyJudgePickWinner(
     });
   } catch (e) {
     console.error("[party] vote judge failed", sessionId, e);
+    if (judgeDebited && isMonetizationSpendEnabled()) {
+      try {
+        await tryCreditSparks({
+          userId: sessionRow.host_user_id,
+          amount: SPARK_COST_PARTY_JUDGE,
+          idempotencyKey: `refund:${judgeIdem}`,
+          sessionId,
+          reason: "refund_party_vote_judge_failed",
+        });
+      } catch (refundErr) {
+        console.error("[sparks] judge refund failed", refundErr);
+      }
+    }
     return candidates.sort((a, b) => a.player_id.localeCompare(b.player_id))[0]!
       .player_id;
   }
@@ -512,30 +558,73 @@ async function hydratePartyRoundSceneBeat(sessionId: string): Promise<void> {
   const { getPartyRoundMilestone } = await import("@/lib/party/party-templates");
   const milestone = getPartyRoundMilestone(cfg.template_key, cfg.round_index);
 
+  const openerIdem = `party_round_opener:${sessionId}:${cfg.round_index}`;
+  let openerDebited = false;
+  let openerSkipAi = false;
+  if (isMonetizationSpendEnabled()) {
+    try {
+      const r = await tryDebitSparks({
+        payerUserId: row.host_user_id,
+        amount: SPARK_COST_PARTY_ROUND_OPENER,
+        idempotencyKey: openerIdem,
+        sessionId,
+        reason: "party_round_opener",
+      });
+      openerDebited = r.applied;
+    } catch (e) {
+      if (e instanceof InsufficientSparksError) {
+        openerSkipAi = true;
+        console.warn(
+          "[party] insufficient Sparks for round opener; using template beat",
+          sessionId,
+        );
+      } else {
+        throw e;
+      }
+    }
+  }
+
   const { getAIProvider } = await import("@/lib/ai");
   const { runPartyRoundOpenerWorker } = await import(
     "@/lib/orchestrator/workers/party-round-opener"
   );
 
   let beat: string;
-  try {
-    beat = await runPartyRoundOpenerWorker({
-      sessionId,
-      provider: getAIProvider(),
-      templateKey: cfg.template_key,
-      roundIndex: cfg.round_index,
-      totalRounds: cfg.total_rounds,
-      milestone,
-      sharedRoleLabel: cfg.shared_role_label ?? null,
-      carryForward: cfg.carry_forward ?? null,
-      adventurePrompt: row.adventure_prompt?.trim() ?? "",
-      adventureTags,
-      worldBibleExcerpt: (row.world_bible ?? "").slice(0, 4000),
-      artDirection: row.art_direction?.trim() ?? "",
-    });
-  } catch (e) {
-    console.error("[party] round opener failed", sessionId, e);
+  if (openerSkipAi) {
     beat = "";
+  } else {
+    try {
+      beat = await runPartyRoundOpenerWorker({
+        sessionId,
+        provider: getAIProvider(),
+        templateKey: cfg.template_key,
+        roundIndex: cfg.round_index,
+        totalRounds: cfg.total_rounds,
+        milestone,
+        sharedRoleLabel: cfg.shared_role_label ?? null,
+        carryForward: cfg.carry_forward ?? null,
+        adventurePrompt: row.adventure_prompt?.trim() ?? "",
+        adventureTags,
+        worldBibleExcerpt: (row.world_bible ?? "").slice(0, 4000),
+        artDirection: row.art_direction?.trim() ?? "",
+      });
+    } catch (e) {
+      console.error("[party] round opener failed", sessionId, e);
+      if (openerDebited && isMonetizationSpendEnabled()) {
+        try {
+          await tryCreditSparks({
+            userId: row.host_user_id,
+            amount: SPARK_COST_PARTY_ROUND_OPENER,
+            idempotencyKey: `refund:${openerIdem}`,
+            sessionId,
+            reason: "refund_party_round_opener_failed",
+          });
+        } catch (refundErr) {
+          console.error("[sparks] opener refund failed", refundErr);
+        }
+      }
+      beat = "";
+    }
   }
 
   const trimmed = beat.trim();
