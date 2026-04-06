@@ -94,6 +94,7 @@ function mapSession(row: typeof sessions.$inferSelect): GameSessionView {
     chapterMaxTurns: row.chapter_max_turns,
     chapterImagesUsed: row.chapter_system_images_used,
     chapterImageBudget: row.chapter_system_image_budget,
+    chapterBreakOffered: row.chapter_break_offered === true,
     estimatedHostSparksPerChapter:
       gameKind === "campaign"
         ? estimateHostSparksPerChapter({ preset, mode: row.mode })

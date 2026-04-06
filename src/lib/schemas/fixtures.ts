@@ -42,6 +42,7 @@ export function createMockSession(overrides: Partial<Session> = {}): Session {
     chapter_system_images_used: 0,
     last_manual_scene_image_at: null,
     spark_pool_balance: 0,
+    chapter_break_offered: false,
     created_at: now,
     updated_at: now,
     ...overrides,

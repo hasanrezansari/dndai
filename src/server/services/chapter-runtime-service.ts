@@ -180,6 +180,22 @@ export async function continueChapterNarrative(params: {
     return { ok: false, status: 409, error: "Not a campaign session" };
   }
 
+  const breakOffered = row.chapter_break_offered === true;
+  const capHit = isChapterTurnCapExceeded({
+    currentRound: row.current_round,
+    chapterStartRound: row.chapter_start_round,
+    chapterMaxTurns: row.chapter_max_turns,
+  });
+  /** Human DM: no AI turn cap — host may always roll chapter window. */
+  if (row.mode === "ai_dm" && !capHit && !breakOffered) {
+    return {
+      ok: false,
+      status: 409,
+      error:
+        "You can open the next chapter when this chapter hits its turn limit, or when the narration offers a chapter break.",
+    };
+  }
+
   const nextChapterIndex = row.chapter_index + 1;
   const recapQuest = await getQuestState(params.sessionId);
   const objective =
@@ -192,6 +208,7 @@ export async function continueChapterNarrative(params: {
       chapter_index: nextChapterIndex,
       chapter_start_round: row.current_round,
       chapter_system_images_used: 0,
+      chapter_break_offered: false,
       state_version: sql`${sessions.state_version} + 1`,
       updated_at: new Date(),
     })
@@ -239,6 +256,7 @@ export async function rollChapterWindowAfterVoteCooldown(
       chapter_index: nextChapterIndex,
       chapter_start_round: row.current_round,
       chapter_system_images_used: 0,
+      chapter_break_offered: false,
       state_version: sql`${sessions.state_version} + 1`,
       updated_at: new Date(),
     })

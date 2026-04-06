@@ -3,7 +3,14 @@ import { and, desc, eq } from "drizzle-orm";
 import { getAIProvider } from "@/lib/ai";
 import { buildFacilitatorRoleLine } from "@/lib/ai/narrative-session-profile";
 import { db } from "@/lib/db";
-import { actions, narrativeEvents, npcStates, sceneSnapshots, turns } from "@/lib/db/schema";
+import {
+  actions,
+  narrativeEvents,
+  npcStates,
+  sceneSnapshots,
+  sessions,
+  turns,
+} from "@/lib/db/schema";
 import { broadcastToSession } from "@/lib/socket/server";
 import { redis } from "@/lib/redis";
 import { buildTurnContext } from "@/lib/orchestrator/context-builder";
@@ -928,6 +935,7 @@ export async function runTurnPipeline(params: {
         setting_change: "none",
         warrants_establishing_shot: false,
       },
+      chapter_break_suggested: false,
     }
     : {
       ...narr0!.data,
@@ -954,6 +962,21 @@ export async function runTurnPipeline(params: {
 
   if (!inserted) {
     throw new Error("Failed to persist narrative");
+  }
+
+  if (
+    !actionDenied &&
+    ctx.session.gameKind === "campaign" &&
+    ctx.session.mode === "ai_dm" &&
+    narration.chapter_break_suggested
+  ) {
+    await db
+      .update(sessions)
+      .set({
+        chapter_break_offered: true,
+        updated_at: new Date(),
+      })
+      .where(eq(sessions.id, sessionId));
   }
 
   if (ctx.npcIds.length > 0 && narration.visible_changes.length > 0) {

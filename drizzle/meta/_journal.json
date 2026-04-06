@@ -162,6 +162,13 @@
       "when": 1775498305543,
       "tag": "0022_needy_raider",
       "breakpoints": true
+    },
+    {
+      "idx": 23,
+      "version": "7",
+      "when": 1776000000000,
+      "tag": "0023_chapter_break_offered",
+      "breakpoints": true
     }
   ]
 }

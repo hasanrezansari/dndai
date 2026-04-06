@@ -72,6 +72,8 @@ export interface GameSessionView {
   chapterMaxTurns?: number;
   chapterImagesUsed?: number;
   chapterImageBudget?: number;
+  /** AI DM: narrator offered a natural chapter break (host may continue before turn cap). */
+  chapterBreakOffered?: boolean;
   /** Rough host Sparks hint per chapter (`ai_dm` campaign only). */
   estimatedHostSparksPerChapter?: number;
   /** Table-funded Sparks (session pool); spent before host wallet on AI charges. */

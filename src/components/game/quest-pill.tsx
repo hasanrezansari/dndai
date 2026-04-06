@@ -64,6 +64,17 @@ export function QuestPill({
       chapterStartRound: session.chapterStartRound ?? 1,
       chapterMaxTurns: session.chapterMaxTurns ?? 30,
     });
+  const chapterBreakOffered =
+    session?.gameKind === "campaign" &&
+    session.mode === "ai_dm" &&
+    session.chapterBreakOffered === true;
+  const showContinueChapter =
+    Boolean(isHost && onContinueChapter) &&
+    session?.gameKind === "campaign" &&
+    session.status === "active" &&
+    (session.mode === "human_dm" ||
+      chapterTurnCapHit ||
+      chapterBreakOffered);
   const liveLeads = useMemo(
     () =>
       (quest.objectiveLeads ?? [])
@@ -106,15 +117,27 @@ export function QuestPill({
           </p>
           {chapterTurnCapHit ? (
             <p className="mt-1.5 text-[10px] font-bold text-[var(--color-failure)]">
-              Turn limit reached — the host must continue the chapter for the table
-              to keep playing.
+              Turn limit reached — continue the chapter so the table can keep taking
+              turns.
             </p>
           ) : null}
-          {isHost && onContinueChapter ? (
+          {chapterBreakOffered && session.mode === "ai_dm" ? (
+            <p className="mt-1.5 text-[10px] font-bold text-[var(--color-silver-muted)] leading-snug">
+              The narration marked a natural chapter break — open the next chapter when
+              the table is ready.
+            </p>
+          ) : null}
+          {session.mode === "human_dm" && isHost ? (
+            <p className="mt-1.5 text-[10px] text-[var(--outline)] leading-snug">
+              As human narrator, advance the chapter window when you move to a new act
+              or scene budget.
+            </p>
+          ) : null}
+          {showContinueChapter ? (
             <button
               type="button"
               disabled={chapterContinueBusy}
-              onClick={() => onContinueChapter()}
+              onClick={() => void onContinueChapter?.()}
               className="mt-2 min-h-[40px] w-full rounded-[var(--radius-card)] border border-[var(--color-gold-rare)]/35 bg-[var(--color-deep-void)] text-[10px] font-black uppercase tracking-wider text-[var(--color-gold-rare)] disabled:opacity-30"
             >
               {chapterContinueBusy ? "Continuing…" : "Continue chapter"}

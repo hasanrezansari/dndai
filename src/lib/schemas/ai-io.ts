@@ -76,6 +76,11 @@ export const NarratorOutputSchema = z.object({
   /** Factual one-liner for continuity: where the party is and what is true before the next action. */
   situation_anchor: z.string().min(8).max(280),
   narrative_beat: NarrativeBeatSchema,
+  /**
+   * True only when this beat is a rare, natural chapter breakpoint (major arc beat resolved,
+   * decisive relocation/time jump completed). Host may open the next chapter before the turn cap.
+   */
+  chapter_break_suggested: z.boolean().optional().default(false),
 });
 export type NarratorOutput = output<typeof NarratorOutputSchema>;
 

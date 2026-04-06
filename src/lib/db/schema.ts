@@ -343,6 +343,11 @@ export const sessions = pgTable(
      * Table-funded Sparks (contributions); spent before `host_user_id` wallet on session AI charges.
      */
     spark_pool_balance: integer("spark_pool_balance").notNull().default(0),
+    /**
+     * AI DM suggested a natural chapter breakpoint this beat; host may open next chapter before turn cap.
+     * Cleared when host continues chapter or vote flow rolls the chapter window.
+     */
+    chapter_break_offered: boolean("chapter_break_offered").notNull().default(false),
     created_at: timestamp("created_at", { withTimezone: true })
       .notNull()
       .defaultNow(),

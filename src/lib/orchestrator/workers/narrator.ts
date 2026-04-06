@@ -73,7 +73,8 @@ RULES:
   - "next_actor_id": always set to null
   - "image_hint": {"subjects": ["key visual subjects in the scene"], "environment": "environment description", "mood": "visual mood", "avoid": ["things to avoid"]} (scene hints for image generation)
   - "situation_anchor": one factual sentence (8-280 chars) — location + immediate truth for the next player, aligned with this beat's outcome
-  - "narrative_beat": {"rhythm": "ongoing"|"transition"|"setpiece"|"denouement", "setting_change": "none"|"texture"|"new_venue"|"world_shaking", "warrants_establishing_shot": boolean}`;
+  - "narrative_beat": {"rhythm": "ongoing"|"transition"|"setpiece"|"denouement", "setting_change": "none"|"texture"|"new_venue"|"world_shaking", "warrants_establishing_shot": boolean}
+  - "chapter_break_suggested": boolean — almost always false. Set true ONLY when this beat is a credible end-of-chapter moment: a major objective beat just resolved, or the party has fully arrived after a long journey, or an act-scale shift is complete — NOT for routine new_venue, small fights, or mid-arc twists. If unsure, false.`;
 
 export function buildNarratorSystemPrompt(facilitatorRoleLine: string): string {
   return `${facilitatorRoleLine.trim()}\n\n${NARRATOR_INSTRUCTIONS_CORE}`;
@@ -317,6 +318,7 @@ export function buildNarratorFallback(
       setting_change: "none",
       warrants_establishing_shot: false,
     },
+    chapter_break_suggested: false,
   });
 }
 

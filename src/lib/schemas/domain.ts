@@ -52,6 +52,7 @@ export const SessionSchema = z.object({
   chapter_system_images_used: z.number().int().min(0).default(0),
   last_manual_scene_image_at: iso.nullable().optional(),
   spark_pool_balance: z.number().int().min(0).default(0),
+  chapter_break_offered: z.boolean().default(false),
   created_at: iso,
   updated_at: iso,
 });

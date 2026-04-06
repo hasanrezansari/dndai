@@ -41,6 +41,8 @@ export interface NpcDetail {
 export interface TurnContext {
   session: {
     mode: string;
+    /** `campaign` | `party` — drives chapter-break persistence in pipeline. */
+    gameKind: string;
     phase: string;
     campaignTitle: string | null;
     adventurePrompt: string | null;
@@ -288,6 +290,7 @@ export async function buildTurnContext({
   return {
     session: {
       mode: sessionRow.mode,
+      gameKind: sessionRow.game_kind ?? "campaign",
       phase: sessionRow.phase,
       campaignTitle: sessionRow.campaign_title,
       adventurePrompt: sessionRow.adventure_prompt,

@@ -30,6 +30,7 @@ const FIXTURE_NARRATOR = {
     setting_change: "texture",
     warrants_establishing_shot: false,
   },
+  chapter_break_suggested: false,
 };
 
 const FIXTURE_INTENT = {
