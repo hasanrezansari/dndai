@@ -372,6 +372,10 @@ export const players = pgTable(
     joined_at: timestamp("joined_at", { withTimezone: true })
       .notNull()
       .defaultNow(),
+    /** One free premise-aligned random class gen per player per session (lobby character flow). */
+    free_premise_random_used: boolean("free_premise_random_used")
+      .notNull()
+      .default(false),
   },
   (t) => [index("players_session_id_idx").on(t.session_id)],
 );

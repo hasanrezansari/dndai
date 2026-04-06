@@ -365,11 +365,30 @@ Store in one module (e.g. `spark-pricing.ts` next to economy service). Revisit a
 
 ---
 
+## 8.1 UI surfaces (user-visible checklist)
+
+Use this list to verify Sparks and payer rules are visible before shipping UX that increases AI spend.
+
+| Surface | Balance / cost | Who pays | Shop / recovery | Notes |
+| ------- | ---------------- | -------- | ---------------- | ----- |
+| **Home** (`/`) | Inline strip: ⚡ balance + Buy Sparks (authenticated); guest hint to link Google | N/A (no session) | Link to `/shop` | Unauthenticated: no strip |
+| **Profile** (`/profile`) | Same strip + refetch after kit/portrait/hero spend | Signed-in user | `/shop` | Guest session shows retention hint |
+| **Lobby** (`/lobby/[code]`) | Fixed HUD: host balance + Buy; guest “host funds” + table pool if &gt; 0 | Host wallet; pool before host for AI | Buy on host HUD | Chapter estimate for `ai_dm` |
+| **Session play** (`/session/[id]`) | Same HUD + pause toasts on 402 | Same as lobby | Toast → Shop | `SparkBalanceHud` |
+| **Shop** (`/shop`) | Pack list; checkout when `checkoutEnabled` | User at checkout | — | Configure Stripe/Razorpay + `SPARK_PACKS_JSON` |
+| **Character create** (`/character/[sessionId]`) | Per-action labels (portrait, Generate Build); insufficient toasts | Usually player wallet for profile-adjacent; session AI uses host — align copy per route | In toasts | Post–Phase 4: Random subsidy rules |
+| **TV** | If no wallet UI, document “display mode” exception | Host session | — | Optional later |
+
+**Guest vs Google:** `@ashveil.guest` may still call `/api/wallet` (balance often 0); marketing copy explains linking Google to retain Sparks.
+
+---
+
 ## 9. Document control
 
 | Version | Date | Notes |
 | ------- | ---- | ----- |
 | 1.0 | 2026-04-06 | Initial implementation plan; greenfield; no legacy grandfathering |
 | 1.1 | 2026-04-06 | Phase 5: Stripe + Razorpay; India routing; Dodo legacy optional |
+| 1.2 | 2026-04-06 | §8.1 UI surfaces checklist (home/profile strip, HUD, shop) |
 
 Update this file when phases complete or scope changes.

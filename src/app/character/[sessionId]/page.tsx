@@ -4,7 +4,6 @@ import { useSession } from "next-auth/react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 
-import { ClassCard } from "@/components/character/class-card";
 import { StatPill } from "@/components/character/stat-pill";
 import { GoldButton } from "@/components/ui/gold-button";
 import { GhostButton } from "@/components/ui/ghost-button";
@@ -21,16 +20,16 @@ import {
   type CharacterStats,
   type ClassProfile,
 } from "@/lib/schemas/domain";
-import { getPresetClassesForPremise } from "@/lib/rules/class-presets";
-import { getStartingEquipmentForPremise } from "@/lib/rules/gear-presets";
 import { getRacesForPremise } from "@/lib/rules/race-presets";
 import {
   CHARACTER_RACE_MAX_LEN,
   normalizeCharacterRace,
-  type CharacterClass,
   type CharacterRace,
 } from "@/lib/rules/character";
-import { SPARK_COST_PORTRAIT_GENERATION } from "@/lib/spark-pricing";
+import {
+  SPARK_COST_CUSTOM_CLASS_GENERATION,
+  SPARK_COST_PORTRAIT_GENERATION,
+} from "@/lib/spark-pricing";
 
 const CUSTOM_RACE_PILL = "__custom__" as const;
 type RacePillValue = CharacterRace | typeof CUSTOM_RACE_PILL;
@@ -70,10 +69,6 @@ export default function CharacterCreationPage() {
         : "";
 
   const [name, setName] = useState("");
-  const [characterClass, setCharacterClass] = useState<CharacterClass>("warrior");
-  const [classMode, setClassMode] = useState<"preset" | "custom">(
-    CUSTOM_CLASSES_ENABLED ? "custom" : "preset",
-  );
   const [customConcept, setCustomConcept] = useState("");
   const [customRole, setCustomRole] = useState<ClassProfile["combat_role"]>("specialist");
   const [customClassProfile, setCustomClassProfile] = useState<ClassProfile | null>(null);
@@ -115,11 +110,6 @@ export default function CharacterCreationPage() {
       world_bible: tablePremise?.world_bible,
     }),
     [tablePremise],
-  );
-
-  const presetClasses = useMemo(
-    () => getPresetClassesForPremise(premiseFields),
-    [premiseFields],
   );
 
   const premiseRaceOptions = useMemo(
@@ -245,27 +235,18 @@ export default function CharacterCreationPage() {
 
   const equipment = useMemo(
     () =>
-      classMode === "custom" && customClassProfile
+      customClassProfile
         ? customClassProfile.starting_gear.map((item) => ({
             name: item.name,
             type: item.type,
           }))
-        : getStartingEquipmentForPremise(characterClass, premiseFields),
-    [characterClass, classMode, customClassProfile, premiseFields],
+        : [],
+    [customClassProfile],
   );
 
-  const selectedMeta = useMemo(
-    () => presetClasses.find((c) => c.value === characterClass),
-    [characterClass, presetClasses],
-  );
-  const classPreviewLabel =
-    classMode === "custom"
-      ? customClassProfile?.display_name || "Custom Class"
-      : (selectedMeta?.label ?? "");
-  const classPreviewRole =
-    classMode === "custom" ? customClassProfile?.combat_role : selectedMeta?.role;
-  const classPreviewFantasy =
-    classMode === "custom" ? customClassProfile?.fantasy : selectedMeta?.fantasy;
+  const classPreviewLabel = customClassProfile?.display_name || "Your role";
+  const classPreviewRole = customClassProfile?.combat_role;
+  const classPreviewFantasy = customClassProfile?.fantasy;
   const customAbilityBudget = useMemo(
     () =>
       customClassProfile?.abilities.reduce((sum, a) => sum + a.power_cost, 0) ?? 0,
@@ -319,19 +300,82 @@ export default function CharacterCreationPage() {
           art_direction: tablePremise?.art_direction ?? undefined,
         }),
       });
+      const j = (await res.json().catch(() => ({}))) as {
+        error?: string;
+        code?: string;
+        classProfile?: ClassProfile;
+      };
       if (!res.ok) {
-        const j = (await res.json().catch(() => ({}))) as { error?: string };
-        setError(j.error ?? "Could not generate class profile");
+        if (isInsufficientSparksApi(res.status, j)) {
+          toast(
+            COPY.spark.profileInsufficient,
+            "info",
+            insufficientSparksToastOptions(),
+          );
+        } else {
+          setError(j.error ?? "Could not generate class profile");
+        }
         return;
       }
-      const data = (await res.json()) as { classProfile?: ClassProfile };
-      if (!data.classProfile) {
+      if (!j.classProfile) {
         setError("Could not generate class profile");
         return;
       }
-      setCustomClassProfile(data.classProfile);
+      setCustomClassProfile(j.classProfile);
     } catch {
       setError("Could not generate class profile");
+    } finally {
+      setClassGenLoading(false);
+    }
+  }
+
+  async function handleRandomFromPremise() {
+    if (!CUSTOM_CLASSES_ENABLED) {
+      setError("Custom classes are currently disabled.");
+      return;
+    }
+    if (!sessionId) return;
+    setClassGenLoading(true);
+    setError(null);
+    try {
+      const res = await fetch("/api/characters/generate-class", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          random_from_premise: true,
+          session_id: sessionId,
+          rolePreference: customRole,
+        }),
+      });
+      const j = (await res.json().catch(() => ({}))) as {
+        error?: string;
+        code?: string;
+        classProfile?: ClassProfile;
+        usedFreePremiseRandom?: boolean;
+      };
+      if (!res.ok) {
+        if (isInsufficientSparksApi(res.status, j)) {
+          toast(
+            COPY.spark.profileInsufficient,
+            "info",
+            insufficientSparksToastOptions(),
+          );
+        } else {
+          setError(j.error ?? "Could not generate a random build");
+        }
+        return;
+      }
+      if (!j.classProfile) {
+        setError("Could not generate a random build");
+        return;
+      }
+      setCustomClassProfile(j.classProfile);
+      setCustomConcept(j.classProfile.fantasy?.trim() || j.classProfile.display_name || "");
+      if (j.usedFreePremiseRandom) {
+        toast("First random build for this story is on the house — edit below.", "success");
+      }
+    } catch {
+      setError("Could not generate a random build");
     } finally {
       setClassGenLoading(false);
     }
@@ -366,17 +410,15 @@ export default function CharacterCreationPage() {
       }
       return;
     }
-    if (classMode === "custom") {
-      if (!customClassProfile) {
-        setError("Generate a custom class profile before entering.");
-        return;
-      }
-      const valid = ClassProfileSchema.safeParse(customClassProfile);
-      if (!valid.success) {
-        const issue = valid.error.issues[0]?.message ?? "Custom class profile is invalid.";
-        setError(issue);
-        return;
-      }
+    if (!customClassProfile) {
+      setError("Generate a build (random or custom) before entering.");
+      return;
+    }
+    const valid = ClassProfileSchema.safeParse(customClassProfile);
+    if (!valid.success) {
+      const issue = valid.error.issues[0]?.message ?? "Custom class profile is invalid.";
+      setError(issue);
+      return;
     }
     const raceNorm = normalizeCharacterRace(raceForApi);
     if (!raceNorm.ok) {
@@ -395,9 +437,7 @@ export default function CharacterCreationPage() {
           sessionId,
           name: name.trim(),
           characterClass:
-            classMode === "custom"
-              ? (customClassProfile?.display_name.trim() || customConcept.trim() || "custom")
-              : characterClass,
+            customClassProfile?.display_name.trim() || customConcept.trim() || "custom",
           race: raceNorm.value,
           stats,
           portraitUrl: portraitUrl?.trim() || undefined,
@@ -410,7 +450,7 @@ export default function CharacterCreationPage() {
             : undefined,
           backstory: backstory.trim() || undefined,
           appearance: appearance.trim() || undefined,
-          classProfile: classMode === "custom" ? customClassProfile ?? undefined : undefined,
+          classProfile: customClassProfile ?? undefined,
         }),
       });
       if (!res.ok) {
@@ -446,11 +486,9 @@ export default function CharacterCreationPage() {
         body: JSON.stringify({
           name: name.trim(),
           heroClass:
-            classMode === "custom"
-              ? (customClassProfile?.display_name.trim() || customConcept.trim() || "custom")
-              : characterClass,
+            customClassProfile?.display_name.trim() || customConcept.trim() || "custom",
           race: portraitRace.value,
-          concept: classMode === "custom" ? customConcept.trim() : undefined,
+          concept: customConcept.trim() || undefined,
           appearance: appearance.trim() || undefined,
           reroll: Boolean(portraitUrl),
         }),
@@ -491,10 +529,9 @@ export default function CharacterCreationPage() {
     stats !== null &&
     !submitLoading &&
     Boolean(sessionId) &&
-    (classMode === "preset" ||
-      (customClassProfile !== null &&
-        customProfileValidation !== null &&
-        customProfileValidation.success)) &&
+    customClassProfile !== null &&
+      customProfileValidation !== null &&
+      customProfileValidation.success &&
     Boolean(playerIdResolved) &&
     (racePill !== CUSTOM_RACE_PILL || raceForApi.length > 0);
 
@@ -767,45 +804,24 @@ export default function CharacterCreationPage() {
           </h2>
         </div>
         <p className="text-xs text-[var(--color-silver-dim)] leading-relaxed">
-          The story is yours — describe who you are. Under the hood we map you to a{" "}
-          <span className="text-[var(--color-silver-muted)]">balanced combat baseline</span> so
-          dice and HP stay fair.{" "}
-          {CUSTOM_CLASSES_ENABLED
-            ? "Generate Build uses this session’s premise from the host when present."
-            : null}
+          Describe who you are in <em>this</em> story — or roll a random hero aligned to the
+          host&apos;s premise. Combat stays on a balanced baseline under the hood.
         </p>
-        <div className="overflow-x-auto scrollbar-hide -mx-1 px-1">
-          <PillSelect
-            options={[
-              ...(CUSTOM_CLASSES_ENABLED
-                ? [{ value: "custom", label: "Describe your role" }]
-                : []),
-              { value: "preset", label: "Quick archetype" },
-            ]}
-            value={classMode}
-            onChange={(value) => setClassMode(value as "preset" | "custom")}
-            wrap={false}
-            className="w-max pb-1"
-          />
-        </div>
-        {classMode === "preset" ? (
-        <div className="overflow-x-auto scrollbar-hide -mx-1 px-1">
-          <div className="flex gap-3 pb-1 w-max">
-            {presetClasses.map((c) => (
-              <ClassCard
-                key={c.value}
-                icon={c.icon}
-                imageUrl={c.imageUrl}
-                label={c.label}
-                role={c.role}
-                selected={characterClass === c.value}
-                onClick={() => setCharacterClass(c.value)}
-              />
-            ))}
-          </div>
-        </div>
-        ) : (
+        {CUSTOM_CLASSES_ENABLED ? (
           <div className="flex flex-col gap-3">
+            <GoldButton
+              type="button"
+              size="md"
+              className="w-full min-h-[48px] text-[10px] font-black uppercase tracking-[0.14em]"
+              disabled={classGenLoading}
+              onClick={() => void handleRandomFromPremise()}
+            >
+              {classGenLoading ? "Generating…" : "Random hero (from table premise)"}
+            </GoldButton>
+            <p className="text-[10px] text-[var(--outline)] uppercase tracking-[0.1em] text-center leading-relaxed">
+              First random per player per story is free. After that,{" "}
+              {SPARK_COST_CUSTOM_CLASS_GENERATION} Sparks — same as Generate Build.
+            </p>
             <label
               htmlFor="custom-class-concept"
               className="text-[10px] font-black uppercase tracking-[0.2em] text-[var(--outline)]"
@@ -1116,24 +1132,18 @@ export default function CharacterCreationPage() {
               </p>
             )}
           </div>
+        ) : (
+          <p className="text-xs text-[var(--color-failure)]">
+            Custom class generation is disabled on this deployment.
+          </p>
         )}
       </section>
 
       {/* Role preview — updates from your choices above */}
       <div className="relative overflow-hidden rounded-[var(--radius-card)] border border-[var(--border-ui)] bg-gradient-to-b from-[var(--surface-container)] to-[var(--color-obsidian)] p-6 flex flex-col items-center gap-3">
-        {classMode === "preset" && selectedMeta?.imageUrl ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={selectedMeta.imageUrl}
-            alt=""
-            className="absolute inset-0 h-full w-full object-cover opacity-45"
-            loading="eager"
-            decoding="async"
-          />
-        ) : null}
         <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-[var(--color-obsidian)] via-[var(--color-obsidian)]/65 to-transparent" />
         <span className="relative text-7xl leading-none select-none drop-shadow-[0_4px_12px_rgba(0,0,0,0.85)]" aria-hidden>
-          {selectedMeta?.icon ?? "—"}
+          ✦
         </span>
         <div className="text-center space-y-1.5">
           <h2 className="relative text-fantasy text-xl text-[var(--color-silver-muted)]">

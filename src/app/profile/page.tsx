@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { signOut, useSession } from "next-auth/react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -14,10 +14,12 @@ import { HeroKitPreview } from "@/components/character/hero-kit-preview";
 import { PillSelect } from "@/components/ui/pill-select";
 import { runGuestGoogleUpgradeFlow } from "@/lib/auth/guest-google-upgrade-client";
 import { COPY } from "@/lib/copy/ashveil";
+import { SparkBalanceInline } from "@/components/monetization/spark-balance-inline";
 import {
   insufficientSparksToastOptions,
   isInsufficientSparksApi,
 } from "@/lib/monetization/insufficient-sparks-ui";
+import { useSparkBalance } from "@/hooks/use-spark-balance";
 import { CHARACTER_RACE_MAX_LEN } from "@/lib/rules/character";
 import {
   SPARK_COST_EXTRA_HERO_SLOT,
@@ -88,6 +90,8 @@ export default function ProfilePage() {
   const [heroes, setHeroes] = useState<ProfileHero[]>([]);
   const [heroFreeSlots, setHeroFreeSlots] = useState(1);
   const [heroBuilderOpen, setHeroBuilderOpen] = useState(false);
+  /** When true, skip auto-opening the hero builder for an empty roster (user tapped Hide). */
+  const heroBuilderDismissedWhileEmptyRef = useRef(false);
   const [inspectedHeroId, setInspectedHeroId] = useState<string | null>(null);
   const [publicProfileEnabled, setPublicProfileEnabledState] = useState(false);
   const [heroName, setHeroName] = useState("");
@@ -135,6 +139,22 @@ export default function ProfilePage() {
     const email = session?.user?.email;
     return typeof email === "string" && email.endsWith("@ashveil.guest");
   }, [session?.user?.email]);
+
+  useEffect(() => {
+    if (heroes.length > 0) heroBuilderDismissedWhileEmptyRef.current = false;
+  }, [heroes.length]);
+
+  useEffect(() => {
+    if (heroesLoading || heroes.length > 0) return;
+    if (heroBuilderDismissedWhileEmptyRef.current) return;
+    setHeroBuilderOpen(true);
+  }, [heroesLoading, heroes.length]);
+
+  const {
+    balance: sparkBalance,
+    loading: sparkBalanceLoading,
+    refetch: refetchSparkBalance,
+  } = useSparkBalance();
 
   const avatarPreview = useMemo(() => {
     if (image?.trim()) return image.trim();
@@ -497,6 +517,7 @@ export default function ProfilePage() {
       }
       setHeroPortraitUrl(j.portraitUrl);
       toast("Portrait generated", "success");
+      void refetchSparkBalance();
     } catch {
       toast("Network error generating portrait", "error");
     } finally {
@@ -569,6 +590,7 @@ export default function ProfilePage() {
         hero?: { id?: string };
       };
       toast("Saved hero created", "success");
+      void refetchSparkBalance();
       setHeroName("");
       setHeroIsPublic(false);
       setHeroConcept("");
@@ -632,6 +654,7 @@ export default function ProfilePage() {
       }
       setHeroKit(parsed.data);
       toast("Kit generated", "success");
+      void refetchSparkBalance();
     } catch {
       toast("Network error generating kit", "error");
     } finally {
@@ -672,6 +695,7 @@ export default function ProfilePage() {
         return;
       }
       toast("Portrait generated", "success");
+      void refetchSparkBalance();
       await refreshHeroes();
     } catch {
       toast("Network error generating portrait", "error");
@@ -859,6 +883,21 @@ export default function ProfilePage() {
             </GhostButton>
           </div>
         </header>
+
+        {status === "authenticated" ? (
+          <GlassCard className="p-4 border-[rgba(212,175,55,0.12)]">
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
+              <p className="text-[10px] uppercase tracking-[0.16em] text-[var(--outline)] shrink-0">
+                {COPY.spark.shopTitle}
+              </p>
+              <SparkBalanceInline
+                balance={sparkBalance}
+                loading={sparkBalanceLoading}
+                isGuest={isGuestSession}
+              />
+            </div>
+          </GlassCard>
+        ) : null}
 
         <GlassCard className="p-4 border-[rgba(212,175,55,0.12)]">
           {isGuestSession ? (
@@ -1272,10 +1311,20 @@ export default function ProfilePage() {
                     disabled={heroBusy}
                     onClick={() => {
                       if (slotsFull) {
+                        heroBuilderDismissedWhileEmptyRef.current = false;
                         setHeroBuilderOpen(true);
                         return;
                       }
-                      setHeroBuilderOpen((v) => !v);
+                      setHeroBuilderOpen((v) => {
+                        const next = !v;
+                        if (next && heroes.length === 0) {
+                          heroBuilderDismissedWhileEmptyRef.current = false;
+                        }
+                        if (v && !next && heroes.length === 0) {
+                          heroBuilderDismissedWhileEmptyRef.current = true;
+                        }
+                        return next;
+                      });
                     }}
                   >
                     {heroBuilderOpen ? "Hide" : heroes.length > 0 ? "Build new" : "Create"}

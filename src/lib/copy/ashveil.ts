@@ -93,5 +93,8 @@ export const COPY = {
       "You need more Sparks for that. Add Sparks to continue, or use a free portrait use if you still have one.",
     portraitRerollHint:
       "Free portrait uses apply first; after that, each generate or reroll costs Sparks.",
+    /** Home / profile inline strip — guest browser account. */
+    marketingGuestHint:
+      "Guest session — link Google in your profile to keep Sparks and purchases when you switch devices.",
   },
 } as const;

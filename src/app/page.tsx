@@ -2,7 +2,7 @@
 
 import { useSession } from "next-auth/react";
 import Link from "next/link";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 
 import { GoogleSignInButton } from "@/components/auth/google-sign-in-button";
@@ -15,7 +15,10 @@ import { GhostButton } from "@/components/ui/ghost-button";
 import { ModeCardsSkeleton } from "@/components/ui/loading-skeleton";
 import { PillSelect } from "@/components/ui/pill-select";
 import type { CampaignMode, SessionMode } from "@/lib/schemas/enums";
+import { SparkBalanceInline } from "@/components/monetization/spark-balance-inline";
 import { COPY } from "@/lib/copy/ashveil";
+import { estimateHostSparksPerChapter } from "@/lib/chapter/chapter-config";
+import { useSparkBalance } from "@/hooks/use-spark-balance";
 import { DEFAULT_PARTY_TOTAL_ROUNDS } from "@/lib/party/party-templates";
 import { LOBBY_TONE_TAG_OPTIONS } from "@/lib/session/tone-tag-options";
 
@@ -28,6 +31,13 @@ const CAMPAIGN_OPTIONS: { value: CampaignMode; label: string }[] = [
 const PARTY_SIZES = [1, 2, 3, 4, 5, 6] as const;
 
 const PARTY_ROUND_OPTIONS = [3, 4, 5, 6, 7, 8, 9, 10, 12] as const;
+
+const HOME_NAV_CHIPS: { href: string; label: string; icon: string }[] = [
+  { href: "/profile", label: "Profile", icon: "person" },
+  { href: "/worlds", label: "Worlds", icon: "public" },
+  { href: "/adventures", label: "Adventures", icon: "travel_explore" },
+  { href: "/tv", label: "TV", icon: "tv" },
+];
 
 /** Rotating status under “Entering your story…” so Quick play never feels frozen (PlayRomana only). */
 const PLAYROMANA_QUICK_LINES = [
@@ -42,7 +52,7 @@ export default function Home() {
   const router = useRouter();
   const { data: authSession, status: authStatus } = useSession();
   const [tutorialComplete, setTutorialComplete] = useState<boolean>(false);
-  const [mode, setMode] = useState<SessionMode | null>(null);
+  const [mode, setMode] = useState<SessionMode | null>("ai_dm");
   const [campaignMode, setCampaignMode] = useState<CampaignMode>("user_prompt");
   const [maxPlayers, setMaxPlayers] = useState<(typeof PARTY_SIZES)[number]>(4);
   const [adventurePrompt, setAdventurePrompt] = useState("");
@@ -74,6 +84,16 @@ export default function Home() {
   const isGuest =
     typeof authSession?.user?.email === "string" &&
     authSession.user.email.endsWith("@ashveil.guest");
+
+  const {
+    balance: sparkBalance,
+    loading: sparkBalanceLoading,
+  } = useSparkBalance();
+
+  const aiDmChapterSparkHint = useMemo(() => {
+    if (partyRoom || mode !== "ai_dm") return null;
+    return estimateHostSparksPerChapter({ preset: "standard", mode: "ai_dm" });
+  }, [partyRoom, mode]);
 
   useEffect(() => {
     try {
@@ -728,15 +748,24 @@ export default function Home() {
           </div>
 
           <div className="relative flex flex-col gap-3 text-left">
-            <p className="pl-3 border-l-2 border-[var(--accent-cyan-muted)] text-[10px] uppercase tracking-[0.22em] text-[var(--text-tertiary)]">
-              {COPY.landing.eyebrow}
-            </p>
-            <p className="text-sm font-semibold tracking-[0.14em] text-[var(--color-gold-rare)]">
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
+              <p className="pl-3 border-l-2 border-[var(--accent-cyan-muted)] text-[10px] uppercase tracking-[0.22em] text-[var(--text-tertiary)] sm:min-w-0 sm:flex-1">
+                {COPY.landing.eyebrow}
+              </p>
+              {authStatus === "authenticated" ? (
+                <SparkBalanceInline
+                  balance={sparkBalance}
+                  loading={sparkBalanceLoading}
+                  isGuest={isGuest}
+                />
+              ) : null}
+            </div>
+            <h1 className="text-[1.85rem] sm:text-4xl font-black text-[var(--color-gold-rare)] leading-[1.1] tracking-tight">
               {getBrandName(brand)}
-            </p>
-            <h1 className="text-[1.65rem] sm:text-3xl font-bold text-[var(--color-silver-muted)] leading-[1.2] tracking-tight font-[family-name:var(--font-gameplay)]">
-              {COPY.landing.heroTitle}
             </h1>
+            <p className="text-lg sm:text-xl font-bold text-[var(--color-silver-muted)] leading-snug tracking-tight font-[family-name:var(--font-gameplay)]">
+              {COPY.landing.heroTitle}
+            </p>
             <p className="text-[15px] sm:text-base text-[var(--text-secondary)] leading-relaxed max-w-[28rem] font-[family-name:var(--font-gameplay)]">
               {COPY.landing.heroSub}
             </p>
@@ -770,43 +799,21 @@ export default function Home() {
               </Link>
             </div>
 
-            <div className="mt-4 flex items-center justify-start gap-2 flex-wrap">
-              <Link
-                href="/profile"
-                className="min-h-[38px] px-3.5 rounded-[var(--radius-chip)] border border-[rgba(255,255,255,0.10)] bg-gradient-to-b from-[rgba(255,255,255,0.06)] to-[rgba(0,0,0,0.14)] text-[10px] font-black uppercase tracking-[0.16em] text-[var(--color-silver-dim)] hover:text-[var(--color-gold-rare)] hover:border-[rgba(242,202,80,0.28)] transition-colors shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]"
-              >
-                <span className="flex items-center justify-center gap-2">
-                  <span className="material-symbols-outlined text-sm">person</span>
-                  Profile
-                </span>
-              </Link>
-              <Link
-                href="/worlds"
-                className="min-h-[38px] px-3.5 rounded-[var(--radius-chip)] border border-[rgba(255,255,255,0.10)] bg-gradient-to-b from-[rgba(255,255,255,0.06)] to-[rgba(0,0,0,0.14)] text-[10px] font-black uppercase tracking-[0.16em] text-[var(--color-silver-dim)] hover:text-[var(--color-gold-rare)] hover:border-[rgba(242,202,80,0.28)] transition-colors shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]"
-              >
-                <span className="flex items-center justify-center gap-2">
-                  <span className="material-symbols-outlined text-sm">public</span>
-                  Worlds
-                </span>
-              </Link>
-              <Link
-                href="/adventures"
-                className="min-h-[38px] px-3.5 rounded-[var(--radius-chip)] border border-[rgba(255,255,255,0.10)] bg-gradient-to-b from-[rgba(255,255,255,0.06)] to-[rgba(0,0,0,0.14)] text-[10px] font-black uppercase tracking-[0.16em] text-[var(--color-silver-dim)] hover:text-[var(--color-gold-rare)] hover:border-[rgba(242,202,80,0.28)] transition-colors shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]"
-              >
-                <span className="flex items-center justify-center gap-2">
-                  <span className="material-symbols-outlined text-sm">travel_explore</span>
-                  Adventures
-                </span>
-              </Link>
-              <Link
-                href="/tv"
-                className="min-h-[38px] px-3.5 rounded-[var(--radius-chip)] border border-[rgba(255,255,255,0.10)] bg-gradient-to-b from-[rgba(255,255,255,0.06)] to-[rgba(0,0,0,0.14)] text-[10px] font-black uppercase tracking-[0.16em] text-[var(--color-silver-dim)] hover:text-[var(--color-gold-rare)] hover:border-[rgba(242,202,80,0.28)] transition-colors shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]"
-              >
-                <span className="flex items-center justify-center gap-2">
-                  <span className="material-symbols-outlined text-sm">tv</span>
-                  TV
-                </span>
-              </Link>
+            <div className="mt-4 flex flex-wrap items-center justify-start gap-2">
+              {HOME_NAV_CHIPS.map((item) => (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  className="min-h-[38px] px-3.5 rounded-[var(--radius-chip)] border border-[rgba(255,255,255,0.10)] bg-gradient-to-b from-[rgba(255,255,255,0.06)] to-[rgba(0,0,0,0.14)] text-[10px] font-black uppercase tracking-[0.16em] text-[var(--color-silver-dim)] hover:text-[var(--color-gold-rare)] hover:border-[rgba(242,202,80,0.28)] transition-colors shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]"
+                >
+                  <span className="flex items-center justify-center gap-2">
+                    <span className="material-symbols-outlined text-sm">
+                      {item.icon}
+                    </span>
+                    {item.label}
+                  </span>
+                </Link>
+              ))}
             </div>
 
             {authSession?.user?.name ? (
@@ -883,6 +890,11 @@ export default function Home() {
             </h2>
           </div>
 
+          <div
+            className="-mx-1 flex gap-3 overflow-x-auto pb-2 pt-1 snap-x snap-mandatory scroll-pl-1 scroll-pr-1 sm:mx-0 sm:grid sm:grid-cols-3 sm:gap-4 sm:overflow-visible sm:pb-0 sm:pt-0"
+            role="list"
+            aria-label={COPY.landing.modesTitle}
+          >
           {/* AI DM Card */}
           <button
             type="button"
@@ -890,7 +902,7 @@ export default function Home() {
               setPartyRoom(false);
               setMode("ai_dm");
             }}
-            className="text-left w-full min-h-[44px] transition-all duration-200 active:scale-[0.98] rounded-[var(--radius-card)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-gold-rare)]/50 focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--color-obsidian)]"
+            className="text-left w-full min-w-[min(82vw,300px)] shrink-0 snap-center min-h-[44px] transition-all duration-200 active:scale-[0.98] rounded-[var(--radius-card)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-gold-rare)]/50 focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--color-obsidian)] sm:min-w-0"
           >
             <div
               className={`relative h-44 rounded-[var(--radius-card)] p-6 flex flex-col justify-end overflow-hidden transition-all duration-300 ${
@@ -947,7 +959,7 @@ export default function Home() {
               setPartyRoom(false);
               setMode("human_dm");
             }}
-            className="text-left w-full min-h-[44px] transition-all duration-200 active:scale-[0.98] rounded-[var(--radius-card)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-gold-rare)]/50 focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--color-obsidian)]"
+            className="text-left w-full min-w-[min(82vw,300px)] shrink-0 snap-center min-h-[44px] transition-all duration-200 active:scale-[0.98] rounded-[var(--radius-card)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-gold-rare)]/50 focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--color-obsidian)] sm:min-w-0"
           >
             <div
               className={`relative h-44 rounded-[var(--radius-card)] p-6 flex flex-col justify-end overflow-hidden transition-all duration-300 ${
@@ -1002,7 +1014,7 @@ export default function Home() {
               setPartyRoom(true);
               setMode("ai_dm");
             }}
-            className="text-left w-full min-h-[44px] transition-all duration-200 active:scale-[0.98] rounded-[var(--radius-card)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-gold-rare)]/50 focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--color-obsidian)]"
+            className="text-left w-full min-w-[min(82vw,300px)] shrink-0 snap-center min-h-[44px] transition-all duration-200 active:scale-[0.98] rounded-[var(--radius-card)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-gold-rare)]/50 focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--color-obsidian)] sm:min-w-0"
           >
             <div
               className={`relative h-44 rounded-[var(--radius-card)] p-6 flex flex-col justify-end overflow-hidden transition-all duration-300 ${
@@ -1051,7 +1063,7 @@ export default function Home() {
               </div>
             </div>
           </button>
-        </section>
+          </div>
 
         <details className="rounded-[var(--radius-card)] border border-[var(--border-ui)] bg-[var(--color-midnight)]/90 p-4 space-y-3 shadow-[0_12px_40px_rgba(0,0,0,0.25)] group">
           <summary className="cursor-pointer list-none flex items-center justify-between gap-3 [&::-webkit-details-marker]:hidden">
@@ -1263,6 +1275,12 @@ export default function Home() {
         {/* Bottom actions (not floating) */}
         <section className="mt-2 rounded-[var(--radius-card)] border border-[var(--border-ui-strong)] bg-[var(--surface-high)]/60 backdrop-blur-md p-4 shadow-[0_24px_80px_rgba(0,0,0,0.45)]">
           <div className="flex flex-col gap-3">
+            {aiDmChapterSparkHint !== null ? (
+              <p className="text-[10px] text-[var(--outline)] text-center uppercase tracking-[0.12em] leading-relaxed">
+                ~{aiDmChapterSparkHint} Sparks/chapter (host estimate, standard
+                pace)
+              </p>
+            ) : null}
             <GoldButton
               type="button"
               size="lg"
@@ -1349,29 +1367,9 @@ export default function Home() {
                   {COPY.landing.backToCreate}
                 </button>
               </form>
-            ) : (
-              <div className="flex items-center justify-between gap-3">
-                <button
-                  type="button"
-                  className="flex-1 min-h-[44px] rounded-[var(--radius-card)] border border-white/10 bg-black/10 text-[10px] font-bold uppercase tracking-[0.14em] text-[var(--color-silver-dim)] hover:text-[var(--color-gold-rare)] hover:border-[var(--color-gold-rare)]/25 transition-colors"
-                  onClick={() => {
-                    setJoinOpen(true);
-                    setJoinError(null);
-                    setJoinShakeKey(0);
-                  }}
-                >
-                  {COPY.landing.ctaJoin}
-                </button>
-                <Link
-                  href="/tv"
-                  className="flex-1 min-h-[44px] rounded-[var(--radius-card)] border border-white/10 bg-black/10 text-[10px] font-bold uppercase tracking-[0.14em] text-[var(--color-silver-dim)] hover:text-[var(--color-gold-rare)] hover:border-[var(--color-gold-rare)]/25 transition-colors flex items-center justify-center gap-2"
-                >
-                  <span className="material-symbols-outlined text-lg">tv</span>
-                  TV
-                </Link>
-              </div>
-            )}
+            ) : null}
           </div>
+        </section>
         </section>
       </div>
     </main>

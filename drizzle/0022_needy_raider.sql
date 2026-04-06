@@ -1,0 +1,1 @@
+ALTER TABLE "players" ADD COLUMN "free_premise_random_used" boolean DEFAULT false NOT NULL;
