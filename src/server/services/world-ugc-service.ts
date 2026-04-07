@@ -9,13 +9,24 @@ import {
 } from "@/lib/analytics/server-events";
 import { ApiError } from "@/lib/api/errors";
 import { db } from "@/lib/db";
-import { worlds } from "@/lib/db/schema";
+import { narrativeEvents, sessions, worlds } from "@/lib/db/schema";
 
 export const UGC_REVIEW_NONE = "none";
 export const UGC_REVIEW_PENDING = "pending";
 export const UGC_REVIEW_REJECTED = "rejected";
 
 const MAX_PENDING_PER_USER = 5;
+
+/** Host may publish after this many rounds, or after enough narrative beats. */
+const MIN_ROUND_FOR_PUBLISH = 2;
+const MIN_NARRATIVE_EVENTS_FOR_PUBLISH = 2;
+
+export const CreateWorldSubmissionFromSessionBodySchema = z.object({
+  sessionId: z.string().uuid(),
+  title: z.string().trim().min(3).max(120).optional(),
+  subtitle: z.string().trim().max(240).optional().nullable(),
+  description: z.string().trim().min(20).max(8000).optional(),
+});
 
 export const CreateWorldSubmissionBodySchema = z.object({
   title: z.string().trim().min(3).max(120),
@@ -74,6 +85,100 @@ async function allocateUniqueSubmissionSlug(title: string): Promise<string> {
     if (!(await worldSlugExists(candidate))) return candidate;
   }
   throw new WorldSubmissionError("Could not allocate a unique slug", 500);
+}
+
+async function insertPendingUgcWorld(params: {
+  slug: string;
+  title: string;
+  subtitle: string | null;
+  cardTeaser: string | null;
+  description: string;
+  snapshot_definition: Record<string, unknown>;
+  campaign_mode_default: string;
+  default_max_players: number;
+  module_key: string | null;
+  created_by_user_id: string;
+  source_session_id: string | null;
+  now: Date;
+}): Promise<{ id: string; slug: string }> {
+  const [row] = await db
+    .insert(worlds)
+    .values({
+      slug: params.slug,
+      title: params.title,
+      subtitle: params.subtitle,
+      card_teaser: params.cardTeaser,
+      description: params.description,
+      status: "draft",
+      sort_order: 9999,
+      module_key: params.module_key,
+      campaign_mode_default: params.campaign_mode_default,
+      default_max_players: params.default_max_players,
+      snapshot_definition: params.snapshot_definition,
+      published_revision: 1,
+      is_featured: false,
+      fork_count: 0,
+      cover_image_url: null,
+      cover_image_alt: null,
+      created_by_user_id: params.created_by_user_id,
+      submitted_for_review_at: params.now,
+      ugc_review_status: UGC_REVIEW_PENDING,
+      rejection_reason: null,
+      source_session_id: params.source_session_id,
+      created_at: params.now,
+      updated_at: params.now,
+    })
+    .returning({ id: worlds.id, slug: worlds.slug });
+  if (!row) {
+    throw new WorldSubmissionError("Could not create submission", 500);
+  }
+  return row;
+}
+
+function sessionTags(raw: unknown): string[] {
+  if (!Array.isArray(raw)) return [];
+  return raw
+    .filter((x): x is string => typeof x === "string")
+    .map((t) => t.trim())
+    .filter(Boolean)
+    .slice(0, 12);
+}
+
+function deriveTitleForSessionSubmission(params: {
+  override?: string | undefined;
+  campaignTitle: string | null;
+  adventurePrompt: string | null;
+}): string {
+  const o = params.override?.trim();
+  if (o && o.length >= 3) return o.slice(0, 120);
+  if (params.campaignTitle?.trim())
+    return params.campaignTitle.trim().slice(0, 120);
+  const ap = params.adventurePrompt?.trim();
+  if (ap) return ap.slice(0, 120);
+  return "Campaign world template";
+}
+
+function deriveDescriptionForSessionSubmission(params: {
+  override?: string | undefined;
+  worldSummary: string | null;
+  adventurePrompt: string | null;
+  campaignTitle: string | null;
+}): string {
+  const o = params.override?.trim();
+  if (o && o.length >= 20) return o.slice(0, 8000);
+  const parts = [params.worldSummary, params.adventurePrompt]
+    .map((s) => s?.trim())
+    .filter((s): s is string => Boolean(s && s.length > 0));
+  let body = parts.join("\n\n").trim();
+  if (body.length < 20) {
+    const title = params.campaignTitle?.trim() || "This campaign";
+    body = `${title} — template derived from a played session.\n\n${body}`.trim();
+  }
+  if (body.length < 20) {
+    body =
+      "User-created campaign setting submitted from play. Moderators may ask for edits before approval.";
+  }
+  return body.slice(0, 8000);
 }
 
 export async function countUserPendingSubmissions(
@@ -138,39 +243,165 @@ export async function createWorldSubmission(params: {
       : {}),
     ...(b.worldBible?.trim() ? { world_bible: b.worldBible.trim() } : {}),
   };
-  const [row] = await db
-    .insert(worlds)
-    .values({
-      slug,
-      title: b.title.trim(),
-      subtitle: b.subtitle?.trim() || null,
-      card_teaser: b.subtitle?.trim() || null,
-      description: b.description.trim(),
-      status: "draft",
-      sort_order: 9999,
-      module_key: null,
-      campaign_mode_default: "user_prompt",
-      default_max_players: b.defaultMaxPlayers ?? 4,
-      snapshot_definition,
-      published_revision: 1,
-      is_featured: false,
-      fork_count: 0,
-      cover_image_url: null,
-      cover_image_alt: null,
-      created_by_user_id: params.userId,
-      submitted_for_review_at: now,
-      ugc_review_status: UGC_REVIEW_PENDING,
-      rejection_reason: null,
-      created_at: now,
-      updated_at: now,
-    })
-    .returning({ id: worlds.id, slug: worlds.slug });
-  if (!row) {
-    throw new WorldSubmissionError("Could not create submission", 500);
-  }
+  const row = await insertPendingUgcWorld({
+    slug,
+    title: b.title.trim(),
+    subtitle: b.subtitle?.trim() || null,
+    cardTeaser: b.subtitle?.trim() || null,
+    description: b.description.trim(),
+    snapshot_definition,
+    campaign_mode_default: "user_prompt",
+    default_max_players: b.defaultMaxPlayers ?? 4,
+    module_key: null,
+    created_by_user_id: params.userId,
+    source_session_id: null,
+    now,
+  });
   logServerAnalyticsEvent("world_ugc_submitted", {
     world_id: row.id,
     user_id_hash: hashUserIdForAnalytics(params.userId),
+  });
+  return row;
+}
+
+export async function createWorldSubmissionFromSession(params: {
+  userId: string;
+  userEmail: string | null;
+  body: unknown;
+}): Promise<{ id: string; slug: string }> {
+  if (isGuestEmail(params.userEmail)) {
+    throw new WorldSubmissionError(
+      "Sign in with Google to submit a world to the catalog",
+      403,
+    );
+  }
+  const pending = await countUserPendingSubmissions(params.userId);
+  if (pending >= MAX_PENDING_PER_USER) {
+    throw new WorldSubmissionError(
+      "Too many worlds awaiting review. Wait for a decision before submitting more.",
+      429,
+    );
+  }
+  const parsed = CreateWorldSubmissionFromSessionBodySchema.safeParse(
+    params.body,
+  );
+  if (!parsed.success) {
+    const msg = parsed.error.issues.map((i) => i.message).join("; ");
+    throw new WorldSubmissionError(msg || "Invalid request body", 400);
+  }
+  const b = parsed.data;
+  const sessionId = b.sessionId;
+
+  const [existingSource] = await db
+    .select({ id: worlds.id })
+    .from(worlds)
+    .where(eq(worlds.source_session_id, sessionId))
+    .limit(1);
+  if (existingSource) {
+    throw new WorldSubmissionError(
+      "This play session already has a catalog submission.",
+      409,
+    );
+  }
+
+  const [sessionRow] = await db
+    .select()
+    .from(sessions)
+    .where(eq(sessions.id, sessionId))
+    .limit(1);
+  if (!sessionRow) {
+    throw new WorldSubmissionError("Session not found", 404);
+  }
+  if (sessionRow.host_user_id !== params.userId) {
+    throw new WorldSubmissionError(
+      "Only the session host can publish this campaign as a template.",
+      403,
+    );
+  }
+  if (sessionRow.game_kind !== "campaign") {
+    throw new WorldSubmissionError(
+      "Party games cannot be published as story-world templates.",
+      400,
+    );
+  }
+  if (sessionRow.status !== "active" && sessionRow.status !== "ended") {
+    throw new WorldSubmissionError(
+      "Publish is available once the session is active or has ended.",
+      400,
+    );
+  }
+
+  const [nev] = await db
+    .select({ n: sql<number>`count(*)::int` })
+    .from(narrativeEvents)
+    .where(eq(narrativeEvents.session_id, sessionId));
+  const narrativeCount = Number(nev?.n ?? 0);
+  const roundOk = sessionRow.current_round >= MIN_ROUND_FOR_PUBLISH;
+  const narrativeOk =
+    narrativeCount >= MIN_NARRATIVE_EVENTS_FOR_PUBLISH;
+  if (!roundOk && !narrativeOk) {
+    throw new WorldSubmissionError(
+      `Play at least ${MIN_ROUND_FOR_PUBLISH} rounds or generate ${MIN_NARRATIVE_EVENTS_FOR_PUBLISH} story beats before publishing.`,
+      400,
+    );
+  }
+
+  const title = deriveTitleForSessionSubmission({
+    override: b.title,
+    campaignTitle: sessionRow.campaign_title,
+    adventurePrompt: sessionRow.adventure_prompt,
+  });
+  const description = deriveDescriptionForSessionSubmission({
+    override: b.description,
+    worldSummary: sessionRow.world_summary,
+    adventurePrompt: sessionRow.adventure_prompt,
+    campaignTitle: sessionRow.campaign_title,
+  });
+  const slug = await allocateUniqueSubmissionSlug(title);
+  const now = new Date();
+  const tags = sessionTags(sessionRow.adventure_tags);
+  const adventurePromptCore =
+    sessionRow.adventure_prompt?.trim() || description.slice(0, 8000);
+  const snapshot_definition: Record<string, unknown> = {
+    tags,
+    adventure_prompt: adventurePromptCore,
+    source_session_id: sessionId,
+    ...(sessionRow.art_direction?.trim()
+      ? { art_direction: sessionRow.art_direction.trim() }
+      : {}),
+    ...(sessionRow.world_bible?.trim()
+      ? { world_bible: sessionRow.world_bible.trim() }
+      : {}),
+    ...(sessionRow.world_id
+      ? { forked_from_world_id: sessionRow.world_id }
+      : {}),
+  };
+  const campaignMode =
+    sessionRow.campaign_mode === "module" ||
+    sessionRow.campaign_mode === "random" ||
+    sessionRow.campaign_mode === "user_prompt"
+      ? sessionRow.campaign_mode
+      : "user_prompt";
+  const maxP = Math.min(8, Math.max(1, sessionRow.max_players));
+
+  const row = await insertPendingUgcWorld({
+    slug,
+    title,
+    subtitle: b.subtitle?.trim() || null,
+    cardTeaser: b.subtitle?.trim() || null,
+    description,
+    snapshot_definition,
+    campaign_mode_default: campaignMode,
+    default_max_players: maxP,
+    module_key: sessionRow.module_key ?? null,
+    created_by_user_id: params.userId,
+    source_session_id: sessionId,
+    now,
+  });
+  logServerAnalyticsEvent("world_ugc_submitted", {
+    world_id: row.id,
+    user_id_hash: hashUserIdForAnalytics(params.userId),
+    source_session_id_hash: hashUserIdForAnalytics(sessionId),
   });
   return row;
 }

@@ -59,7 +59,7 @@ async function requestOpenRouterImage(params: {
     headers: {
       Authorization: `Bearer ${params.apiKey}`,
       "Content-Type": "application/json",
-      "HTTP-Referer": process.env.NEXTAUTH_URL ?? "https://playdndai.com",
+      "HTTP-Referer": process.env.NEXTAUTH_URL ?? "https://whatifplay.com",
       "X-Title": "Ashveil DND",
     },
     body: JSON.stringify({

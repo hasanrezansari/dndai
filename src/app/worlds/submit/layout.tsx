@@ -1,8 +1,9 @@
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "Submit a world · Worlds",
-  description: "Propose a story setting for the public worlds catalog (moderated).",
+  title: "Publish from play · Worlds",
+  description:
+    "How to submit a campaign as a moderated story-world template after you play.",
 };
 
 export default function WorldSubmitLayout({

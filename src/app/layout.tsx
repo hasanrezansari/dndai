@@ -36,7 +36,7 @@ export const metadata: Metadata = {
       ? "Curated Roman adventures. Start instantly, invite friends, and let the world respond."
       : "WhatIf — multiplayer storytelling in any genre. AI or human narrator, shared heroes, turns, and scene art in one link.",
   metadataBase: new URL(
-    process.env.NEXTAUTH_URL ?? "https://playdndai.com",
+    process.env.NEXTAUTH_URL ?? "https://whatifplay.com",
   ),
   openGraph: {
     title: `${getBrandName(metaBrand)} — ${getBrandTagline(metaBrand)}`,

@@ -15,7 +15,7 @@ function resolveMainOrigin(): string {
   const raw =
     process.env.MAIN_APP_ORIGIN ??
     process.env.NEXT_PUBLIC_MAIN_APP_ORIGIN ??
-    "https://playdndai.com";
+    "https://whatifplay.com";
   return raw.replace(/\/$/, "");
 }
 

@@ -32,6 +32,7 @@ const gladiatorRow = {
   submitted_for_review_at: null,
   ugc_review_status: "none",
   rejection_reason: null,
+  source_session_id: null,
   created_at: new Date("2026-01-01T00:00:00.000Z"),
   updated_at: new Date("2026-01-01T00:00:00.000Z"),
 } as const satisfies WorldRow;

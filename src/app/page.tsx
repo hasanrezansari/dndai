@@ -601,7 +601,7 @@ export default function Home() {
               }}
               className="w-full min-h-[48px] flex items-center justify-center rounded-[var(--radius-button)] border border-[var(--border-ui-strong)] text-[var(--color-silver-muted)] font-bold uppercase tracking-[0.1em] text-sm hover:border-[var(--color-gold-rare)] hover:text-[var(--color-gold-rare)] transition-colors"
             >
-              More worlds (playdndai)
+              More worlds (whatifplay.com)
             </Link>
 
             <GhostButton

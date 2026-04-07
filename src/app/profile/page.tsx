@@ -3,7 +3,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { signOut, useSession } from "next-auth/react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 
 import { GoogleSignInButton } from "@/components/auth/google-sign-in-button";
 import { GlassCard } from "@/components/ui/glass-card";
@@ -77,7 +76,6 @@ function dicebearHeroPortrait(seed: string): string {
 }
 
 export default function ProfilePage() {
-  const router = useRouter();
   const { status, data: session } = useSession();
   const { toast } = useToast();
 
@@ -238,7 +236,7 @@ export default function ProfilePage() {
     return () => {
       cancelled = true;
     };
-  }, [status, router, session?.user?.name]);
+  }, [status, session?.user?.name]);
 
   useEffect(() => {
     if (status !== "authenticated" || isGuestSession) return;
@@ -880,9 +878,12 @@ export default function ProfilePage() {
                 Sign out
               </GhostButton>
             ) : null}
-            <GhostButton size="sm" type="button" onClick={() => router.back()}>
-              Back
-            </GhostButton>
+            <Link
+              href="/"
+              className="shrink-0 px-4 py-2 text-xs min-h-[40px] inline-flex items-center justify-center bg-transparent text-[var(--color-silver-muted)] border border-[var(--border-ui-strong)] rounded-[var(--radius-button)] font-bold uppercase tracking-[0.1em] transition-all duration-[var(--duration-med)] [transition-timing-function:var(--ease-out-soft)] hover:border-[var(--color-gold-rare)] hover:text-[var(--color-gold-rare)] active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-gold-rare)]/70 focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--color-obsidian)]"
+            >
+              Home
+            </Link>
           </div>
         </header>
 
@@ -968,7 +969,7 @@ export default function ProfilePage() {
                 href="/worlds/submit"
                 className="shrink-0 min-h-[40px] px-3 inline-flex items-center rounded-[var(--radius-button)] border border-[rgba(212,175,55,0.35)] text-[10px] font-bold uppercase tracking-[0.12em] text-[var(--color-gold-rare)] hover:bg-[rgba(212,175,55,0.08)] transition-colors"
               >
-                New submission
+                How to publish
               </Link>
             </div>
             {worldSubsLoading ? (

@@ -231,14 +231,15 @@ export function WorldsGalleryClient() {
             where you can start a lobby.
           </p>
           <p className="text-[11px] text-[var(--outline)] leading-relaxed">
-            Creators with a Google account can{" "}
+            After you host a campaign session, you can publish it as a template from the session
+            screen (moderated — not public until approved).{" "}
             <Link
               href="/worlds/submit"
               className="text-[var(--color-gold-rare)] underline underline-offset-4"
             >
-              submit a world
-            </Link>{" "}
-            for review (not shown publicly until approved).
+              How publishing works
+            </Link>
+            .
           </p>
         </section>
 
@@ -366,10 +367,12 @@ export function WorldsGalleryClient() {
         ) : null}
 
         {!loading && worlds.length === 0 && !error ? (
-          <p className="text-sm text-[var(--color-silver-dim)]">
-            No published worlds yet. Ask the host to run{" "}
-            <code className="text-[var(--color-outline)]">pnpm run db:seed:worlds</code>
-            .
+          <p className="text-sm text-[var(--color-silver-dim)] leading-relaxed">
+            The gallery is empty because there are no published catalog rows in the database yet
+            (this is normal after a reset). It is not an error with your account. To populate
+            curated cards in dev or staging, run{" "}
+            <code className="text-[var(--color-outline)]">npm run db:seed:worlds</code> against the
+            same database the app uses, then refresh.
           </p>
         ) : null}
       </main>

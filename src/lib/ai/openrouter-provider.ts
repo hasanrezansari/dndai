@@ -129,7 +129,9 @@ export class OpenRouterProvider implements AIProvider {
         headers: {
           "Content-Type": "application/json",
           Authorization: `Bearer ${this.apiKey()}`,
-          "HTTP-Referer": "https://playdndai.com",
+          "HTTP-Referer":
+            process.env.NEXTAUTH_URL?.replace(/\/$/, "") ??
+            "https://whatifplay.com",
           "X-Title": "Ashveil DnD",
         },
         body: JSON.stringify({

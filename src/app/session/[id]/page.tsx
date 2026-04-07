@@ -7,6 +7,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { SparkBalanceHud } from "@/components/game/spark-balance-hud";
 import { ConnectionStatus } from "@/components/ui/connection-status";
 import { GhostButton } from "@/components/ui/ghost-button";
+import { GoldButton } from "@/components/ui/gold-button";
 import {
   SkeletonCard,
   SkeletonCircle,
@@ -202,6 +203,11 @@ export default function SessionGameplayPage() {
   const [displayLinkHint, setDisplayLinkHint] = useState<string | null>(null);
   const [sceneDetailOpen, setSceneDetailOpen] = useState(false);
   const [questOpen, setQuestOpen] = useState(false);
+  const [publishOpen, setPublishOpen] = useState(false);
+  const [publishBusy, setPublishBusy] = useState(false);
+  const [publishTitle, setPublishTitle] = useState("");
+  const [publishDesc, setPublishDesc] = useState("");
+  const [publishErr, setPublishErr] = useState<string | null>(null);
   const [partyInspectPlayerId, setPartyInspectPlayerId] = useState<
     string | null
   >(null);
@@ -254,6 +260,23 @@ export default function SessionGameplayPage() {
   const isHost = useMemo(
     () => Boolean(players.find((p) => p.id === currentPlayerId)?.isHost),
     [players, currentPlayerId],
+  );
+
+  const canOfferPublishTemplate = useMemo(
+    () =>
+      isHost &&
+      Boolean(session) &&
+      session!.gameKind !== "party" &&
+      (session!.status === "active" || session!.status === "ended"),
+    [isHost, session],
+  );
+
+  const isGoogleSignedIn = useMemo(
+    () =>
+      authStatus === "authenticated" &&
+      typeof authSession?.user?.email === "string" &&
+      !authSession.user.email.endsWith("@ashveil.guest"),
+    [authSession?.user?.email, authStatus],
   );
 
   const showInsufficientSparksToast = useCallback(() => {
@@ -454,6 +477,43 @@ export default function SessionGameplayPage() {
       isHost,
     ],
   );
+
+  const handleSubmitPublishTemplate = useCallback(async () => {
+    if (!sessionId || publishBusy) return;
+    setPublishErr(null);
+    setPublishBusy(true);
+    try {
+      const body: Record<string, string> = { sessionId };
+      const t = publishTitle.trim();
+      if (t.length >= 3) body.title = t;
+      const d = publishDesc.trim();
+      if (d.length >= 20) body.description = d;
+      const res = await fetch("/api/worlds/submissions/from-session", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      const data: unknown = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        const msg =
+          typeof data === "object" &&
+          data !== null &&
+          "error" in data &&
+          typeof (data as { error: unknown }).error === "string"
+            ? (data as { error: string }).error
+            : "Could not submit";
+        setPublishErr(msg);
+        return;
+      }
+      toast("Submitted for review", "success");
+      setPublishOpen(false);
+      router.push("/profile");
+    } catch {
+      setPublishErr("Network error");
+    } finally {
+      setPublishBusy(false);
+    }
+  }, [publishBusy, publishDesc, publishTitle, router, sessionId, toast]);
 
   const handleDmNarrate = useCallback(
     async (text: string) => {
@@ -1012,6 +1072,65 @@ export default function SessionGameplayPage() {
           />
         ) : null}
       </BottomSheet>
+      <BottomSheet
+        isOpen={publishOpen}
+        onClose={() => setPublishOpen(false)}
+        title="Publish as world template"
+      >
+        <div className="space-y-4 px-1 pb-6">
+          <p className="text-xs text-[var(--color-silver-dim)] leading-relaxed">
+            Sends your campaign premise and lobby setup to the moderation queue. It will not
+            appear on the public gallery until approved. One submission per play session.
+          </p>
+          <label className="block space-y-1">
+            <span className="text-[10px] uppercase tracking-[0.18em] text-[var(--outline)]">
+              Title (optional)
+            </span>
+            <input
+              value={publishTitle}
+              onChange={(e) => setPublishTitle(e.target.value)}
+              maxLength={120}
+              placeholder="Defaults from your campaign title or premise"
+              className="w-full min-h-[44px] px-3 rounded-[var(--radius-card)] bg-[var(--color-deep-void)] border border-[var(--border-ui-strong)] text-[var(--color-silver-muted)]"
+            />
+          </label>
+          <label className="block space-y-1">
+            <span className="text-[10px] uppercase tracking-[0.18em] text-[var(--outline)]">
+              Description (optional, min 20 chars if set)
+            </span>
+            <textarea
+              value={publishDesc}
+              onChange={(e) => setPublishDesc(e.target.value)}
+              maxLength={8000}
+              rows={4}
+              placeholder="Defaults from your world summary and adventure prompt"
+              className="w-full px-3 py-2 rounded-[var(--radius-card)] bg-[var(--color-deep-void)] border border-[var(--border-ui-strong)] text-[var(--color-silver-muted)] text-sm leading-relaxed"
+            />
+          </label>
+          {publishErr ? (
+            <p className="text-sm text-[var(--color-failure)] leading-relaxed">{publishErr}</p>
+          ) : null}
+          <div className="flex flex-col gap-2 pt-1">
+            <GoldButton
+              type="button"
+              size="lg"
+              className="w-full min-h-[48px]"
+              disabled={publishBusy}
+              onClick={() => void handleSubmitPublishTemplate()}
+            >
+              {publishBusy ? "Sending…" : "Submit for review"}
+            </GoldButton>
+            <GhostButton
+              type="button"
+              size="md"
+              className="w-full"
+              onClick={() => setPublishOpen(false)}
+            >
+              Cancel
+            </GhostButton>
+          </div>
+        </div>
+      </BottomSheet>
       <DiceOverlay />
       <StatPopupOverlay />
       <header className="relative z-[1] h-[min(36vh,320px)] w-full shrink-0 overflow-hidden border-b border-[var(--border-divide)]">
@@ -1084,6 +1203,32 @@ export default function SessionGameplayPage() {
               <span className="font-mono text-[var(--color-gold-support)] tracking-[0.12em]">
                 {session.joinCode}
               </span>
+            </p>
+          ) : null}
+          {canOfferPublishTemplate && isGoogleSignedIn ? (
+            <div className="mt-3">
+              <GhostButton
+                type="button"
+                size="md"
+                className="min-h-[44px] w-full border-[var(--border-ui-strong)]"
+                onClick={() => {
+                  setPublishErr(null);
+                  setPublishTitle(session?.campaignTitle?.trim() || "");
+                  setPublishDesc("");
+                  setPublishOpen(true);
+                }}
+              >
+                <span className="material-symbols-outlined text-base">public</span>
+                Publish as world template
+              </GhostButton>
+              <p className="mt-1.5 text-[9px] text-[var(--outline)] leading-relaxed text-center px-1">
+                Host only · moderation queue · not public until approved
+              </p>
+            </div>
+          ) : null}
+          {canOfferPublishTemplate && !isGoogleSignedIn ? (
+            <p className="mt-3 text-[9px] text-[var(--outline)] text-center leading-relaxed px-1">
+              Sign in with Google from the lobby to publish this campaign as a catalog template.
             </p>
           ) : null}
         </div>
