@@ -51,7 +51,8 @@ RULES:
 - Spellcasting costs mana (1-3 per cast, regardless of success)
 - If no enemies are present and the action is peaceful, minimal or no damage
 - Consider the narrative context — if wolves are attacking, failed actions mean wolf bites (2-4 damage)
-- ALWAYS include at least one effect for the acting player (even if hp_delta is 0)`;
+- ALWAYS include at least one effect for the acting player (even if hp_delta is 0)
+- If JSON includes "betrayal_spine" with phase "rogue_intent" or "confronting", weight social/interpersonal fallout in narrative_hint; do not use phase_change to "resolve" that arc (host tools only). Friendly-fire or party-vs-party is allowed when the action clearly targets allies.`;
 
 function buildFallbackFromPatches(
   patches: StatePatch[],
@@ -141,6 +142,8 @@ export async function interpretConsequences(params: {
   npcs: NpcInfo[];
   sceneContext: string;
   fallbackPatches: StatePatch[];
+  /** Campaign betrayal line for quest; omit when off / party mode. */
+  betrayalSpine?: string | null;
   provider?: AIProvider;
 }): Promise<OrchestrationStepResult<ConsequenceOutput>> {
   const provider = params.provider ?? getAIProvider();
@@ -182,6 +185,9 @@ export async function interpretConsequences(params: {
       attitude: n.attitude,
     })),
     scene_context: params.sceneContext.slice(0, 500),
+    betrayal_spine:
+      params.betrayalSpine?.trim() ||
+      "(none — standard party cooperation unless action targets party)",
   });
 
   return runOrchestrationStep({

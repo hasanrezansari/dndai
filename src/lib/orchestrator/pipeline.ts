@@ -14,6 +14,11 @@ import {
 import { broadcastToSession } from "@/lib/socket/server";
 import { redis } from "@/lib/redis";
 import { buildTurnContext } from "@/lib/orchestrator/context-builder";
+import {
+  BETRAYAL_INTERRUPT_SYSTEM_APPENDIX,
+  buildBetrayalSpineForNarrator,
+  shouldApplyBetrayalNarratorInterrupt,
+} from "@/lib/orchestrator/betrayal-pipeline";
 import { commitStatePatches } from "@/lib/orchestrator/apply-state";
 import { logTrace } from "@/lib/orchestrator/trace";
 import { parseIntent } from "@/lib/orchestrator/workers/intent-parser";
@@ -705,6 +710,7 @@ export async function runTurnPipeline(params: {
         ctx.recentEvents.slice(-2).join(" ").slice(0, 500) ||
         "",
       fallbackPatches,
+      betrayalSpine: buildBetrayalSpineForNarrator(ctx),
       provider,
     });
 
@@ -860,7 +866,7 @@ export async function runTurnPipeline(params: {
     ctx.session.adventurePrompt?.trim() ||
     "";
 
-  const facilitatorSystemPrompt = buildNarratorSystemPrompt(
+  let facilitatorSystemPrompt = buildNarratorSystemPrompt(
     buildFacilitatorRoleLine({
       campaign_mode: ctx.session.campaignMode,
       module_key: ctx.session.moduleKey,
@@ -870,6 +876,9 @@ export async function runTurnPipeline(params: {
       world_bible: ctx.session.worldBible,
     }),
   );
+  if (shouldApplyBetrayalNarratorInterrupt(ctx)) {
+    facilitatorSystemPrompt = `${facilitatorSystemPrompt}\n\n${BETRAYAL_INTERRUPT_SYSTEM_APPENDIX}`;
+  }
   const worldBibleExcerpt =
     ctx.session.worldBible?.trim().slice(0, 4000) ?? "";
 
@@ -909,10 +918,7 @@ export async function runTurnPipeline(params: {
       sceneContext,
       partySummary: ctx.allCharacterSummaries.join("; "),
       questContext: ctx.questContext,
-      betrayalSpine:
-        ctx.session.gameKind === "campaign" && ctx.betrayalMode !== "off"
-          ? `mode=${ctx.betrayalMode}; phase=${ctx.betrayalPhase ?? "idle"}; last_outcome=${ctx.betrayalOutcomeId ?? "none"}`
-          : null,
+      betrayalSpine: buildBetrayalSpineForNarrator(ctx),
       npcContext: ctx.npcContext,
       canonicalState: memoryBundle.canonicalState,
       rollingSummary: memoryBundle.rollingSummary,

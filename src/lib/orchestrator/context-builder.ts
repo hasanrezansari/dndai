@@ -85,6 +85,8 @@ export interface TurnContext {
   betrayalMode: string;
   betrayalPhase: string | null;
   betrayalOutcomeId: string | null;
+  betrayalInstigatorPlayerId: string | null;
+  betrayalTraitorPlayerId: string | null;
   npcContext: string | null;
   npcIds: Array<{ id: string; name: string }>;
   nextPlayerName: string;
@@ -259,6 +261,8 @@ export async function buildTurnContext({
       : "off";
   const betrayalPhase = quest?.betrayal?.phase ?? null;
   const betrayalOutcomeId = quest?.betrayal?.outcome_id ?? null;
+  const betrayalInstigatorPlayerId = quest?.betrayal?.instigator_player_id ?? null;
+  const betrayalTraitorPlayerId = quest?.betrayal?.traitor_player_id ?? null;
 
   const npcRows = await db
     .select()
@@ -345,6 +349,8 @@ export async function buildTurnContext({
     betrayalMode,
     betrayalPhase,
     betrayalOutcomeId,
+    betrayalInstigatorPlayerId,
+    betrayalTraitorPlayerId,
     npcContext,
     npcIds,
     nextPlayerName,

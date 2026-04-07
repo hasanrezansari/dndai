@@ -55,6 +55,28 @@ async function bumpSessionStateVersion(sessionId: string): Promise<void> {
     .where(eq(sessions.id, sessionId));
 }
 
+/**
+ * Align `sessions.phase` with an open confrontation when not in tactical combat.
+ * Mid-combat betrayals keep `combat` so the shell stays fight-forward.
+ */
+async function nudgeSessionExplorationPhaseForConfrontation(
+  sessionId: string,
+): Promise<void> {
+  const [row] = await db
+    .select({ phase: sessions.phase })
+    .from(sessions)
+    .where(eq(sessions.id, sessionId))
+    .limit(1);
+  if (!row) return;
+  const p = row.phase;
+  if (p === "exploration" || p === "rest" || p === "social") {
+    await db
+      .update(sessions)
+      .set({ phase: "social", updated_at: new Date() })
+      .where(eq(sessions.id, sessionId));
+  }
+}
+
 async function insertBetrayalTimelineNote(params: {
   sessionId: string;
   round: number;
@@ -223,6 +245,7 @@ export async function transitionBetrayalPhase(params: {
       round,
       text: `[Betrayal phase] ${from} → confronting${inst ? `; instigator_player_id=${inst}` : ""}`,
     });
+    await nudgeSessionExplorationPhaseForConfrontation(params.sessionId);
     await bumpSessionStateVersion(params.sessionId);
     return { phase: "confronting" };
   }
