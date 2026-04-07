@@ -45,6 +45,7 @@ export function questProgressForModel(quest: {
   betrayal?: {
     phase?: string;
     outcome_id?: string;
+    instigator_player_id?: string | null;
     traitor_player_id?: string | null;
     macguffin_holder_player_id?: string | null;
   };
@@ -56,11 +57,12 @@ export function questProgressForModel(quest: {
   const b = quest.betrayal;
   if (!b || b.phase === "idle") return base;
   const oid = b.outcome_id ? `outcome=${b.outcome_id}` : "";
+  const inst = b.instigator_player_id ? `instigator=${b.instigator_player_id}` : "";
   const traitor = b.traitor_player_id ? `traitor_player=${b.traitor_player_id}` : "";
   const holder = b.macguffin_holder_player_id
     ? `macguffin_holder=${b.macguffin_holder_player_id}`
     : "";
-  const extra = [oid, traitor, holder].filter(Boolean).join("; ");
+  const extra = [oid, inst, traitor, holder].filter(Boolean).join("; ");
   return extra
     ? `${base} | Betrayal spine: phase=${b.phase}; ${extra}`
     : `${base} | Betrayal spine: phase=${b.phase}`;

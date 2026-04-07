@@ -41,6 +41,8 @@ export type ObjectiveLead = {
 export type BetrayalQuestSlice = {
   phase: "idle" | "rogue_intent" | "confronting" | "resolved";
   outcome_id?: string;
+  /** Player who declared rogue intent (Phase B confrontational). */
+  instigator_player_id?: string | null;
   traitor_player_id?: string | null;
   macguffin_holder_player_id?: string | null;
   last_updated_round?: number;

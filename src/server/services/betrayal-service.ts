@@ -2,12 +2,19 @@ import { and, desc, eq, sql } from "drizzle-orm";
 
 import { ApiError } from "@/lib/api/errors";
 import { db } from "@/lib/db";
-import { memorySummaries, sessions } from "@/lib/db/schema";
+import { memorySummaries, players, sessions } from "@/lib/db/schema";
+import { isPlayerForUser } from "@/lib/auth/guards";
 import { applyBetrayalOutcomeToQuest } from "@/server/services/betrayal-resolver";
+import {
+  assertBetrayalPhaseTransition,
+  type BetrayalFsmPhase,
+} from "@/server/services/betrayal-state-machine";
 import {
   defaultQuestState,
   getQuestState,
   persistQuestState,
+  type BetrayalQuestSlice,
+  type QuestState,
 } from "@/server/services/quest-service";
 
 const BETRAYAL_FACT_KIND = "betrayal_fact_v1";
@@ -38,7 +45,192 @@ export async function insertBetrayalFactMemory(params: {
   });
 }
 
-/** Host-only Phase A hook: apply a registered betrayal outcome to quest + memory + bump session version. */
+async function bumpSessionStateVersion(sessionId: string): Promise<void> {
+  await db
+    .update(sessions)
+    .set({
+      state_version: sql`${sessions.state_version} + 1`,
+      updated_at: new Date(),
+    })
+    .where(eq(sessions.id, sessionId));
+}
+
+async function insertBetrayalTimelineNote(params: {
+  sessionId: string;
+  round: number;
+  text: string;
+}): Promise<void> {
+  await db.insert(memorySummaries).values({
+    session_id: params.sessionId,
+    summary_type: "betrayal_fact_v1",
+    turn_range_start: Math.max(1, params.round),
+    turn_range_end: Math.max(1, params.round),
+    content: {
+      kind: BETRAYAL_FACT_KIND,
+      text: params.text,
+      outcome_id: "__phase__",
+    },
+  });
+}
+
+/**
+ * Betrayal phase transitions:
+ * - `story_only`: host may reset arc (`idle`) after a resolved/confronting beat.
+ * - `confrontational`: full beat flow (rogue intent, confrontation, reset).
+ */
+export async function transitionBetrayalPhase(params: {
+  sessionId: string;
+  userId: string;
+  targetPhase: "rogue_intent" | "confronting" | "idle";
+  instigatorPlayerId?: string | null;
+}): Promise<{ phase: string }> {
+  const [row] = await db
+    .select()
+    .from(sessions)
+    .where(eq(sessions.id, params.sessionId))
+    .limit(1);
+  if (!row) {
+    throw new BetrayalServiceError("Session not found", 404);
+  }
+  if (row.game_kind !== "campaign") {
+    throw new BetrayalServiceError("Betrayal spine is campaign-only", 400);
+  }
+  const mode = row.betrayal_mode ?? "off";
+  if (mode === "off") {
+    throw new BetrayalServiceError(
+      "Betrayal mode is off for this session",
+      409,
+    );
+  }
+  if (params.targetPhase !== "idle" && mode !== "confrontational") {
+    throw new BetrayalServiceError(
+      "Rogue intent and confrontation require betrayal_mode confrontational",
+      409,
+    );
+  }
+  if (row.status !== "active" && row.status !== "paused") {
+    throw new BetrayalServiceError(
+      "Betrayal phases can only change during an active or paused session",
+      409,
+    );
+  }
+
+  const round = row.current_round;
+  const quest =
+    (await getQuestState(params.sessionId)) ??
+    defaultQuestState("Survive the adventure.");
+  const slice = quest.betrayal;
+  const from: BetrayalFsmPhase = (slice?.phase as BetrayalFsmPhase) ?? "idle";
+
+  if (params.targetPhase === "idle") {
+    if (row.host_user_id !== params.userId) {
+      throw new BetrayalServiceError("Only the host can reset the betrayal arc", 403);
+    }
+    if (from === "idle") {
+      return { phase: "idle" };
+    }
+    assertBetrayalPhaseTransition(from, "idle");
+    const nextQuest: QuestState = {
+      ...quest,
+      betrayal: { phase: "idle", last_updated_round: round },
+      updatedAt: new Date().toISOString(),
+    };
+    await persistQuestState(params.sessionId, round, nextQuest);
+    await insertBetrayalTimelineNote({
+      sessionId: params.sessionId,
+      round,
+      text: `[Betrayal phase] ${from} → idle (arc reset)`,
+    });
+    await bumpSessionStateVersion(params.sessionId);
+    return { phase: "idle" };
+  }
+
+  if (params.targetPhase === "rogue_intent") {
+    assertBetrayalPhaseTransition(from, "rogue_intent");
+    const inst = params.instigatorPlayerId?.trim();
+    if (!inst) {
+      throw new BetrayalServiceError(
+        "instigatorPlayerId is required to declare rogue intent",
+        400,
+      );
+    }
+    const allowed =
+      row.host_user_id === params.userId ||
+      (await isPlayerForUser(inst, params.sessionId, params.userId));
+    if (!allowed) {
+      throw new BetrayalServiceError(
+        "Only the instigating player or host may declare rogue intent",
+        403,
+      );
+    }
+    const [pRow] = await db
+      .select({ id: players.id })
+      .from(players)
+      .where(
+        and(eq(players.id, inst), eq(players.session_id, params.sessionId)),
+      )
+      .limit(1);
+    if (!pRow) {
+      throw new BetrayalServiceError("instigatorPlayerId is not in this session", 400);
+    }
+
+    const nextSlice: BetrayalQuestSlice = {
+      phase: "rogue_intent",
+      instigator_player_id: inst,
+      last_updated_round: round,
+    };
+    const nextQuest: QuestState = {
+      ...quest,
+      betrayal: nextSlice,
+      updatedAt: new Date().toISOString(),
+    };
+    await persistQuestState(params.sessionId, round, nextQuest);
+    await insertBetrayalTimelineNote({
+      sessionId: params.sessionId,
+      round,
+      text: `[Betrayal phase] ${from} → rogue_intent; instigator_player_id=${inst}`,
+    });
+    await bumpSessionStateVersion(params.sessionId);
+    return { phase: "rogue_intent" };
+  }
+
+  if (params.targetPhase === "confronting") {
+    if (row.host_user_id !== params.userId) {
+      throw new BetrayalServiceError(
+        "Only the host can open the confrontation beat",
+        403,
+      );
+    }
+    assertBetrayalPhaseTransition(from, "confronting");
+    const inst =
+      params.instigatorPlayerId?.trim() ||
+      (from === "rogue_intent" ? slice?.instigator_player_id?.trim() : null) ||
+      null;
+
+    const nextSlice: BetrayalQuestSlice = {
+      phase: "confronting",
+      ...(inst ? { instigator_player_id: inst } : {}),
+      last_updated_round: round,
+    };
+    const nextQuest: QuestState = {
+      ...quest,
+      betrayal: nextSlice,
+      updatedAt: new Date().toISOString(),
+    };
+    await persistQuestState(params.sessionId, round, nextQuest);
+    await insertBetrayalTimelineNote({
+      sessionId: params.sessionId,
+      round,
+      text: `[Betrayal phase] ${from} → confronting${inst ? `; instigator_player_id=${inst}` : ""}`,
+    });
+    await bumpSessionStateVersion(params.sessionId);
+    return { phase: "confronting" };
+  }
+
+  throw new BetrayalServiceError("Invalid target phase", 400);
+}
+
+/** Host-only: apply registered betrayal outcome; story_only from idle; confrontational from idle or confronting. */
 export async function applyHostBetrayalOutcome(params: {
   sessionId: string;
   hostUserId: string;
@@ -80,11 +272,20 @@ export async function applyHostBetrayalOutcome(params: {
     defaultQuestState("Survive the adventure.");
 
   const prevPhase = quest.betrayal?.phase ?? "idle";
-  if (prevPhase !== "idle") {
-    throw new BetrayalServiceError(
-      "Betrayal outcome can only be applied from phase idle (reset the arc in a later build)",
-      409,
-    );
+  if (mode === "story_only") {
+    if (prevPhase !== "idle") {
+      throw new BetrayalServiceError(
+        "Betrayal outcome can only be applied from phase idle in story_only mode",
+        409,
+      );
+    }
+  } else if (mode === "confrontational") {
+    if (prevPhase !== "idle" && prevPhase !== "confronting") {
+      throw new BetrayalServiceError(
+        "Apply an outcome from idle or during open confrontation, or reset the arc",
+        409,
+      );
+    }
   }
 
   const { quest: nextQuest, memoryFactLine } = applyBetrayalOutcomeToQuest(
@@ -105,13 +306,7 @@ export async function applyHostBetrayalOutcome(params: {
     outcomeId: nextQuest.betrayal?.outcome_id ?? params.outcomeId,
   });
 
-  await db
-    .update(sessions)
-    .set({
-      state_version: sql`${sessions.state_version} + 1`,
-      updated_at: new Date(),
-    })
-    .where(eq(sessions.id, params.sessionId));
+  await bumpSessionStateVersion(params.sessionId);
 
   return {
     questObjective: nextQuest.objective,

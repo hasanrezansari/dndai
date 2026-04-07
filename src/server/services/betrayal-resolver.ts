@@ -38,7 +38,10 @@ export function applyBetrayalOutcomeToQuest(
   outcomeId: string,
   ctx: BetrayalApplyContext,
 ): BetrayalResolveResult {
-  const traitor = ctx.traitor_player_id ?? null;
+  const traitor =
+    ctx.traitor_player_id ??
+    quest.betrayal?.instigator_player_id ??
+    null;
   const round = ctx.round;
   const holderFromCtx = ctx.macguffin_holder_player_id ?? null;
 

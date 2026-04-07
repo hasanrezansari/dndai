@@ -108,6 +108,7 @@ export interface QuestProgressView {
   betrayal?: {
     phase: string;
     outcome_id?: string;
+    instigator_player_id?: string | null;
     traitor_player_id?: string | null;
     macguffin_holder_player_id?: string | null;
     last_updated_round?: number;

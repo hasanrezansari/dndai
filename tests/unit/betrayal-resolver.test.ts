@@ -33,4 +33,18 @@ describe("applyBetrayalOutcomeToQuest", () => {
     });
     expect(quest.betrayal?.outcome_id).toBe("betrayal_outcome_unknown");
   });
+
+  it("defaults traitor from quest instigator when ctx omits traitor", () => {
+    const instigator = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
+    const q = baseQuest();
+    q.betrayal = {
+      phase: "confronting",
+      instigator_player_id: instigator,
+      last_updated_round: 2,
+    };
+    const { quest } = applyBetrayalOutcomeToQuest(q, "betrayal_traitor_caught", {
+      round: 4,
+    });
+    expect(quest.betrayal?.traitor_player_id).toBe(instigator);
+  });
 });

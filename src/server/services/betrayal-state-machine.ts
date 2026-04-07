@@ -18,7 +18,7 @@ export class BetrayalStateMachineError extends Error {
   }
 }
 
-/** Validates quest-level betrayal.phase transitions (Phase B will use alongside session FSM). */
+/** Validates quest-level betrayal.phase transitions (confrontation arc + host resets). */
 export function assertBetrayalPhaseTransition(
   from: BetrayalFsmPhase,
   to: BetrayalFsmPhase,

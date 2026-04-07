@@ -1069,6 +1069,14 @@ export default function SessionGameplayPage() {
             onContinueChapter={() => void handleContinueChapter()}
             onEndingVote={(choice) => void handleEndingVote(choice)}
             onGenerateFinalChapter={() => void handleGenerateFinalChapter()}
+            sessionId={sessionId}
+            players={players}
+            onSessionMutated={async () => {
+              const res = await fetch(`/api/sessions/${sessionId}/state`);
+              if (!res.ok) return;
+              const data = (await res.json()) as SessionStatePayload;
+              hydrate(data);
+            }}
           />
         ) : null}
       </BottomSheet>

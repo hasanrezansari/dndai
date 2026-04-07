@@ -4,7 +4,12 @@ vi.mock("@/lib/orchestrator/trace", () => ({
   logTrace: vi.fn().mockResolvedValue(undefined),
 }));
 
-import type { AIProvider } from "@/lib/ai";
+import type {
+  AIProvider,
+  ModelTier,
+  TokenUsage,
+  ZodSchema,
+} from "@/lib/ai/types";
 import { MockProvider } from "@/lib/ai/mock-provider";
 import { buildFacilitatorRoleLine } from "@/lib/ai/narrative-session-profile";
 import { parseIntent } from "@/lib/orchestrator/workers/intent-parser";
@@ -95,7 +100,14 @@ describe("mixed-party simulation", () => {
   it("passes custom class profile context to rules interpreter prompt", async () => {
     const calls: string[] = [];
     const probeProvider: AIProvider = {
-      async generateStructured(params) {
+      async generateStructured<T>(params: {
+        model: ModelTier;
+        systemPrompt: string;
+        userPrompt: string;
+        schema: ZodSchema<T>;
+        maxTokens?: number;
+        temperature?: number;
+      }): Promise<{ data: T; usage: TokenUsage }> {
         calls.push(params.userPrompt);
         return {
           data: RulesInterpreterOutputSchema.parse({
@@ -108,7 +120,7 @@ describe("mixed-party simulation", () => {
               dc: 12,
             }],
             auto_success: false,
-          }),
+          }) as T,
           usage: { inputTokens: 0, outputTokens: 0, model: "probe" },
         };
       },
@@ -167,11 +179,19 @@ describe("mixed-party simulation", () => {
   it("passes normalized identity bundle to narrator prompt", async () => {
     const calls: string[] = [];
     const probeProvider: AIProvider = {
-      async generateStructured(params) {
+      async generateStructured<T>(params: {
+        model: ModelTier;
+        systemPrompt: string;
+        userPrompt: string;
+        schema: ZodSchema<T>;
+        maxTokens?: number;
+        temperature?: number;
+      }): Promise<{ data: T; usage: TokenUsage }> {
         calls.push(params.userPrompt);
         return {
           data: {
-            scene_text: "Kade pivots through neon rain and drives forward with a precise edge cut as sparks flare.",
+            scene_text:
+              "Kade pivots through neon rain and drives forward with a precise edge cut as sparks flare.",
             visible_changes: [],
             tone: "tense",
             next_actor_id: null,
@@ -183,7 +203,7 @@ describe("mixed-party simulation", () => {
               setting_change: "texture",
               warrants_establishing_shot: false,
             },
-          },
+          } as T,
           usage: { inputTokens: 0, outputTokens: 0, model: "probe" },
         };
       },
