@@ -909,6 +909,10 @@ export async function runTurnPipeline(params: {
       sceneContext,
       partySummary: ctx.allCharacterSummaries.join("; "),
       questContext: ctx.questContext,
+      betrayalSpine:
+        ctx.session.gameKind === "campaign" && ctx.betrayalMode !== "off"
+          ? `mode=${ctx.betrayalMode}; phase=${ctx.betrayalPhase ?? "idle"}; last_outcome=${ctx.betrayalOutcomeId ?? "none"}`
+          : null,
       npcContext: ctx.npcContext,
       canonicalState: memoryBundle.canonicalState,
       rollingSummary: memoryBundle.rollingSummary,

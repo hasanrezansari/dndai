@@ -13,6 +13,7 @@ import {
 } from "@/lib/db/schema";
 import { questProgressForModel } from "@/lib/quest-display";
 import { ClassProfileSchema } from "@/lib/schemas/domain";
+import { fetchBetrayalFactLines } from "@/server/services/betrayal-service";
 import { getQuestState } from "@/server/services/quest-service";
 
 import {
@@ -80,6 +81,14 @@ async function buildCanonicalState(sessionId: string): Promise<string> {
 
   const quest = await getQuestState(sessionId);
   const questLine = quest ? questProgressForModel(quest) : "";
+  const betrayalFacts =
+    sess.game_kind === "campaign"
+      ? await fetchBetrayalFactLines(sessionId, 5)
+      : [];
+  const betrayalBlock =
+    betrayalFacts.length > 0
+      ? `Betrayal facts (server): ${betrayalFacts.join(" | ")}`
+      : "";
 
   const worldSummary = typeof sess.world_summary === "string" ? sess.world_summary : "";
   const worldBible =
@@ -95,6 +104,7 @@ async function buildCanonicalState(sessionId: string): Promise<string> {
     `Party: ${charParts.join("; ") || "none"}`,
     npcParts.length > 0 ? `NPCs: ${npcParts.join("; ")}` : "",
     questLine,
+    betrayalBlock,
   ].filter(Boolean);
 
   return truncateToTokenBudget(parts.join("\n"), TOKEN_BUDGET.canonicalState);

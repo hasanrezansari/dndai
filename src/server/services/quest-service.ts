@@ -37,6 +37,15 @@ export type ObjectiveLead = {
   updatedRound: number;
 };
 
+/** Server-owned betrayal arc slice (campaign); extended via `outcome_id` registry. */
+export type BetrayalQuestSlice = {
+  phase: "idle" | "rogue_intent" | "confronting" | "resolved";
+  outcome_id?: string;
+  traitor_player_id?: string | null;
+  macguffin_holder_player_id?: string | null;
+  last_updated_round?: number;
+};
+
 export type QuestState = {
   objective: string;
   subObjectives?: string[];
@@ -52,6 +61,8 @@ export type QuestState = {
   questChapterAnchor?: number;
   /** Counts turns spent at max progress while waiting for narrative closure. */
   turnsAtFullProgress?: number;
+  /** Betrayal / PvP spine; omitted when `sessions.betrayal_mode` is `off`. */
+  betrayal?: BetrayalQuestSlice;
   updatedAt: string;
 };
 
@@ -82,6 +93,14 @@ function isQuestState(value: unknown): value is QuestState {
       typeof v.progressEarnedThisChapter === "number") &&
     (v.questChapterAnchor === undefined || typeof v.questChapterAnchor === "number") &&
     (v.turnsAtFullProgress === undefined || typeof v.turnsAtFullProgress === "number");
+  const betrayalOk =
+    v.betrayal === undefined ||
+    (typeof v.betrayal === "object" &&
+      v.betrayal !== null &&
+      typeof (v.betrayal as BetrayalQuestSlice).phase === "string" &&
+      ["idle", "rogue_intent", "confronting", "resolved"].includes(
+        (v.betrayal as BetrayalQuestSlice).phase,
+      ));
   return (
     typeof v.objective === "string" &&
     typeof v.progress === "number" &&
@@ -90,7 +109,8 @@ function isQuestState(value: unknown): value is QuestState {
     (v.status === "active" || v.status === "ready_to_end" || v.status === "failed") &&
     endingVote &&
     typeof v.updatedAt === "string" &&
-    optNums
+    optNums &&
+    betrayalOk
   );
 }
 
@@ -890,7 +910,7 @@ export async function finalizeSessionEnd(sessionId: string): Promise<number> {
   return updated?.stateVersion ?? 0;
 }
 
-async function persistQuestState(
+export async function persistQuestState(
   sessionId: string,
   round: number,
   state: QuestState,

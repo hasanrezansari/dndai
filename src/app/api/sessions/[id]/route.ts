@@ -14,6 +14,7 @@ import {
   increaseSessionMaxPlayers,
   SessionLobbyUpdateError,
   SessionNotFoundError,
+  updateSessionBetrayalMode,
   updateSessionLobbyPremise,
   updateSessionVisualRhythmPreset,
 } from "@/server/services/session-service";
@@ -27,6 +28,7 @@ const PatchSessionBodySchema = z
     adventure_tags: z.array(z.string().max(64)).max(24).optional(),
     party_shared_role_label: z.string().max(200).nullable().optional(),
     visual_rhythm_preset: z.enum(["standard", "cinematic"]).optional(),
+    betrayal_mode: z.enum(["off", "story_only", "confrontational"]).optional(),
   })
   .refine(
     (d) =>
@@ -36,7 +38,8 @@ const PatchSessionBodySchema = z
       d.art_direction !== undefined ||
       d.adventure_tags !== undefined ||
       d.party_shared_role_label !== undefined ||
-      d.visual_rhythm_preset !== undefined,
+      d.visual_rhythm_preset !== undefined ||
+      d.betrayal_mode !== undefined,
     { message: "At least one field required" },
   );
 
@@ -122,6 +125,19 @@ export async function PATCH(
         art_direction: data.art_direction,
         adventure_tags: data.adventure_tags,
         party_shared_role_label: data.party_shared_role_label,
+      });
+      try {
+        await broadcastToSession(id, "session-premise-updated", {});
+      } catch (err) {
+        console.error(err);
+      }
+    }
+
+    if (data.betrayal_mode !== undefined) {
+      await updateSessionBetrayalMode({
+        sessionId: id,
+        actingUserId: user.id,
+        betrayalMode: data.betrayal_mode,
       });
       try {
         await broadcastToSession(id, "session-premise-updated", {});

@@ -353,6 +353,8 @@ export async function generateNarration(params: {
   fallbackPremiseHint?: string;
   /** Prior turn's locked situation line; empty when session has no anchor yet. */
   establishedSituation?: string | null;
+  /** Campaign betrayal spine for narrator (mode / phase / last outcome_id). */
+  betrayalSpine?: string | null;
   provider: AIProvider;
 }): Promise<OrchestrationStepResult<NarratorOutput>> {
   const normalizedDisplayClass = (params.characterClassIdentity ?? "").trim();
@@ -385,6 +387,9 @@ export async function generateNarration(params: {
     established_situation:
       params.establishedSituation?.trim() ||
       "(none yet — infer only from scene_context, recent_narrative, and canonical_state)",
+    betrayal_spine:
+      params.betrayalSpine?.trim() ||
+      "(none — treat party as loyal unless quest_progress mentions betrayal)",
   });
 
   const rollResult = params.diceResults[0]?.result as DiceRoll["result"] | undefined;

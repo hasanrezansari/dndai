@@ -169,6 +169,20 @@
       "when": 1776000000000,
       "tag": "0023_chapter_break_offered",
       "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "7",
+      "when": 1776100000000,
+      "tag": "0024_worlds_source_session",
+      "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "7",
+      "when": 1776200000000,
+      "tag": "0025_sessions_betrayal_mode",
+      "breakpoints": true
     }
   ]
 }

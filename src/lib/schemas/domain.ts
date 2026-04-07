@@ -53,6 +53,10 @@ export const SessionSchema = z.object({
   last_manual_scene_image_at: iso.nullable().optional(),
   spark_pool_balance: z.number().int().min(0).default(0),
   chapter_break_offered: z.boolean().default(false),
+  /** Betrayal mechanics opt-in; campaign tables only. */
+  betrayal_mode: z
+    .enum(["off", "story_only", "confrontational"])
+    .default("off"),
   created_at: iso,
   updated_at: iso,
 });

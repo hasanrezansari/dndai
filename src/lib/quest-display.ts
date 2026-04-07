@@ -42,9 +42,26 @@ export function questProgressForModel(quest: {
   progress: number;
   risk: number;
   status: string;
+  betrayal?: {
+    phase?: string;
+    outcome_id?: string;
+    traitor_player_id?: string | null;
+    macguffin_holder_player_id?: string | null;
+  };
 }): string {
   const progressPart = isQuestFinaleThreshold(quest)
     ? "finale threshold (party may vote to end or continue)"
     : `${quest.progress}%`;
-  return `Quest: ${quest.objective} | Progress ${progressPart} | Danger ${quest.risk}% | ${quest.status}`;
+  const base = `Quest: ${quest.objective} | Progress ${progressPart} | Danger ${quest.risk}% | ${quest.status}`;
+  const b = quest.betrayal;
+  if (!b || b.phase === "idle") return base;
+  const oid = b.outcome_id ? `outcome=${b.outcome_id}` : "";
+  const traitor = b.traitor_player_id ? `traitor_player=${b.traitor_player_id}` : "";
+  const holder = b.macguffin_holder_player_id
+    ? `macguffin_holder=${b.macguffin_holder_player_id}`
+    : "";
+  const extra = [oid, traitor, holder].filter(Boolean).join("; ");
+  return extra
+    ? `${base} | Betrayal spine: phase=${b.phase}; ${extra}`
+    : `${base} | Betrayal spine: phase=${b.phase}`;
 }

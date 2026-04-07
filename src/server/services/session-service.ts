@@ -464,6 +464,38 @@ export async function updateSessionLobbyPremise(params: {
   }
 }
 
+/** Host-only: betrayal mechanics opt-in (`campaign` only). */
+export async function updateSessionBetrayalMode(params: {
+  sessionId: string;
+  actingUserId: string;
+  betrayalMode: "off" | "story_only" | "confrontational";
+}): Promise<void> {
+  const [row] = await db
+    .select()
+    .from(sessions)
+    .where(eq(sessions.id, params.sessionId))
+    .limit(1);
+  if (!row) throw new SessionNotFoundError();
+  if (row.host_user_id !== params.actingUserId) {
+    throw new SessionLobbyUpdateError("Forbidden", 403);
+  }
+  if (row.game_kind !== "campaign") {
+    throw new SessionLobbyUpdateError("Betrayal mode is campaign-only", 409);
+  }
+  const [updated] = await db
+    .update(sessions)
+    .set({
+      betrayal_mode: params.betrayalMode,
+      state_version: sql`${sessions.state_version} + 1`,
+      updated_at: new Date(),
+    })
+    .where(eq(sessions.id, params.sessionId))
+    .returning({ id: sessions.id });
+  if (!updated) {
+    throw new SessionLobbyUpdateError("Could not update session", 409);
+  }
+}
+
 /** Host-only lobby: switch Standard vs Cinematic chapter caps. */
 export async function updateSessionVisualRhythmPreset(params: {
   sessionId: string;

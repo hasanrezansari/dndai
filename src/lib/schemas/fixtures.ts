@@ -43,6 +43,7 @@ export function createMockSession(overrides: Partial<Session> = {}): Session {
     last_manual_scene_image_at: null,
     spark_pool_balance: 0,
     chapter_break_offered: false,
+    betrayal_mode: "off",
     created_at: now,
     updated_at: now,
     ...overrides,

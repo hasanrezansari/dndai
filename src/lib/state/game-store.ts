@@ -78,6 +78,8 @@ export interface GameSessionView {
   estimatedHostSparksPerChapter?: number;
   /** Table-funded Sparks (session pool); spent before host wallet on AI charges. */
   sparkPoolBalance?: number;
+  /** Betrayal/PvP spine: off | story_only | confrontational (campaign only). */
+  betrayalMode?: "off" | "story_only" | "confrontational";
 }
 
 export interface QuestProgressView {
@@ -102,6 +104,14 @@ export interface QuestProgressView {
     eligibleVoterIds: string[];
     votes: Record<string, "end_now" | "continue">;
   } | null;
+  /** Server quest spine: betrayal arc (optional). */
+  betrayal?: {
+    phase: string;
+    outcome_id?: string;
+    traitor_player_id?: string | null;
+    macguffin_holder_player_id?: string | null;
+    last_updated_round?: number;
+  };
 }
 
 export interface GamePlayerView {

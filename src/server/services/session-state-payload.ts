@@ -95,6 +95,13 @@ function mapSession(row: typeof sessions.$inferSelect): GameSessionView {
     chapterImagesUsed: row.chapter_system_images_used,
     chapterImageBudget: row.chapter_system_image_budget,
     chapterBreakOffered: row.chapter_break_offered === true,
+    betrayalMode:
+      gameKind === "campaign" &&
+      (row.betrayal_mode === "off" ||
+        row.betrayal_mode === "story_only" ||
+        row.betrayal_mode === "confrontational")
+        ? row.betrayal_mode
+        : "off",
     estimatedHostSparksPerChapter:
       gameKind === "campaign"
         ? estimateHostSparksPerChapter({ preset, mode: row.mode })

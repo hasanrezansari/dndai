@@ -242,6 +242,12 @@ export const worlds = pgTable(
     ugc_review_status: text("ugc_review_status").notNull().default("none"),
     /** Short message shown to submitter when rejected (optional). */
     rejection_reason: text("rejection_reason"),
+    /**
+     * Play-to-publish: the campaign session this draft was created from.
+     * At most one worlds row may reference a given session (unique when set).
+     * FK to `sessions.id` is enforced in SQL migrations (avoid Drizzle circular ref with `sessions.world_id`).
+     */
+    source_session_id: uuid("source_session_id"),
     created_at: timestamp("created_at", { withTimezone: true })
       .notNull()
       .defaultNow(),
@@ -253,6 +259,7 @@ export const worlds = pgTable(
     index("worlds_status_idx").on(t.status),
     index("worlds_created_by_user_id_idx").on(t.created_by_user_id),
     index("worlds_ugc_review_status_idx").on(t.ugc_review_status),
+    uniqueIndex("worlds_source_session_id_uidx").on(t.source_session_id),
   ],
 );
 
@@ -348,6 +355,11 @@ export const sessions = pgTable(
      * Cleared when host continues chapter or vote flow rolls the chapter window.
      */
     chapter_break_offered: boolean("chapter_break_offered").notNull().default(false),
+    /**
+     * Betrayal / PvP beats: `off` (default) | `story_only` (narrative+quest spine) | `confrontational` (Phase B+ interrupts).
+     * Campaign sessions only; ignored for `party` game_kind.
+     */
+    betrayal_mode: text("betrayal_mode").notNull().default("off"),
     created_at: timestamp("created_at", { withTimezone: true })
       .notNull()
       .defaultNow(),

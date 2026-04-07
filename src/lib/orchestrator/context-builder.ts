@@ -81,6 +81,10 @@ export interface TurnContext {
   partyMembers: PartyMemberInfo[];
   npcDetails: NpcDetail[];
   questContext: string | null;
+  /** Betrayal spine for prompts (campaign); mode off → nullish fields. */
+  betrayalMode: string;
+  betrayalPhase: string | null;
+  betrayalOutcomeId: string | null;
   npcContext: string | null;
   npcIds: Array<{ id: string; name: string }>;
   nextPlayerName: string;
@@ -249,6 +253,12 @@ export async function buildTurnContext({
   if (quest) {
     questContext = questProgressForModel(quest);
   }
+  const betrayalMode =
+    sessionRow.game_kind === "campaign"
+      ? (sessionRow.betrayal_mode ?? "off")
+      : "off";
+  const betrayalPhase = quest?.betrayal?.phase ?? null;
+  const betrayalOutcomeId = quest?.betrayal?.outcome_id ?? null;
 
   const npcRows = await db
     .select()
@@ -332,6 +342,9 @@ export async function buildTurnContext({
     partyMembers,
     npcDetails,
     questContext,
+    betrayalMode,
+    betrayalPhase,
+    betrayalOutcomeId,
     npcContext,
     npcIds,
     nextPlayerName,
