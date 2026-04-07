@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import type { TurnContext } from "@/lib/orchestrator/context-builder";
 import {
+  buildHumanDmBetrayalBriefing,
   buildBetrayalSpineForNarrator,
   shouldApplyBetrayalNarratorInterrupt,
 } from "@/lib/orchestrator/betrayal-pipeline";
@@ -114,5 +115,27 @@ describe("betrayal pipeline helpers", () => {
         }),
       ),
     ).toBe(false);
+  });
+
+  it("buildHumanDmBetrayalBriefing returns confrontation prompts", () => {
+    const out = buildHumanDmBetrayalBriefing(
+      baseCtx({
+        betrayalMode: "confrontational",
+        betrayalPhase: "confronting",
+      }),
+    );
+    expect(out).not.toBeNull();
+    expect(out?.spine).toContain("phase=confronting");
+    expect(out?.prompts.length).toBeGreaterThan(0);
+  });
+
+  it("buildHumanDmBetrayalBriefing returns null when mode off", () => {
+    const out = buildHumanDmBetrayalBriefing(
+      baseCtx({
+        betrayalMode: "off",
+        betrayalPhase: null,
+      }),
+    );
+    expect(out).toBeNull();
   });
 });

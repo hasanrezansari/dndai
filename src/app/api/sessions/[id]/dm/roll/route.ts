@@ -67,7 +67,12 @@ export async function POST(
       .where(
         and(
           eq(turns.session_id, sessionId),
-          inArray(turns.status, ["awaiting_input", "processing", "awaiting_dm"]),
+          inArray(turns.status, [
+            "awaiting_input",
+            "processing",
+            "awaiting_dm",
+            "awaiting_pvp_defense",
+          ]),
         ),
       )
       .orderBy(desc(turns.started_at))

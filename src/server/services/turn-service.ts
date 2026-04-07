@@ -243,6 +243,25 @@ export async function validateTurnOwnership(
     return { valid: false, turn: null, error: "Session not found" };
   }
 
+  const [pvpTurnRow] = await db
+    .select()
+    .from(turns)
+    .where(
+      and(
+        eq(turns.session_id, sessionId),
+        eq(turns.status, "awaiting_pvp_defense"),
+      ),
+    )
+    .orderBy(desc(turns.started_at))
+    .limit(1);
+
+  if (pvpTurnRow) {
+    if (sessionRow.current_player_id !== playerId) {
+      return { valid: false, turn: null, error: "Not your turn" };
+    }
+    return { valid: true, turn: mapTurnRow(pvpTurnRow) };
+  }
+
   let turnRow: typeof turns.$inferSelect | undefined;
   if (sessionRow.current_player_id) {
     const rows = await db

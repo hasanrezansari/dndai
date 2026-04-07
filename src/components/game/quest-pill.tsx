@@ -186,7 +186,6 @@ function BetrayalConfrontationPanel(props: {
   quest: QuestProgressView;
   players: GamePlayerView[];
   sessionId: string;
-  currentPlayerId: string | null;
   isHost: boolean;
   onSessionMutated: () => Promise<void>;
 }) {
@@ -195,13 +194,11 @@ function BetrayalConfrontationPanel(props: {
     quest,
     players,
     sessionId,
-    currentPlayerId,
     isHost,
     onSessionMutated,
   } = props;
   const [busy, setBusy] = useState<string | null>(null);
   const [err, setErr] = useState<string | null>(null);
-  const [hostRogueTarget, setHostRogueTarget] = useState<string>("");
 
   const phase = quest.betrayal?.phase ?? "idle";
   const instigatorId = quest.betrayal?.instigator_player_id ?? null;
@@ -242,20 +239,12 @@ function BetrayalConfrontationPanel(props: {
   );
 
   const postPhase = useCallback(
-    (
-      targetPhase: "rogue_intent" | "confronting" | "idle",
-      instigatorPlayerId?: string | null,
-    ) =>
+    (targetPhase: "idle") =>
       run(`phase:${targetPhase}`, () =>
         fetch(`/api/sessions/${sessionId}/betrayal/phase`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            targetPhase,
-            ...(instigatorPlayerId !== undefined
-              ? { instigatorPlayerId }
-              : {}),
-          }),
+          body: JSON.stringify({ targetPhase }),
         }),
       ),
     [run, sessionId],
@@ -291,6 +280,11 @@ function BetrayalConfrontationPanel(props: {
       <p className="text-[9px] font-black uppercase tracking-[0.15em] text-[var(--color-failure)]">
         Betrayal — confrontational
       </p>
+      <p className="mt-1 text-[9px] text-[var(--outline)] leading-snug">
+        Confrontation now auto-opens when a player takes a hostile action against
+        another party member. This panel is for resolving outcomes and resetting
+        the arc.
+      </p>
       <p className="mt-1 text-[10px] font-bold text-[var(--color-silver-muted)]">
         Beat: {formatBetrayalPhase(phase)}
         {instigatorName ? (
@@ -303,80 +297,10 @@ function BetrayalConfrontationPanel(props: {
         <p className="mt-1.5 text-[10px] text-[var(--color-failure)]">{err}</p>
       ) : null}
 
-      {phase === "idle" && currentPlayerId ? (
-        <button
-          type="button"
-          disabled={Boolean(busy)}
-          onClick={() =>
-            void postPhase("rogue_intent", currentPlayerId)
-          }
-          className="mt-2 min-h-[40px] w-full rounded-[var(--radius-card)] border border-[var(--border-ui)] bg-[var(--surface-high)] text-[10px] font-black uppercase tracking-wider text-[var(--color-silver-muted)] disabled:opacity-30"
-        >
-          {busy === "phase:rogue_intent"
-            ? "Declaring…"
-            : "Declare rogue intent (you)"}
-        </button>
-      ) : null}
-
-      {isHost && phase === "idle" && players.length > 0 ? (
-        <div className="mt-2 space-y-1.5 rounded-[var(--radius-card)] border border-[var(--border-ui)]/60 bg-[var(--surface-high)]/30 px-2 py-2">
-          <p className="text-[9px] font-bold uppercase tracking-wider text-[var(--outline)]">
-            Host: declare for a seat
-          </p>
-          <select
-            value={hostRogueTarget}
-            onChange={(e) => setHostRogueTarget(e.target.value)}
-            className="min-h-[36px] w-full rounded-[var(--radius-card)] border border-[var(--border-ui-strong)] bg-[var(--color-deep-void)] px-2 text-[11px] text-[var(--color-silver-muted)]"
-          >
-            <option value="">Choose player…</option>
-            {players.map((p) => (
-              <option key={p.id} value={p.id}>
-                {(p.character?.name || p.displayName || `Seat ${p.seatIndex + 1}`).slice(0, 48)}
-              </option>
-            ))}
-          </select>
-          <button
-            type="button"
-            disabled={Boolean(busy) || !hostRogueTarget}
-            onClick={() => void postPhase("rogue_intent", hostRogueTarget)}
-            className="min-h-[36px] w-full rounded-[var(--radius-card)] border border-[var(--border-ui)] bg-[var(--surface-high)] text-[9px] font-black uppercase tracking-wider text-[var(--color-silver-muted)] disabled:opacity-30"
-          >
-            {busy === "phase:rogue_intent"
-              ? "Declaring…"
-              : "Declare rogue intent for selected player"}
-          </button>
-        </div>
-      ) : null}
-
-      {isHost && phase === "idle" ? (
-        <button
-          type="button"
-          disabled={Boolean(busy)}
-          onClick={() => void postPhase("confronting")}
-          className="mt-2 min-h-[40px] w-full rounded-[var(--radius-card)] border border-[var(--color-gold-rare)]/40 bg-[var(--color-deep-void)] text-[10px] font-black uppercase tracking-wider text-[var(--color-gold-rare)] disabled:opacity-30"
-        >
-          {busy === "phase:confronting"
-            ? "Opening…"
-            : "Open confrontation (skip declare)"}
-        </button>
-      ) : null}
-
-      {isHost && phase === "rogue_intent" ? (
-        <button
-          type="button"
-          disabled={Boolean(busy)}
-          onClick={() => void postPhase("confronting")}
-          className="mt-2 min-h-[40px] w-full rounded-[var(--radius-card)] border border-[var(--color-gold-rare)]/40 bg-[var(--color-deep-void)] text-[10px] font-black uppercase tracking-wider text-[var(--color-gold-rare)] disabled:opacity-30"
-        >
-          {busy === "phase:confronting"
-            ? "Opening…"
-            : "Lock in confrontation beat"}
-        </button>
-      ) : null}
-
       {phase === "confronting" && !isHost ? (
         <p className="mt-2 text-[10px] text-[var(--outline)] leading-snug">
-          Confrontation is live — the host will pick how this beat resolves.
+          Confrontation is live — respond in turn when challenged, then host can
+          register table outcome.
         </p>
       ) : null}
 
@@ -589,7 +513,6 @@ export function QuestPill({
               quest={quest}
               players={players}
               sessionId={sessionId}
-              currentPlayerId={currentPlayerId}
               isHost={isHost}
               onSessionMutated={onSessionMutated}
             />

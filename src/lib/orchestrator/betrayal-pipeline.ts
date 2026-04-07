@@ -48,3 +48,31 @@ export function shouldApplyBetrayalNarratorInterrupt(ctx: TurnContext): boolean 
     (ctx.betrayalPhase === "rogue_intent" || ctx.betrayalPhase === "confronting")
   );
 }
+
+/** Deterministic DM prompts when `human_dm` awaits narration during a betrayal beat. */
+export function buildHumanDmBetrayalBriefing(ctx: TurnContext): {
+  spine: string;
+  prompts: string[];
+} | null {
+  if (ctx.session.gameKind !== "campaign" || ctx.betrayalMode === "off") {
+    return null;
+  }
+  const spine = buildBetrayalSpineForNarrator(ctx);
+  if (!spine) return null;
+  const prompts =
+    ctx.betrayalPhase === "confronting"
+      ? [
+          "Accusation or ultimatum in the open.",
+          "Sudden violence or a shove toward a hazard.",
+          "Someone tries to de-escalate and the table refuses.",
+        ]
+      : ctx.betrayalPhase === "rogue_intent"
+        ? [
+            "Mistrust in a small gesture or withheld information.",
+            "Two allies quietly doubt the same plan.",
+          ]
+        : [];
+  return { spine, prompts };
+}
+
+export const BETRAYAL_SETPIECE_PC_VS_PC_APPENDIX = `SETPIECE PRIORITY: This beat targets another hero. Prefer narrative_beat rhythm "setpiece" or meaningful "transition", a vivid image_hint, and a situation_anchor that states both actors' fates clearly for share/clips.`;

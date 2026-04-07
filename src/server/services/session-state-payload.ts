@@ -23,6 +23,9 @@ import {
 import { CharacterStatsSchema } from "@/lib/schemas/domain";
 import { mapNpcRowToCombatantView } from "@/lib/state/npc-combatant-mapper";
 import type {
+  DmAwaitingState,
+  DmBetrayalBriefing,
+  PvpDefenseChallengeState,
   FeedEntry,
   GamePlayerView,
   GameSessionView,
@@ -42,6 +45,7 @@ import {
   turnsElapsedInChapter,
 } from "@/lib/chapter/chapter-config";
 import { getQuestState } from "@/server/services/quest-service";
+import { loadPvpDefenseStage } from "@/server/services/pvp-defense-service";
 
 /** Cap scene_snapshots loaded per hydrate (feed pairing + latest hero image). */
 export const SCENE_SNAPSHOT_FEED_LIMIT = 100;
@@ -186,6 +190,45 @@ function playerDisplayLabel(
   const p = playersList.find((x) => x.id === playerId);
   if (!p) return "Player";
   return p.character?.name ?? p.displayName ?? `Seat ${p.seatIndex + 1}`;
+}
+
+function buildDmBetrayalBriefingFromQuest(params: {
+  session: GameSessionView;
+  players: GamePlayerView[];
+  quest: Awaited<ReturnType<typeof getQuestState>>;
+}): DmBetrayalBriefing | null {
+  if (params.session.gameKind !== "campaign") return null;
+  if (params.session.betrayalMode === "off") return null;
+  const phase = params.quest?.betrayal?.phase;
+  if (!phase) return null;
+
+  const byId = (playerId: string | null | undefined): string => {
+    if (!playerId?.trim()) return "none";
+    const p = params.players.find((x) => x.id === playerId);
+    if (!p) return `player_id=${playerId}`;
+    return p.character?.name ?? p.displayName ?? `player_id=${playerId}`;
+  };
+
+  const spine =
+    `mode=${params.session.betrayalMode}; phase=${phase}; ` +
+    `last_outcome=${params.quest?.betrayal?.outcome_id ?? "none"}; ` +
+    `instigator_pc=${byId(params.quest?.betrayal?.instigator_player_id)}; ` +
+    `traitor_slot_pc=${byId(params.quest?.betrayal?.traitor_player_id)}`;
+
+  const prompts =
+    phase === "confronting"
+      ? [
+          "Accusation or ultimatum in the open.",
+          "Sudden violence or a shove toward a hazard.",
+          "Someone tries to de-escalate and the table refuses.",
+        ]
+      : phase === "rogue_intent"
+        ? [
+            "Mistrust in a small gesture or withheld information.",
+            "Two allies quietly doubt the same plan.",
+          ]
+        : [];
+  return { spine, prompts };
 }
 
 function rawToStatEffects(
@@ -723,12 +766,21 @@ export async function loadSessionStatePayload(
     .orderBy(desc(turns.started_at))
     .limit(1);
 
-  const dmAwaiting = dmAwaitingRow
-    ? {
-        turnId: dmAwaitingRow.id,
-        actingPlayerId: dmAwaitingRow.player_id,
-      }
-    : null;
+  const [pvpAwaitingRow] = await db
+    .select({
+      id: turns.id,
+      player_id: turns.player_id,
+      round_number: turns.round_number,
+    })
+    .from(turns)
+    .where(
+      and(
+        eq(turns.session_id, sessionId),
+        eq(turns.status, "awaiting_pvp_defense"),
+      ),
+    )
+    .orderBy(desc(turns.started_at))
+    .limit(1);
 
   let activeTurnId: string | null = null;
   if (sessionRow.current_player_id) {
@@ -760,6 +812,9 @@ export async function loadSessionStatePayload(
       .limit(1);
     activeTurnId = processingTurnRow?.id ?? null;
   }
+  if (!activeTurnId && pvpAwaitingRow) {
+    activeTurnId = pvpAwaitingRow.id;
+  }
   if (!activeTurnId && dmAwaitingRow) {
     activeTurnId = dmAwaitingRow.id;
   }
@@ -782,6 +837,31 @@ export async function loadSessionStatePayload(
       : await getQuestState(sessionId);
   const mappedSession = mapSession(sessionRow);
   mappedSession.finalChapterPublished = Boolean(finalChapterRow);
+  const betrayalBriefing = buildDmBetrayalBriefingFromQuest({
+    session: mappedSession,
+    players: mappedPlayers,
+    quest,
+  });
+  const dmAwaiting: DmAwaitingState | null = dmAwaitingRow
+    ? {
+        turnId: dmAwaitingRow.id,
+        actingPlayerId: dmAwaitingRow.player_id,
+        ...(betrayalBriefing ? { betrayalBriefing } : {}),
+      }
+    : null;
+
+  let pvpDefense: PvpDefenseChallengeState | null = null;
+  if (pvpAwaitingRow) {
+    const staged = await loadPvpDefenseStage(pvpAwaitingRow.id);
+    if (staged) {
+      pvpDefense = {
+        turnId: pvpAwaitingRow.id,
+        attackerPlayerId: staged.attackerPlayerId,
+        defenderPlayerId: staged.defenderPlayerId,
+        roundNumber: pvpAwaitingRow.round_number,
+      };
+    }
+  }
 
   const summaryRows = await db
     .select({
@@ -824,6 +904,7 @@ export async function loadSessionStatePayload(
     narrativeText,
     scenePending,
     dmAwaiting,
+    pvpDefense,
     activeTurnId,
     quest,
     rollingMemories,

@@ -38,6 +38,9 @@ export function ActionBar({
   const [busy, setBusy] = useState(false);
   const [targetOpen, setTargetOpen] = useState(false);
   const openSheet = useGameStore((s) => s.openSheet);
+  const pvpDefense = useGameStore((s) => s.pvpDefense);
+  const selfId = useGameStore((s) => s.currentPlayerId);
+  const players = useGameStore((s) => s.players);
 
   const submit = useCallback(async () => {
     const t = value.trim();
@@ -73,6 +76,16 @@ export function ActionBar({
       <div
         className={`bg-[var(--color-obsidian)] border-t border-[var(--border-divide)] space-y-3 px-4 py-3 ${safeBottom}`}
       >
+        {pvpDefense ? (
+          <p className="text-center text-[11px] font-bold uppercase tracking-[0.12em] text-[var(--atmosphere-combat)]">
+            Party clash
+            {selfId === pvpDefense.attackerPlayerId
+              ? " — you may act after your strike resolves"
+              : selfId === pvpDefense.defenderPlayerId
+                ? " — your response!"
+                : ""}
+          </p>
+        ) : null}
         <div className="grid grid-cols-3 gap-2">
           <button
             type="button"
@@ -205,6 +218,16 @@ export function ActionBar({
 
   return (
     <div className={`bg-[var(--color-obsidian)] border-t border-[var(--border-divide)] space-y-3 px-4 py-3 ${safeBottom}`}>
+      {pvpDefense ? (
+        <p className="text-center text-[11px] font-bold uppercase tracking-[0.12em] text-[var(--atmosphere-combat)]">
+          Party clash
+          {selfId === pvpDefense.attackerPlayerId
+            ? " — waiting on defender"
+            : selfId === pvpDefense.defenderPlayerId
+              ? ""
+              : ` — waiting on ${players.find((p) => p.id === pvpDefense.defenderPlayerId)?.character?.name ?? "defender"}`}
+        </p>
+      ) : null}
       <p className="text-center text-xs text-[var(--outline)] flex items-center justify-center gap-2 uppercase tracking-[0.15em]">
         <span className="material-symbols-outlined text-sm animate-pulse">
           hourglass_top

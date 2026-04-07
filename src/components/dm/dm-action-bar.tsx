@@ -26,6 +26,7 @@ export function DmActionBar({
   playerId,
 }: DmActionBarProps) {
   const dmDc = useGameStore((s) => s.dmDc);
+  const dmAwaiting = useGameStore((s) => s.dmAwaiting);
   const [narration, setNarration] = useState("");
   const [busy, setBusy] = useState(false);
   const [showDc, setShowDc] = useState(false);
@@ -91,8 +92,21 @@ export function DmActionBar({
       className={`glass-heavy glow-gold space-y-3 px-3 py-3 ${safeBottom}`}
     >
       {waitingForDm ? (
-        <div className="animate-pulse rounded-[var(--radius-chip)] border border-[var(--color-gold-rare)]/40 bg-[var(--color-gold-rare)]/10 px-3 py-2 text-center text-sm font-medium text-[var(--color-gold-support)]">
-          Player acted — narrate the outcome
+        <div className="space-y-2 rounded-[var(--radius-chip)] border border-[var(--color-gold-rare)]/40 bg-[var(--color-gold-rare)]/10 px-3 py-2 text-[var(--color-gold-support)]">
+          <div className="animate-pulse text-center text-sm font-medium">
+            Player acted — narrate the outcome
+          </div>
+          {dmAwaiting?.betrayalBriefing ? (
+            <div className="rounded-[var(--radius-chip)] border border-[var(--color-gold-rare)]/30 bg-[var(--color-midnight)]/35 p-2 text-xs">
+              <p className="font-semibold">Betrayal beat brief</p>
+              <p className="mt-1 opacity-90">{dmAwaiting.betrayalBriefing.spine}</p>
+              {dmAwaiting.betrayalBriefing.prompts.length > 0 ? (
+                <p className="mt-1 opacity-90">
+                  Prompt beats: {dmAwaiting.betrayalBriefing.prompts.join(" | ")}
+                </p>
+              ) : null}
+            </div>
+          ) : null}
         </div>
       ) : null}
 

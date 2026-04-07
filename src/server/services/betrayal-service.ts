@@ -6,6 +6,10 @@ import { memorySummaries, players, sessions } from "@/lib/db/schema";
 import { isPlayerForUser } from "@/lib/auth/guards";
 import { applyBetrayalOutcomeToQuest } from "@/server/services/betrayal-resolver";
 import {
+  normalizeBetrayalPvpMeta,
+  resetBetrayalPvpForNewArc,
+} from "@/server/services/betrayal-pvp-guards";
+import {
   assertBetrayalPhaseTransition,
   type BetrayalFsmPhase,
 } from "@/server/services/betrayal-state-machine";
@@ -96,9 +100,11 @@ async function insertBetrayalTimelineNote(params: {
 }
 
 /**
- * Betrayal phase transitions:
+ * Betrayal phase transitions (host/API):
  * - `story_only`: host may reset arc (`idle`) after a resolved/confronting beat.
- * - `confrontational`: full beat flow (rogue intent, confrontation, reset).
+ * - `confrontational`: rogue intent and host-driven phase tweaks optional; the
+ *   confrontation beat also opens automatically on the first gated hostile PC
+ *   action (see `ensureConfrontationPhaseForPvpAction`).
  */
 export async function transitionBetrayalPhase(params: {
   sessionId: string;
@@ -155,6 +161,7 @@ export async function transitionBetrayalPhase(params: {
     const nextQuest: QuestState = {
       ...quest,
       betrayal: { phase: "idle", last_updated_round: round },
+      betrayal_pvp: resetBetrayalPvpForNewArc(normalizeBetrayalPvpMeta(quest.betrayal_pvp)),
       updatedAt: new Date().toISOString(),
     };
     await persistQuestState(params.sessionId, round, nextQuest);
@@ -219,7 +226,7 @@ export async function transitionBetrayalPhase(params: {
   if (params.targetPhase === "confronting") {
     if (row.host_user_id !== params.userId) {
       throw new BetrayalServiceError(
-        "Only the host can open the confrontation beat",
+        "Only the host can set confrontation via the betrayal phase API (it also opens automatically on hostile PC-vs-PC actions in confrontational play)",
         403,
       );
     }
@@ -251,6 +258,67 @@ export async function transitionBetrayalPhase(params: {
   }
 
   throw new BetrayalServiceError("Invalid target phase", 400);
+}
+
+/**
+ * System transition used by pipeline: first hostile PC-vs-PC action in
+ * `confrontational` mode auto-opens `confronting` (no host click required).
+ */
+export async function ensureConfrontationPhaseForPvpAction(params: {
+  sessionId: string;
+  instigatorPlayerId: string;
+}): Promise<{ changed: boolean; phase: BetrayalFsmPhase; quest: QuestState }> {
+  const [row] = await db
+    .select()
+    .from(sessions)
+    .where(eq(sessions.id, params.sessionId))
+    .limit(1);
+  if (!row) {
+    throw new BetrayalServiceError("Session not found", 404);
+  }
+  const round = row.current_round;
+  const quest =
+    (await getQuestState(params.sessionId)) ??
+    defaultQuestState("Survive the adventure.");
+  const from: BetrayalFsmPhase =
+    (quest.betrayal?.phase as BetrayalFsmPhase) ?? "idle";
+
+  if (row.game_kind !== "campaign" || row.betrayal_mode !== "confrontational") {
+    return { changed: false, phase: from, quest };
+  }
+  if (from === "confronting") {
+    return { changed: false, phase: "confronting", quest };
+  }
+  if (row.status !== "active" && row.status !== "paused") {
+    return { changed: false, phase: from, quest };
+  }
+
+  assertBetrayalPhaseTransition(from, "confronting");
+  const inst = params.instigatorPlayerId.trim();
+  const nextSlice: BetrayalQuestSlice = {
+    phase: "confronting",
+    instigator_player_id:
+      inst ||
+      quest.betrayal?.instigator_player_id ||
+      null,
+    last_updated_round: round,
+  };
+  const nextQuest: QuestState = {
+    ...quest,
+    betrayal: nextSlice,
+    updatedAt: new Date().toISOString(),
+  };
+  await persistQuestState(params.sessionId, round, nextQuest);
+  await insertBetrayalTimelineNote({
+    sessionId: params.sessionId,
+    round,
+    text:
+      `[Betrayal phase] ${from} → confronting (auto-open via hostile PC action)` +
+      (inst ? `; instigator_player_id=${inst}` : ""),
+  });
+  await nudgeSessionExplorationPhaseForConfrontation(params.sessionId);
+  await bumpSessionStateVersion(params.sessionId);
+  return { changed: true, phase: "confronting", quest: nextQuest };
 }
 
 /** Host-only: apply registered betrayal outcome; story_only from idle; confrontational from idle or confronting. */

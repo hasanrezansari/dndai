@@ -13,10 +13,15 @@ import {
 } from "@/lib/db/schema";
 import { broadcastToSession } from "@/lib/socket/server";
 import { redis } from "@/lib/redis";
-import { buildTurnContext } from "@/lib/orchestrator/context-builder";
+import {
+  buildTurnContext,
+  type PartyMemberInfo,
+} from "@/lib/orchestrator/context-builder";
 import {
   BETRAYAL_INTERRUPT_SYSTEM_APPENDIX,
+  BETRAYAL_SETPIECE_PC_VS_PC_APPENDIX,
   buildBetrayalSpineForNarrator,
+  buildHumanDmBetrayalBriefing,
   shouldApplyBetrayalNarratorInterrupt,
 } from "@/lib/orchestrator/betrayal-pipeline";
 import { commitStatePatches } from "@/lib/orchestrator/apply-state";
@@ -33,7 +38,28 @@ import {
   runSummarizer,
 } from "@/lib/memory";
 
-import type { ActionIntent, ConsequenceEffect, NarratorOutput } from "@/lib/schemas/ai-io";
+import type {
+  ActionIntent,
+  ConsequenceEffect,
+  NarratorOutput,
+  RulesInterpreterOutput,
+} from "@/lib/schemas/ai-io";
+import type { OrchestrationStepResult } from "@/lib/ai/types";
+import {
+  BETRAYAL_PC_TARGET_DC_BONUS,
+  evaluateBetrayalPvpGate,
+  isBetrayalPvpHostileIntent,
+} from "@/server/services/betrayal-pvp-guards";
+import { ensureConfrontationPhaseForPvpAction } from "@/server/services/betrayal-service";
+import {
+  broadcastPvpDefenseChallenge,
+  clearPvpDefenseStage,
+  handoffToPvpDefense,
+  loadPvpDefenseStage,
+  savePvpDefenseStage,
+  setSessionCurrentPlayer,
+  type PvpDefenseStageV1,
+} from "@/server/services/pvp-defense-service";
 import type { DiceRoll, NarrativeEvent } from "@/lib/schemas/domain";
 import type { StatePatch } from "@/lib/schemas/state-patches";
 import { performRoll } from "@/server/services/dice-service";
@@ -159,6 +185,44 @@ function resolveNpcTarget(
   const first = npcTargets[0];
   if (!first?.label) return null;
   return matchNpcRowByLabel(first.label, npcIds);
+}
+
+/** Resolve another party member targeted by the intent (excludes the acting player). */
+function resolveOtherPlayerTarget(
+  intent: ActionIntent,
+  actingPlayerId: string,
+  partyMembers: PartyMemberInfo[],
+): { playerId: string; name: string } | null {
+  const others = partyMembers.filter((p) => p.playerId !== actingPlayerId);
+  const playerTargets = intent.targets?.filter((t) => t.kind === "player") ?? [];
+  if (!playerTargets.length) return null;
+
+  const byId = playerTargets.find((t) => t.id && others.some((m) => m.playerId === t.id));
+  if (byId?.id) {
+    const m = others.find((p) => p.playerId === byId.id);
+    if (m) return { playerId: m.playerId, name: m.name };
+  }
+
+  for (const t of playerTargets) {
+    if (!t.label?.trim()) continue;
+    const ll = t.label.trim().toLowerCase();
+    if (["self", "me", "myself", "i"].includes(ll)) continue;
+    const exact = others.find((m) => m.name.trim().toLowerCase() === ll);
+    if (exact) return { playerId: exact.playerId, name: exact.name };
+  }
+
+  for (const t of playerTargets) {
+    if (!t.label?.trim()) continue;
+    const ll = t.label.trim().toLowerCase();
+    if (["self", "me", "myself", "i"].includes(ll)) continue;
+    const sub = others.find(
+      (m) =>
+        ll.includes(m.name.trim().toLowerCase()) ||
+        m.name.trim().toLowerCase().includes(ll),
+    );
+    if (sub) return { playerId: sub.playerId, name: sub.name };
+  }
+  return null;
 }
 
 function sanitizeNpcName(label: string): string {
@@ -514,8 +578,15 @@ async function resolveRollDc(params: {
   roll: { dice: string; dc?: number };
   npcTargetId: string | null;
   dmDcOverride: number | null;
+  /** When set, attack does not use NPC AC path — DC-based resolution (e.g. vs another PC). */
+  otherPlayerTargetId: string | null;
+  applyBetrayalPcTargetDcBonus: boolean;
 }): Promise<number> {
-  if (params.intent.action_type === "attack" && params.npcTargetId) {
+  const vsPc =
+    params.otherPlayerTargetId !== null &&
+    params.otherPlayerTargetId !== undefined &&
+    params.otherPlayerTargetId.trim().length > 0;
+  if (params.intent.action_type === "attack" && params.npcTargetId && !vsPc) {
     const [npc] = await db
       .select({ ac: npcStates.ac })
       .from(npcStates)
@@ -528,11 +599,48 @@ async function resolveRollDc(params: {
       .limit(1);
     if (npc?.ac) return npc.ac;
   }
-  if (params.roll.dc !== undefined) return params.roll.dc;
-  if (params.dmDcOverride !== null && params.roll.dice === "d20") {
-    return params.dmDcOverride;
+  let dc: number;
+  if (params.roll.dc !== undefined) {
+    dc = params.roll.dc;
+  } else if (params.dmDcOverride !== null && params.roll.dice === "d20") {
+    dc = params.dmDcOverride;
+  } else {
+    dc = baseRollDc(params.roll);
   }
-  return baseRollDc(params.roll);
+  if (
+    params.applyBetrayalPcTargetDcBonus &&
+    vsPc &&
+    params.roll.dice === "d20"
+  ) {
+    dc = Math.min(30, dc + BETRAYAL_PC_TARGET_DC_BONUS);
+  }
+  return dc;
+}
+
+function abilityScoreMod(score: number): number {
+  return Math.floor((score - 10) / 2);
+}
+
+function ensureContestedRollForPcHostile(params: {
+  intent: ActionIntent;
+  rules: RulesInterpreterOutput;
+}): RulesInterpreterOutput {
+  if (params.rules.rolls.length > 0) return params.rules;
+  return {
+    ...params.rules,
+    auto_success: false,
+    rolls: [
+      {
+        dice: "d20",
+        modifier: 0,
+        advantage_state: "none",
+        context:
+          params.intent.action_type === "cast_spell"
+            ? "Betrayal clash — attacker resolve"
+            : "Betrayal clash — attacker strike",
+      },
+    ],
+  };
 }
 
 export type TurnPipelineResult =
@@ -553,6 +661,18 @@ export type TurnPipelineResult =
       consequenceEffects: ConsequenceEffect[];
       shouldEndSession: boolean;
       expectedNextPlayerId: string;
+    }
+  | {
+      kind: "pvp_defense_wait";
+      turnId: string;
+      attackerPlayerId: string;
+      defenderPlayerId: string;
+      roundNumber: number;
+      /** Empty — we pause before attacker dice. */
+      diceRolls: DiceRoll[];
+      statePatches: StatePatch[];
+      consequenceEffects: ConsequenceEffect[];
+      shouldEndSession: boolean;
     };
 
 export async function runTurnPipeline(params: {
@@ -597,6 +717,9 @@ export async function runTurnPipeline(params: {
     characterName: ctx.character.name,
     characterClass: ctx.character.class,
     recentEvents: ctx.recentEvents,
+    betrayalConfrontationActive:
+      ctx.betrayalMode === "confrontational" &&
+      ctx.betrayalPhase === "confronting",
     provider,
   });
   const intent = intentResult.data;
@@ -613,21 +736,170 @@ export async function runTurnPipeline(params: {
     .set({ parsed_intent: intent as unknown as Record<string, unknown> })
     .where(eq(actions.id, actionId));
 
-  const rulesResult = await interpretRules({
-    sessionId,
-    turnId,
+  const objectiveFallback =
+    ctx.session.adventurePrompt?.trim() ||
+    ctx.session.campaignTitle?.trim() ||
+    "Complete the mission and survive.";
+
+  const otherPlayerTarget = resolveOtherPlayerTarget(
     intent,
-    characterStats: ctx.character.stats,
-    characterClass: ctx.character.class,
-    mechanicalClass: ctx.character.mechanicalClass,
-    classProfile: ctx.character.classProfile,
-    provider,
-  });
-  const rules = rulesResult.data;
+    playerId,
+    ctx.partyMembers,
+  );
+
+  const questForPvpGate =
+    (await getQuestState(sessionId)) ?? defaultQuestState(objectiveFallback);
+  let effectiveQuestForPvpGate = questForPvpGate;
+  let effectiveBetrayalPhase = ctx.betrayalPhase;
+
+  const needsBetrayalPvpGate =
+    otherPlayerTarget !== null &&
+    isBetrayalPvpHostileIntent({ actionType: intent.action_type });
+
+  if (
+    needsBetrayalPvpGate &&
+    ctx.betrayalMode === "confrontational" &&
+    effectiveBetrayalPhase !== "confronting"
+  ) {
+    const opened = await ensureConfrontationPhaseForPvpAction({
+      sessionId,
+      instigatorPlayerId: playerId,
+    });
+    effectiveBetrayalPhase = opened.phase;
+    effectiveQuestForPvpGate = opened.quest;
+  }
+
+  const runInterpretRules = () =>
+    interpretRules({
+      sessionId,
+      turnId,
+      intent,
+      characterStats: ctx.character.stats,
+      characterClass: ctx.character.class,
+      mechanicalClass: ctx.character.mechanicalClass,
+      classProfile: ctx.character.classProfile,
+      provider,
+    });
+
+  let rulesResult: OrchestrationStepResult<RulesInterpreterOutput>;
+  if (needsBetrayalPvpGate) {
+    const gate = evaluateBetrayalPvpGate({
+      betrayalMode: ctx.betrayalMode,
+      betrayalPhase: effectiveBetrayalPhase,
+      quest: effectiveQuestForPvpGate,
+      attackerPlayerId: playerId,
+      victimPlayerId: otherPlayerTarget.playerId,
+      currentRound: ctx.session.currentRound,
+    });
+    if (!gate.ok) {
+      rulesResult = {
+        data: {
+          legal: false,
+          denial_reason: gate.reason,
+          rolls: [],
+        },
+        usage: {
+          model: "deterministic",
+          inputTokens: 0,
+          outputTokens: 0,
+        },
+        latencyMs: 0,
+        success: true,
+      };
+    } else {
+      rulesResult = await runInterpretRules();
+    }
+  } else {
+    rulesResult = await runInterpretRules();
+  }
+
+  const rulesRaw = rulesResult.data;
+  const betrayalGateOk =
+    !needsBetrayalPvpGate || rulesRaw.legal;
+
+  const rulesForPipeline =
+    ctx.betrayalMode === "confrontational" &&
+    ctx.betrayalPhase === "confronting" &&
+    otherPlayerTarget &&
+    isBetrayalPvpHostileIntent({ actionType: intent.action_type }) &&
+    betrayalGateOk &&
+    rulesRaw.legal
+      ? ensureContestedRollForPcHostile({ intent, rules: rulesRaw })
+      : rulesRaw;
+
+  const rules = rulesForPipeline;
   const actionDenied = !rules.legal;
   const deniedReason = rules.denial_reason?.trim() || "That action is not possible right now.";
   const npcTarget = resolveNpcTarget(intent, ctx.npcIds);
   const dmDcOverride = await getDmDcOverride(sessionId);
+
+  const applyPcTargetBetrayalDc =
+    ctx.betrayalMode === "confrontational" && effectiveBetrayalPhase === "confronting";
+
+  const shouldPauseForPvpDefense =
+    ctx.betrayalMode === "confrontational" &&
+    effectiveBetrayalPhase === "confronting" &&
+    otherPlayerTarget &&
+    isBetrayalPvpHostileIntent({ actionType: intent.action_type }) &&
+    betrayalGateOk &&
+    !actionDenied &&
+    rules.rolls.length > 0;
+
+  if (shouldPauseForPvpDefense) {
+    const stage: PvpDefenseStageV1 = {
+      v: 1,
+      sessionId,
+      turnId,
+      actionId,
+      attackerPlayerId: playerId,
+      defenderPlayerId: otherPlayerTarget.playerId,
+      attackerRawInput: rawInput,
+      intent,
+      rules,
+      roundNumber: ctx.session.currentRound,
+    };
+    await savePvpDefenseStage(stage);
+
+    const [marked] = await db
+      .update(turns)
+      .set({ status: "awaiting_pvp_defense" })
+      .where(and(eq(turns.id, turnId), eq(turns.status, "processing")))
+      .returning({
+        id: turns.id,
+        round_number: turns.round_number,
+        player_id: turns.player_id,
+      });
+
+    if (!marked) {
+      throw new Error("Failed to mark turn awaiting PvP defense");
+    }
+
+    await handoffToPvpDefense({
+      sessionId,
+      turnId,
+      defenderPlayerId: otherPlayerTarget.playerId,
+    });
+
+    await broadcastPvpDefenseChallenge({
+      sessionId,
+      turnId,
+      attackerPlayerId: playerId,
+      defenderPlayerId: otherPlayerTarget.playerId,
+      roundNumber: marked.round_number,
+    });
+
+    return {
+      kind: "pvp_defense_wait",
+      turnId,
+      attackerPlayerId: playerId,
+      defenderPlayerId: otherPlayerTarget.playerId,
+      roundNumber: marked.round_number,
+      diceRolls: [],
+      statePatches: [],
+      consequenceEffects: [],
+      shouldEndSession: false,
+    };
+  }
 
   const d0 = Date.now();
   const diceRolls: DiceRoll[] = [];
@@ -655,6 +927,8 @@ export async function runTurnPipeline(params: {
           roll,
           npcTargetId: npcTarget?.id ?? null,
           dmDcOverride,
+          otherPlayerTargetId: otherPlayerTarget?.playerId ?? null,
+          applyBetrayalPcTargetDcBonus: applyPcTargetBetrayalDc,
         }),
       });
       diceRolls.push(dr);
@@ -755,11 +1029,7 @@ export async function runTurnPipeline(params: {
     ? {
       state:
         (await getQuestState(sessionId)) ??
-        defaultQuestState(
-          ctx.session.adventurePrompt?.trim() ||
-            ctx.session.campaignTitle?.trim() ||
-            "Complete the mission and survive.",
-        ),
+        defaultQuestState(objectiveFallback),
       visibleChanges: [],
       shouldEndSession: false,
     }
@@ -768,15 +1038,21 @@ export async function runTurnPipeline(params: {
       turnId,
       round: ctx.session.currentRound,
       chapterIndex: ctx.session.chapterIndex,
-      objectiveFallback:
-        ctx.session.adventurePrompt?.trim() ||
-        ctx.session.campaignTitle?.trim() ||
-        "Complete the mission and survive.",
+      objectiveFallback,
       actionType: intent.action_type,
       diceRolls,
       actionText: rawInput,
       recentNarrative: ctx.recentEvents[ctx.recentEvents.length - 1],
       provider,
+      betrayalPvpClash:
+        otherPlayerTarget &&
+        isBetrayalPvpHostileIntent({ actionType: intent.action_type }) &&
+        ctx.betrayalMode === "confrontational"
+          ? {
+              attackerPlayerId: playerId,
+              victimPlayerId: otherPlayerTarget.playerId,
+            }
+          : undefined,
     });
   const consequenceEffects = actionDenied ? [] : consequenceResult!.data.effects;
   const consequenceModel = actionDenied ? "deterministic" : consequenceResult!.usage.model;
@@ -834,9 +1110,11 @@ export async function runTurnPipeline(params: {
       throw new Error("Failed to mark turn awaiting DM");
     }
     try {
+      const briefing = buildHumanDmBetrayalBriefing(ctx);
       await broadcastToSession(sessionId, "awaiting-dm", {
         turn_id: turnId,
         acting_player_id: playerId,
+        ...(briefing ? { betrayal_briefing: briefing } : {}),
       });
     } catch (err) {
       console.error(err);
@@ -878,6 +1156,14 @@ export async function runTurnPipeline(params: {
   );
   if (shouldApplyBetrayalNarratorInterrupt(ctx)) {
     facilitatorSystemPrompt = `${facilitatorSystemPrompt}\n\n${BETRAYAL_INTERRUPT_SYSTEM_APPENDIX}`;
+  }
+  if (
+    shouldApplyBetrayalNarratorInterrupt(ctx) &&
+    ctx.betrayalPhase === "confronting" &&
+    otherPlayerTarget &&
+    isBetrayalPvpHostileIntent({ actionType: intent.action_type })
+  ) {
+    facilitatorSystemPrompt = `${facilitatorSystemPrompt}\n\n${BETRAYAL_SETPIECE_PC_VS_PC_APPENDIX}`;
   }
   const worldBibleExcerpt =
     ctx.session.worldBible?.trim().slice(0, 4000) ?? "";
@@ -1057,6 +1343,672 @@ export async function runTurnPipeline(params: {
         ctx.session.adventurePrompt?.trim() ||
         "",
       characterNames: ctx.allPlayerNames,
+      imageHint: narration.image_hint,
+    };
+  }
+
+  return {
+    kind: "ai",
+    narrativeEvent: mapNarrativeRow(inserted),
+    diceRolls,
+    statePatches,
+    consequenceEffects,
+    shouldEndSession: questUpdate.shouldEndSession,
+    imageNeeded,
+    imageJobPayload,
+  };
+}
+
+export type TurnPipelineResumeResult = Exclude<
+  TurnPipelineResult,
+  { kind: "pvp_defense_wait" }
+>;
+
+export async function resumeTurnPipelineAfterPvpDefense(params: {
+  sessionId: string;
+  turnId: string;
+  defenderPlayerId: string;
+  defenseActionId: string;
+  defenseRawInput: string;
+}): Promise<TurnPipelineResumeResult> {
+  const stage = await loadPvpDefenseStage(params.turnId);
+  if (!stage || stage.v !== 1) {
+    throw new Error("No pending PvP defense stage for this turn");
+  }
+  if (stage.sessionId !== params.sessionId || stage.turnId !== params.turnId) {
+    throw new Error("PvP defense stage mismatch");
+  }
+  if (stage.defenderPlayerId !== params.defenderPlayerId) {
+    throw new Error("Not the defender for this clash");
+  }
+
+  await clearPvpDefenseStage(params.turnId);
+
+  await setSessionCurrentPlayer({
+    sessionId: params.sessionId,
+    playerId: stage.attackerPlayerId,
+  });
+
+  const ctxAttacker = await buildTurnContext({
+    sessionId: params.sessionId,
+    playerId: stage.attackerPlayerId,
+    turnId: params.turnId,
+  });
+  const ctxDefender = await buildTurnContext({
+    sessionId: params.sessionId,
+    playerId: params.defenderPlayerId,
+    turnId: params.turnId,
+  });
+
+  const provider = getAIProvider();
+
+  const intentAttacker = stage.intent;
+  const rulesAttacker = stage.rules;
+  const otherPlayerTarget = resolveOtherPlayerTarget(
+    intentAttacker,
+    stage.attackerPlayerId,
+    ctxAttacker.partyMembers,
+  );
+
+  const npcTarget = resolveNpcTarget(intentAttacker, ctxAttacker.npcIds);
+  const dmDcOverride = await getDmDcOverride(params.sessionId);
+  const applyPcTargetBetrayalDc =
+    ctxAttacker.betrayalMode === "confrontational" &&
+    ctxAttacker.betrayalPhase === "confronting";
+
+  const defenseIntentRes = await parseIntent({
+    sessionId: params.sessionId,
+    turnId: params.turnId,
+    rawInput: params.defenseRawInput,
+    characterName: ctxDefender.character.name,
+    characterClass: ctxDefender.character.class,
+    recentEvents: ctxDefender.recentEvents,
+    betrayalConfrontationActive:
+      ctxDefender.betrayalMode === "confrontational" &&
+      ctxDefender.betrayalPhase === "confronting",
+    provider,
+  });
+  const intentDefender = defenseIntentRes.data;
+
+  await db
+    .update(actions)
+    .set({ parsed_intent: intentDefender as unknown as Record<string, unknown> })
+    .where(eq(actions.id, params.defenseActionId));
+
+  let defenseRules = (
+    await interpretRules({
+      sessionId: params.sessionId,
+      turnId: params.turnId,
+      intent: intentDefender,
+      characterStats: ctxDefender.character.stats,
+      characterClass: ctxDefender.character.class,
+      mechanicalClass: ctxDefender.character.mechanicalClass,
+      classProfile: ctxDefender.character.classProfile,
+      provider,
+    })
+  ).data;
+
+  if (!defenseRules.legal || defenseRules.rolls.length === 0) {
+    const atkType = intentAttacker.action_type;
+    const defStat = atkType === "cast_spell" ? "wis" : "dex";
+    defenseRules = {
+      legal: true,
+      rolls: [
+        {
+          dice: "d20",
+          modifier: abilityScoreMod(ctxDefender.character.stats[defStat] ?? 10),
+          advantage_state: "none",
+          context: "Betrayal clash — defender",
+        },
+      ],
+    };
+  }
+
+  const atkRollSpec = rulesAttacker.rolls[0];
+  if (!atkRollSpec) {
+    throw new Error("Attacker rolls missing from PvP stage");
+  }
+
+  const atkStat = intentAttacker.action_type === "cast_spell" ? "wis" : "dex";
+  const atkMod =
+    atkRollSpec.modifier !== 0
+      ? atkRollSpec.modifier
+      : abilityScoreMod(ctxAttacker.character.stats[atkStat] ?? 10);
+
+  try {
+    await broadcastToSession(params.sessionId, "dice-rolling", {
+      roll_context: atkRollSpec.context,
+      dice_type: atkRollSpec.dice,
+      turn_id: params.turnId,
+      round_number: ctxAttacker.session.currentRound,
+    });
+  } catch (err) {
+    console.error("[pipeline] dice-rolling broadcast failed:", err);
+  }
+
+  const attackerClash = await performRoll({
+    actionId: stage.actionId,
+    diceType: atkRollSpec.dice,
+    context: atkRollSpec.context,
+    modifier: atkMod,
+    advantageState: atkRollSpec.advantage_state,
+    dc: await resolveRollDc({
+      sessionId: params.sessionId,
+      intent: intentAttacker,
+      roll: atkRollSpec,
+      npcTargetId: npcTarget?.id ?? null,
+      dmDcOverride,
+      otherPlayerTargetId: otherPlayerTarget?.playerId ?? null,
+      applyBetrayalPcTargetDcBonus: applyPcTargetBetrayalDc,
+    }),
+  });
+
+  const defRollSpec = defenseRules.rolls[0]!;
+  try {
+    await broadcastToSession(params.sessionId, "dice-rolling", {
+      roll_context: defRollSpec.context,
+      dice_type: defRollSpec.dice,
+      turn_id: params.turnId,
+      round_number: ctxAttacker.session.currentRound,
+    });
+  } catch (err) {
+    console.error("[pipeline] dice-rolling broadcast failed:", err);
+  }
+
+  const defenderClash = await performRoll({
+    actionId: stage.actionId,
+    diceType: defRollSpec.dice,
+    context: defRollSpec.context,
+    modifier: defRollSpec.modifier,
+    advantageState: defRollSpec.advantage_state,
+    dc: await resolveRollDc({
+      sessionId: params.sessionId,
+      intent: intentDefender,
+      roll: defRollSpec,
+      npcTargetId: null,
+      dmDcOverride,
+      otherPlayerTargetId: null,
+      applyBetrayalPcTargetDcBonus: false,
+    }),
+  });
+
+  const clashBlocked = defenderClash.total >= attackerClash.total;
+  const diceRolls: DiceRoll[] = clashBlocked
+    ? [attackerClash, defenderClash]
+    : [attackerClash];
+
+  const actionDenied = clashBlocked;
+  const deniedReason = clashBlocked
+    ? "The defender meets the attack — the clash fails to land clean."
+    : "";
+
+  await logTrace({
+    sessionId: params.sessionId,
+    turnId: params.turnId,
+    stepName: "dice_rolls",
+    input: {
+      actionId: stage.actionId,
+      pvp_clash: true,
+      clash_blocked: clashBlocked,
+    },
+    output: {
+      rolls: [attackerClash, defenderClash].map((r) => ({
+        id: r.id,
+        total: r.total,
+        result: r.result,
+      })),
+    },
+    modelUsed: "deterministic",
+    tokensIn: 0,
+    tokensOut: 0,
+    latencyMs: 0,
+    success: true,
+  });
+
+  const combinedRaw = `${stage.attackerRawInput}\n\n[defender_response:${params.defenseRawInput}]`;
+
+  const s0 = Date.now();
+  const fallbackPatches = actionDenied
+    ? []
+    : computeFallbackPatches(
+      intentAttacker,
+      diceRolls,
+      stage.attackerPlayerId,
+      stage.attackerRawInput,
+      ctxAttacker.npcIds,
+    );
+
+  const actingMember =
+    ctxAttacker.partyMembers.find((p) => p.playerId === stage.attackerPlayerId) ?? {
+      playerId: stage.attackerPlayerId,
+      name: ctxAttacker.character.name,
+      hp: ctxAttacker.character.hp,
+      maxHp: ctxAttacker.character.maxHp,
+      mana: ctxAttacker.character.mana,
+      maxMana: ctxAttacker.character.maxMana,
+      conditions: ctxAttacker.character.conditions,
+    };
+
+  const consequenceResult = actionDenied
+    ? null
+    : await interpretConsequences({
+      sessionId: params.sessionId,
+      turnId: params.turnId,
+      rawInput: combinedRaw,
+      intent: intentAttacker,
+      diceRolls,
+      actingPlayer: actingMember,
+      partyMembers: ctxAttacker.partyMembers,
+      npcs: ctxAttacker.npcDetails,
+      sceneContext:
+        ctxAttacker.currentSceneDescription?.trim() ||
+        ctxAttacker.recentEvents.slice(-2).join(" ").slice(0, 500) ||
+        "",
+      fallbackPatches,
+      betrayalSpine: buildBetrayalSpineForNarrator(ctxAttacker),
+      provider,
+    });
+
+  const statePatches: StatePatch[] = actionDenied
+    ? []
+    : consequenceResult!.usage.model === "fallback"
+      ? fallbackPatches
+      : consequenceToPatches(consequenceResult!.data);
+
+  if (
+    !actionDenied &&
+    intentAttacker.action_type === "inspect" &&
+    npcTarget &&
+    diceRolls[0]
+  ) {
+    const r = diceRolls[0].result;
+    const level =
+      r === "success" || r === "critical_success" ? "full" : "partial";
+    statePatches.push({
+      op: "npc_reveal",
+      npcId: npcTarget.id,
+      level,
+    });
+  }
+
+  if (
+    !actionDenied &&
+    npcTarget &&
+    diceRolls[0] &&
+    (intentAttacker.action_type === "attack" ||
+      intentAttacker.action_type === "cast_spell")
+  ) {
+    const r = diceRolls[0].result;
+    if (r === "success" || r === "critical_success") {
+      statePatches.push({
+        op: "npc_reveal",
+        npcId: npcTarget.id,
+        level: r === "critical_success" ? "full" : "partial",
+      });
+    }
+    statePatches.push({
+      op: "npc_mark_hostile",
+      npcId: npcTarget.id,
+      reason: intentAttacker.action_type,
+    });
+  }
+
+  const objectiveFallback =
+    ctxAttacker.session.adventurePrompt?.trim() ||
+    ctxAttacker.session.campaignTitle?.trim() ||
+    "Complete the mission and survive.";
+
+  const questUpdate = actionDenied
+    ? {
+      state:
+        (await getQuestState(params.sessionId)) ??
+        defaultQuestState(objectiveFallback),
+      visibleChanges: [],
+      shouldEndSession: false,
+    }
+    : await applyTurnQuestProgress({
+      sessionId: params.sessionId,
+      turnId: params.turnId,
+      round: ctxAttacker.session.currentRound,
+      chapterIndex: ctxAttacker.session.chapterIndex,
+      objectiveFallback,
+      actionType: intentAttacker.action_type,
+      diceRolls,
+      actionText: combinedRaw,
+      recentNarrative:
+        ctxAttacker.recentEvents[ctxAttacker.recentEvents.length - 1],
+      provider,
+      betrayalPvpClash:
+        !clashBlocked &&
+        otherPlayerTarget &&
+        isBetrayalPvpHostileIntent({ actionType: intentAttacker.action_type }) &&
+        ctxAttacker.betrayalMode === "confrontational"
+          ? {
+              attackerPlayerId: stage.attackerPlayerId,
+              victimPlayerId: otherPlayerTarget.playerId,
+            }
+          : undefined,
+    });
+
+  const consequenceEffects = actionDenied ? [] : consequenceResult!.data.effects;
+  const consequenceModel = actionDenied
+    ? "deterministic"
+    : consequenceResult!.usage.model;
+  const consequenceTokensIn = actionDenied ? 0 : consequenceResult!.usage.inputTokens;
+  const consequenceTokensOut = actionDenied
+    ? 0
+    : consequenceResult!.usage.outputTokens;
+  const consequenceSuccess = actionDenied ? true : consequenceResult!.success;
+  const consequenceError = actionDenied ? deniedReason : consequenceResult!.error;
+  await logTrace({
+    sessionId: params.sessionId,
+    turnId: params.turnId,
+    stepName: "state_delta",
+    input: {
+      intent_summary: intentAttacker.action_type,
+      ai_consequences:
+        !actionDenied && consequenceResult!.usage.model !== "fallback",
+      pvp_resume: true,
+    },
+    output: {
+      patches: statePatches,
+      consequence_effects: consequenceEffects,
+      quest_state: questUpdate.state,
+    },
+    modelUsed: consequenceModel,
+    tokensIn: consequenceTokensIn,
+    tokensOut: consequenceTokensOut,
+    latencyMs: Date.now() - s0,
+    success: consequenceSuccess,
+    errorMessage: consequenceError,
+  });
+
+  const a0 = Date.now();
+  const { stateVersion } = await commitStatePatches(
+    params.sessionId,
+    statePatches,
+  );
+  await logTrace({
+    sessionId: params.sessionId,
+    turnId: params.turnId,
+    stepName: "apply_state",
+    input: { patch_count: statePatches.length },
+    output: { state_version: stateVersion },
+    modelUsed: "deterministic",
+    tokensIn: 0,
+    tokensOut: 0,
+    latencyMs: Date.now() - a0,
+    success: true,
+  });
+
+  await db
+    .update(actions)
+    .set({ resolution_status: "applied" })
+    .where(eq(actions.id, stage.actionId));
+  await db
+    .update(actions)
+    .set({ resolution_status: "applied" })
+    .where(eq(actions.id, params.defenseActionId));
+
+  const resolvedNextActor = await resolveNextActorForNarration(
+    params.sessionId,
+    stage.attackerPlayerId,
+  );
+
+  if (ctxAttacker.session.mode === "human_dm") {
+    const [marked] = await db
+      .update(turns)
+      .set({ status: "awaiting_dm" })
+      .where(
+        and(eq(turns.id, params.turnId), eq(turns.status, "processing")),
+      )
+      .returning({ id: turns.id });
+    if (!marked) {
+      throw new Error("Failed to mark turn awaiting DM");
+    }
+    try {
+      const briefing = buildHumanDmBetrayalBriefing(ctxAttacker);
+      await broadcastToSession(params.sessionId, "awaiting-dm", {
+        turn_id: params.turnId,
+        acting_player_id: stage.attackerPlayerId,
+        ...(briefing ? { betrayal_briefing: briefing } : {}),
+      });
+    } catch (err) {
+      console.error(err);
+    }
+    return {
+      kind: "human_dm",
+      diceRolls,
+      statePatches,
+      consequenceEffects,
+      shouldEndSession: questUpdate.shouldEndSession,
+      expectedNextPlayerId: resolvedNextActor.nextPlayerId,
+    };
+  }
+
+  const expectedNextPlayerId = resolvedNextActor.nextPlayerId;
+  const actorName = ctxAttacker.character.name;
+  const nextActorName = resolvedNextActor.nextPlayerDisplayName;
+
+  const [memoryBundle, establishedSituation] = await Promise.all([
+    buildMemoryBundle("narrator", params.sessionId),
+    fetchLatestSituationAnchor(params.sessionId),
+  ]);
+
+  const sceneContext =
+    ctxAttacker.currentSceneDescription?.trim() ||
+    ctxAttacker.session.campaignTitle?.trim() ||
+    ctxAttacker.session.adventurePrompt?.trim() ||
+    "";
+
+  let facilitatorSystemPrompt = buildNarratorSystemPrompt(
+    buildFacilitatorRoleLine({
+      campaign_mode: ctxAttacker.session.campaignMode,
+      module_key: ctxAttacker.session.moduleKey,
+      adventure_prompt: ctxAttacker.session.adventurePrompt,
+      adventure_tags: ctxAttacker.session.adventureTags,
+      art_direction: ctxAttacker.session.artDirection,
+      world_bible: ctxAttacker.session.worldBible,
+    }),
+  );
+  if (shouldApplyBetrayalNarratorInterrupt(ctxAttacker)) {
+    facilitatorSystemPrompt = `${facilitatorSystemPrompt}\n\n${BETRAYAL_INTERRUPT_SYSTEM_APPENDIX}`;
+  }
+  if (
+    shouldApplyBetrayalNarratorInterrupt(ctxAttacker) &&
+    ctxAttacker.betrayalPhase === "confronting" &&
+    otherPlayerTarget &&
+    isBetrayalPvpHostileIntent({ actionType: intentAttacker.action_type })
+  ) {
+    facilitatorSystemPrompt = `${facilitatorSystemPrompt}\n\n${BETRAYAL_SETPIECE_PC_VS_PC_APPENDIX}`;
+  }
+  const worldBibleExcerpt =
+    ctxAttacker.session.worldBible?.trim().slice(0, 4000) ?? "";
+
+  const fallbackPremiseHint = [
+    ...(ctxAttacker.session.adventureTags ?? []),
+    ctxAttacker.session.adventurePrompt ?? "",
+    ctxAttacker.session.worldBible?.trim().slice(0, 600) ?? "",
+    ctxAttacker.session.artDirection ?? "",
+  ]
+    .filter(Boolean)
+    .join(" ")
+    .slice(0, 1500);
+
+  const narr0 = actionDenied
+    ? null
+    : await generateNarration({
+      sessionId: params.sessionId,
+      turnId: params.turnId,
+      rawInput: combinedRaw,
+      intent: intentAttacker,
+      diceResults: diceRolls.map((r) => ({
+        context: r.context,
+        total: r.total,
+        result: r.result,
+      })),
+      characterName: actorName,
+      characterPronouns: ctxAttacker.character.pronouns,
+      characterTraits: ctxAttacker.character.traits,
+      characterBackstory: ctxAttacker.character.backstory,
+      characterAppearance: ctxAttacker.character.appearance,
+      characterClassIdentity: ctxAttacker.character.classIdentitySummary,
+      characterMechanicalClass: ctxAttacker.character.mechanicalClass,
+      characterIdentitySource: ctxAttacker.character.classProfile?.source ?? "preset",
+      characterVisualTags: ctxAttacker.character.classProfile?.visual_tags ?? [],
+      nextPlayerName: nextActorName,
+      recentNarrative: memoryBundle.recentEventWindow,
+      sceneContext,
+      partySummary: ctxAttacker.allCharacterSummaries.join("; "),
+      questContext: ctxAttacker.questContext,
+      betrayalSpine: buildBetrayalSpineForNarrator(ctxAttacker),
+      npcContext: ctxAttacker.npcContext,
+      canonicalState: memoryBundle.canonicalState,
+      rollingSummary: memoryBundle.rollingSummary,
+      stylePolicy: memoryBundle.stylePolicy,
+      facilitatorSystemPrompt,
+      worldBibleExcerpt: worldBibleExcerpt || undefined,
+      fallbackPremiseHint: fallbackPremiseHint || undefined,
+      establishedSituation,
+      provider,
+    });
+
+  let narration: NarratorOutput = actionDenied
+    ? {
+      scene_text: `${actorName} strikes — ${deniedReason}`,
+      visible_changes: ["Party clash — defended"],
+      tone: "tense",
+      next_actor_id: expectedNextPlayerId,
+      image_hint: { subjects: [], avoid: [] },
+      situation_anchor:
+        establishedSituation ??
+        "The fiction holds; no new location or circumstance was established this beat.",
+      narrative_beat: {
+        rhythm: "ongoing",
+        setting_change: "none",
+        warrants_establishing_shot: false,
+      },
+      chapter_break_suggested: false,
+    }
+    : {
+      ...narr0!.data,
+      next_actor_id: expectedNextPlayerId,
+    };
+  narration = {
+    ...narration,
+    visible_changes: [...narration.visible_changes, ...questUpdate.visibleChanges],
+  };
+
+  const [inserted] = await db
+    .insert(narrativeEvents)
+    .values({
+      session_id: params.sessionId,
+      turn_id: params.turnId,
+      scene_text: narration.scene_text,
+      visible_changes: narration.visible_changes,
+      tone: narration.tone,
+      next_actor_id: narration.next_actor_id,
+      image_hint: narration.image_hint as Record<string, unknown>,
+      situation_anchor: narration.situation_anchor,
+    })
+    .returning();
+
+  if (!inserted) {
+    throw new Error("Failed to persist narrative");
+  }
+
+  if (
+    !actionDenied &&
+    ctxAttacker.session.gameKind === "campaign" &&
+    ctxAttacker.session.mode === "ai_dm" &&
+    narration.chapter_break_suggested
+  ) {
+    await db
+      .update(sessions)
+      .set({
+        chapter_break_offered: true,
+        updated_at: new Date(),
+      })
+      .where(eq(sessions.id, params.sessionId));
+  }
+
+  if (ctxAttacker.npcIds.length > 0 && narration.visible_changes.length > 0) {
+    try {
+      await updateNpcStatesFromNarrative(
+        params.sessionId,
+        ctxAttacker.npcIds,
+        narration.visible_changes,
+        narration.scene_text,
+      );
+    } catch (err) {
+      console.error("[pipeline] NPC state update failed, continuing:", err);
+    }
+  }
+  if (ctxAttacker.npcIds.length > 0) {
+    try {
+      await unlockNpcPortraitsFromLatestScene({
+        sessionId: params.sessionId,
+        sceneText: narration.scene_text,
+        visibleChanges: narration.visible_changes,
+      });
+    } catch (err) {
+      console.error("[pipeline] NPC portrait unlock fallback failed, continuing:", err);
+    }
+  }
+
+  try {
+    if (await shouldSummarize(params.sessionId, ctxAttacker.session.currentRound)) {
+      await runSummarizer({
+        sessionId: params.sessionId,
+        currentRound: ctxAttacker.session.currentRound,
+        provider,
+      });
+    }
+  } catch (err) {
+    console.error("[pipeline] summarizer failed, continuing:", err);
+  }
+
+  const visualDeltaResult = actionDenied
+    ? null
+    : await checkVisualDelta({
+      sessionId: params.sessionId,
+      turnId: params.turnId,
+      narrativeText: narration.scene_text,
+      currentSceneDescription: ctxAttacker.currentSceneDescription,
+      priorSituationAnchor: establishedSituation,
+      newSituationAnchor: narration.situation_anchor,
+      narrativeBeat: narration.narrative_beat,
+    });
+  const imageNeeded = visualDeltaResult?.data.image_needed ?? false;
+
+  await logTrace({
+    sessionId: params.sessionId,
+    turnId: params.turnId,
+    stepName: "visual_delta",
+    input: { narrative_len: narration.scene_text.length, pvp_resume: true },
+    output: {
+      image_needed: imageNeeded,
+      reasons: visualDeltaResult?.data.reasons ?? [],
+      beat: narration.narrative_beat,
+    },
+    modelUsed: "deterministic",
+    tokensIn: 0,
+    tokensOut: 0,
+    latencyMs: visualDeltaResult?.latencyMs ?? 0,
+    success: true,
+  });
+
+  let imageJobPayload: SessionImageJobPayload | undefined;
+  if (imageNeeded) {
+    imageJobPayload = {
+      turnId: params.turnId,
+      narrativeText: narration.scene_text,
+      sceneContext:
+        ctxAttacker.currentSceneDescription?.trim() ||
+        ctxAttacker.session.campaignTitle?.trim() ||
+        ctxAttacker.session.adventurePrompt?.trim() ||
+        "",
+      characterNames: ctxAttacker.allPlayerNames,
       imageHint: narration.image_hint,
     };
   }

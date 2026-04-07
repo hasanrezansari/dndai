@@ -189,6 +189,24 @@ export interface DiceOverlayData {
   result: string;
 }
 
+export type DmBetrayalBriefing = {
+  spine: string;
+  prompts: string[];
+};
+
+export type DmAwaitingState = {
+  turnId: string;
+  actingPlayerId: string;
+  betrayalBriefing?: DmBetrayalBriefing;
+};
+
+export type PvpDefenseChallengeState = {
+  turnId: string;
+  attackerPlayerId: string;
+  defenderPlayerId: string;
+  roundNumber: number;
+};
+
 /** Partial sync from `GET .../scene-status` (host / room display fallback poll). */
 export type SceneStatusHydratePatch = {
   sceneImage?: string | null;
@@ -207,7 +225,8 @@ export type SessionStatePayload = {
   sceneTitle?: string | null;
   narrativeText?: string | null;
   scenePending?: boolean;
-  dmAwaiting?: { turnId: string; actingPlayerId: string } | null;
+  dmAwaiting?: DmAwaitingState | null;
+  pvpDefense?: PvpDefenseChallengeState | null;
   quest?: QuestProgressView | null;
   rollingMemories?: RollingMemoryView[];
   npcs?: NpcCombatantView[];
@@ -231,7 +250,8 @@ interface GameState {
   activeSheet: ActiveSheet | null;
   isDm: boolean;
   waitingForDm: boolean;
-  dmAwaiting: { turnId: string; actingPlayerId: string } | null;
+  dmAwaiting: DmAwaitingState | null;
+  pvpDefense: PvpDefenseChallengeState | null;
   dmDc: number | null;
   quest: QuestProgressView | null;
   rollingMemories: RollingMemoryView[];
@@ -276,8 +296,9 @@ interface GameState {
   setWaitingForDm: (waiting: boolean) => void;
   setIsDm: (isDm: boolean) => void;
   setDmAwaiting: (
-    value: { turnId: string; actingPlayerId: string } | null,
+    value: DmAwaitingState | null,
   ) => void;
+  setPvpDefense: (value: PvpDefenseChallengeState | null) => void;
   setDmDc: (dc: number | null) => void;
   setQuest: (quest: QuestProgressView | null) => void;
   setRollingMemories: (memories: RollingMemoryView[]) => void;
@@ -312,7 +333,8 @@ const emptyState = {
   activeSheet: null as ActiveSheet | null,
   isDm: false,
   waitingForDm: false,
-  dmAwaiting: null as { turnId: string; actingPlayerId: string } | null,
+  dmAwaiting: null as DmAwaitingState | null,
+  pvpDefense: null as PvpDefenseChallengeState | null,
   dmDc: null as number | null,
   quest: null as QuestProgressView | null,
   rollingMemories: [] as RollingMemoryView[],
@@ -388,6 +410,8 @@ export const useGameStore = create<GameState>((set) => ({
 
   setDmAwaiting: (value) => set({ dmAwaiting: value }),
 
+  setPvpDefense: (value) => set({ pvpDefense: value }),
+
   setDmDc: (dc) => set({ dmDc: dc }),
 
   setQuest: (quest) => set({ quest }),
@@ -422,6 +446,7 @@ export const useGameStore = create<GameState>((set) => ({
       scenePending: data.scenePending ?? false,
       waitingForDm: Boolean(data.dmAwaiting),
       dmAwaiting: data.dmAwaiting ?? null,
+      pvpDefense: data.pvpDefense ?? null,
       quest: data.quest ?? null,
       rollingMemories: data.rollingMemories ?? [],
       npcs: data.npcs ?? [],
@@ -447,6 +472,7 @@ export const useGameStore = create<GameState>((set) => ({
         scenePending: data.scenePending ?? false,
         waitingForDm: Boolean(data.dmAwaiting),
         dmAwaiting: data.dmAwaiting ?? null,
+        pvpDefense: data.pvpDefense ?? null,
         quest: data.quest ?? null,
         rollingMemories: data.rollingMemories ?? [],
         activeTurnId:

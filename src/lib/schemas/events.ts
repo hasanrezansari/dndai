@@ -100,6 +100,12 @@ export type NarrationUpdateEvent = output<typeof NarrationUpdateEventSchema>;
 export const AwaitingDmEventSchema = z.object({
   turn_id: z.string().uuid(),
   acting_player_id: z.string().uuid(),
+  betrayal_briefing: z
+    .object({
+      spine: z.string(),
+      prompts: z.array(z.string()),
+    })
+    .optional(),
 });
 export type AwaitingDmEvent = output<typeof AwaitingDmEventSchema>;
 
@@ -162,3 +168,11 @@ export const RoundSummaryEventSchema = z.object({
   turn_id: z.string().uuid().optional(),
 });
 export type RoundSummaryEvent = output<typeof RoundSummaryEventSchema>;
+
+export const PvpDefenseChallengeEventSchema = z.object({
+  turn_id: z.string().uuid(),
+  attacker_player_id: z.string().uuid(),
+  defender_player_id: z.string().uuid(),
+  round_number: z.number().int().min(1),
+});
+export type PvpDefenseChallengeEvent = output<typeof PvpDefenseChallengeEventSchema>;

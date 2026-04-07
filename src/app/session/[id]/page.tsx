@@ -152,6 +152,7 @@ export default function SessionGameplayPage() {
   const closeSheet = useGameStore((s) => s.closeSheet);
   const isDm = useGameStore((s) => s.isDm);
   const waitingForDm = useGameStore((s) => s.waitingForDm);
+  const pvpDefense = useGameStore((s) => s.pvpDefense);
   const quest = useGameStore((s) => s.quest);
   const npcs = useGameStore((s) => s.npcs);
   const setIsDm = useGameStore((s) => s.setIsDm);
@@ -432,32 +433,41 @@ export default function SessionGameplayPage() {
       if (!pid || !sessionId) return;
       setIsThinking(true);
       try {
-        const res = await fetch(`/api/sessions/${sessionId}/actions`, {
+        const pv = st.pvpDefense;
+        const url =
+          pv && pv.defenderPlayerId === pid
+            ? `/api/sessions/${sessionId}/pvp-defense`
+            : `/api/sessions/${sessionId}/actions`;
+        const body =
+          pv && pv.defenderPlayerId === pid
+            ? { playerId: pid, turnId: pv.turnId, text }
+            : { playerId: pid, text };
+        const res = await fetch(url, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ playerId: pid, text }),
+          body: JSON.stringify(body),
         });
-        const body = (await res.json().catch(() => ({}))) as {
+        const jsonBody = (await res.json().catch(() => ({}))) as {
           error?: string;
           code?: string;
         };
         if (!res.ok) {
           setIsThinking(false);
-          if (res.status === 402 && body.code === "insufficient_sparks") {
+          if (res.status === 402 && jsonBody.code === "insufficient_sparks") {
             showInsufficientSparksToast();
             return;
           }
-          if (res.status === 409 && body.code === "chapter_turn_cap") {
+          if (res.status === 409 && jsonBody.code === "chapter_turn_cap") {
             toast(
               isHost
-                ? `${body.error ?? "Chapter turn limit reached."} Open Quest to continue the chapter.`
-                : (body.error ?? "Chapter turn limit reached."),
+                ? `${jsonBody.error ?? "Chapter turn limit reached."} Open Quest to continue the chapter.`
+                : (jsonBody.error ?? "Chapter turn limit reached."),
               "error",
               { duration: 8000 },
             );
             return;
           }
-          toast(body.error ?? "Action failed", "error");
+          toast(jsonBody.error ?? "Action failed", "error");
           return;
         }
         setIsThinking(false);

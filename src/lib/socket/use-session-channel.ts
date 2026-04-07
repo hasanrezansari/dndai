@@ -11,6 +11,7 @@ import {
   NarrationUpdateEventSchema,
   PartyStateUpdatedEventSchema,
   PlayerDisconnectedEventSchema,
+  PvpDefenseChallengeEventSchema,
   PlayerJoinedEventSchema,
   PlayerReadyEventSchema,
   RoundSummaryEventSchema,
@@ -290,6 +291,7 @@ export function useSessionChannel(
       const name = playerDisplayName(players, parsed.data.player_id);
       useGameStore.getState().setWaitingForDm(false);
       useGameStore.getState().setDmAwaiting(null);
+      useGameStore.getState().setPvpDefense(null);
       useGameStore.getState().updateSessionField(
         "currentPlayerId",
         parsed.data.player_id,
@@ -618,11 +620,49 @@ export function useSessionChannel(
     const onAwaitingDm = (raw: unknown) => {
       const parsed = AwaitingDmEventSchema.safeParse(raw);
       if (!parsed.success) return;
+      useGameStore.getState().setPvpDefense(null);
       useGameStore.getState().setActiveTurnId(parsed.data.turn_id);
       useGameStore.getState().setWaitingForDm(true);
       useGameStore.getState().setDmAwaiting({
         turnId: parsed.data.turn_id,
         actingPlayerId: parsed.data.acting_player_id,
+        ...(parsed.data.betrayal_briefing
+          ? {
+              betrayalBriefing: {
+                spine: parsed.data.betrayal_briefing.spine,
+                prompts: parsed.data.betrayal_briefing.prompts,
+              },
+            }
+          : {}),
+      });
+    };
+
+    const onPvpDefenseChallenge = (raw: unknown) => {
+      const parsed = PvpDefenseChallengeEventSchema.safeParse(raw);
+      if (!parsed.success) return;
+      useGameStore.getState().setWaitingForDm(false);
+      useGameStore.getState().setDmAwaiting(null);
+      useGameStore.getState().setActiveTurnId(parsed.data.turn_id);
+      useGameStore.getState().updateSessionField(
+        "currentPlayerId",
+        parsed.data.defender_player_id,
+      );
+      useGameStore.getState().setPvpDefense({
+        turnId: parsed.data.turn_id,
+        attackerPlayerId: parsed.data.attacker_player_id,
+        defenderPlayerId: parsed.data.defender_player_id,
+        roundNumber: parsed.data.round_number,
+      });
+      const players = useGameStore.getState().players;
+      const defName = playerDisplayName(players, parsed.data.defender_player_id);
+      useGameStore.getState().addFeedEntry({
+        id: feedId(),
+        type: "system",
+        text: `${defName} — respond to the party clash.`,
+        timestamp: nowIso(),
+        turnId: parsed.data.turn_id,
+        roundNumber: parsed.data.round_number,
+        playerId: parsed.data.defender_player_id,
       });
     };
 
@@ -687,6 +727,7 @@ export function useSessionChannel(
       channel.bind("scene-image-failed", onSceneImageFailed);
       channel.bind("round-summary", onRoundSummary);
       channel.bind("awaiting-dm", onAwaitingDm);
+      channel.bind("pvp-defense-challenge", onPvpDefenseChallenge);
       channel.bind("dm-notice", onDmNotice);
       channel.bind("pusher:subscription_succeeded", onSubscriptionSucceeded);
     }
@@ -754,6 +795,7 @@ export function useSessionChannel(
         channel.unbind("scene-image-failed", onSceneImageFailed);
         channel.unbind("round-summary", onRoundSummary);
         channel.unbind("awaiting-dm", onAwaitingDm);
+        channel.unbind("pvp-defense-challenge", onPvpDefenseChallenge);
         channel.unbind("dm-notice", onDmNotice);
         channel.unbind("pusher:subscription_succeeded", onSubscriptionSucceeded);
       }

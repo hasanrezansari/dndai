@@ -5,6 +5,7 @@ import { db } from "@/lib/db";
 import { generateQuestSignal } from "@/lib/orchestrator/workers/quest-signaler";
 import { characters, memorySummaries, players, sessions } from "@/lib/db/schema";
 import type { DiceRoll } from "@/lib/schemas/domain";
+import { recordBetrayalPvpClash } from "@/server/services/betrayal-pvp-guards";
 
 const QUEST_KIND = "quest_state_v1";
 const MAX_PROGRESS = 100;
@@ -48,6 +49,13 @@ export type BetrayalQuestSlice = {
   last_updated_round?: number;
 };
 
+/** Anti-grief counters for confrontational PC-vs-PC clashes (stored in quest milestone JSON). */
+export type BetrayalPvpMeta = {
+  clashes_this_arc: number;
+  initiations_by_player: Record<string, number>;
+  last_pair_round: Record<string, number>;
+};
+
 export type QuestState = {
   objective: string;
   subObjectives?: string[];
@@ -65,6 +73,8 @@ export type QuestState = {
   turnsAtFullProgress?: number;
   /** Betrayal / PvP spine; omitted when `sessions.betrayal_mode` is `off`. */
   betrayal?: BetrayalQuestSlice;
+  /** Tracks betrayal clash limits (`confrontational` + `confronting` only). */
+  betrayal_pvp?: BetrayalPvpMeta;
   updatedAt: string;
 };
 
@@ -103,6 +113,16 @@ function isQuestState(value: unknown): value is QuestState {
       ["idle", "rogue_intent", "confronting", "resolved"].includes(
         (v.betrayal as BetrayalQuestSlice).phase,
       ));
+  const pvp = (v as Partial<QuestState>).betrayal_pvp;
+  const betrayalPvpOk =
+    pvp === undefined ||
+    (typeof pvp === "object" &&
+      pvp !== null &&
+      typeof (pvp as BetrayalPvpMeta).clashes_this_arc === "number" &&
+      typeof (pvp as BetrayalPvpMeta).initiations_by_player === "object" &&
+      (pvp as BetrayalPvpMeta).initiations_by_player !== null &&
+      typeof (pvp as BetrayalPvpMeta).last_pair_round === "object" &&
+      (pvp as BetrayalPvpMeta).last_pair_round !== null);
   return (
     typeof v.objective === "string" &&
     typeof v.progress === "number" &&
@@ -112,7 +132,8 @@ function isQuestState(value: unknown): value is QuestState {
     endingVote &&
     typeof v.updatedAt === "string" &&
     optNums &&
-    betrayalOk
+    betrayalOk &&
+    betrayalPvpOk
   );
 }
 
@@ -651,6 +672,11 @@ export async function applyTurnQuestProgress(params: {
   actionText?: string;
   recentNarrative?: string;
   provider?: AIProvider;
+  /** Record a gated betrayal PC-vs-PC clash when present. */
+  betrayalPvpClash?: {
+    attackerPlayerId: string;
+    victimPlayerId: string;
+  } | null;
 }): Promise<{
   state: QuestState;
   visibleChanges: string[];
@@ -755,6 +781,16 @@ export async function applyTurnQuestProgress(params: {
     }
   }
 
+  let nextBetrayalPvp = current.betrayal_pvp;
+  if (params.betrayalPvpClash && current.betrayal?.phase === "confronting") {
+    nextBetrayalPvp = recordBetrayalPvpClash(
+      current,
+      params.betrayalPvpClash.attackerPlayerId,
+      params.betrayalPvpClash.victimPlayerId,
+      params.round,
+    );
+  }
+
   const nextState: QuestState = {
     objective: current.objective,
     subObjectives: updateSubObjectivesFromSignal({
@@ -789,6 +825,8 @@ export async function applyTurnQuestProgress(params: {
     progressEarnedThisChapter: earnedInChapter,
     questChapterAnchor: chapterIndex,
     turnsAtFullProgress: turnsAtFull,
+    betrayal: current.betrayal,
+    betrayal_pvp: nextBetrayalPvp,
     updatedAt: new Date().toISOString(),
   };
 

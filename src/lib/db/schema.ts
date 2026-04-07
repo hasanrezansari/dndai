@@ -356,7 +356,7 @@ export const sessions = pgTable(
      */
     chapter_break_offered: boolean("chapter_break_offered").notNull().default(false),
     /**
-     * Betrayal / PvP beats: `off` (default) | `story_only` (host outcome from idle) | `confrontational` (Phase B beats + host outcomes).
+     * Betrayal / PvP beats: `off` (default) | `story_only` (host outcome from idle) | `confrontational` (host outcomes + confrontation auto-opens on hostile PC targets).
      * Campaign sessions only; ignored for `party` game_kind.
      */
     betrayal_mode: text("betrayal_mode").notNull().default("off"),

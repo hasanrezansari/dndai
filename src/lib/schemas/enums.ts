@@ -21,6 +21,7 @@ export const TurnStatusSchema = z.enum([
   "awaiting_input",
   "processing",
   "awaiting_dm",
+  "awaiting_pvp_defense",
   "resolved",
 ]);
 export type TurnStatus = output<typeof TurnStatusSchema>;

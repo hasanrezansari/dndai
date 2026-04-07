@@ -1,13 +1,11 @@
 import { randomUUID } from "crypto";
 
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { after } from "next/server";
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 
-export const maxDuration = 120;
-
-import { apiError, handleApiError, insufficientSparksResponse } from "@/lib/api/errors";
+import { apiError, handleApiError } from "@/lib/api/errors";
 import { COPY } from "@/lib/copy/ashveil";
 import {
   isPlayerForUser,
@@ -15,36 +13,33 @@ import {
   unauthorizedResponse,
 } from "@/lib/auth/guards";
 import { db } from "@/lib/db";
-import { sessions, turns } from "@/lib/db/schema";
-import { runTurnPipeline } from "@/lib/orchestrator/pipeline";
+import { actions, sessions, turns } from "@/lib/db/schema";
 import { runImagePipeline } from "@/lib/orchestrator/image-worker";
+import { resumeTurnPipelineAfterPvpDefense } from "@/lib/orchestrator/pipeline";
 import { broadcastToSession } from "@/lib/socket/server";
 import { finalizeSessionEnd } from "@/server/services/quest-service";
-import { SPARK_COST_AI_TEXT_TURN } from "@/lib/spark-pricing";
-import {
-  InsufficientSparksError,
-  isMonetizationSpendEnabled,
-  tryDebitSparksWithSessionPool,
-  tryRefundSessionSparkDebit,
-} from "@/server/services/spark-economy-service";
 import {
   assertCampaignChapterAllowsAiTurn,
   assertChapterImageBudget,
   incrementChapterSystemImageUsage,
 } from "@/server/services/chapter-runtime-service";
+import { loadPvpDefenseStage } from "@/server/services/pvp-defense-service";
 import {
+  acquireTurnLock,
   advanceTurn,
   NotYourTurnError,
   PartySessionRpgActionError,
-  resolveCurrentProcessingTurn,
-  resolveAwaitingDmTurn,
   releaseTurnLock,
-  submitAction,
+  resolveAwaitingDmTurn,
+  resolveCurrentProcessingTurn,
   TurnBeingProcessedError,
 } from "@/server/services/turn-service";
 
+export const maxDuration = 120;
+
 const BodySchema = z.object({
   playerId: z.string().uuid(),
+  turnId: z.string().uuid(),
   text: z.string().min(1).max(8000),
 });
 
@@ -87,105 +82,85 @@ export async function POST(
   }
 
   let lockHeld = false;
-  let aiTurnSparkDebited = false;
-  let sparkPoolUsedForRefund = 0;
-  let sparkPayerUserId: string | null = null;
-  let sparkActionIdForRefund = "";
 
   try {
-    const { actionId, turnId } = await submitAction({
-      sessionId,
-      playerId: parsed.data.playerId,
-      rawInput: parsed.data.text,
-    });
-    lockHeld = true;
-    sparkActionIdForRefund = actionId;
-
-    const [sessionForSparks] = await db
-      .select({
-        mode: sessions.mode,
-        host_user_id: sessions.host_user_id,
-      })
+    const [sessionRow] = await db
+      .select({ game_kind: sessions.game_kind })
       .from(sessions)
       .where(eq(sessions.id, sessionId))
       .limit(1);
+    if (sessionRow?.game_kind === "party") {
+      throw new PartySessionRpgActionError();
+    }
 
-    sparkPayerUserId = sessionForSparks?.host_user_id ?? null;
+    const stage = await loadPvpDefenseStage(parsed.data.turnId);
+    if (!stage || stage.defenderPlayerId !== parsed.data.playerId) {
+      return apiError("No PvP defense pending for this player", 409);
+    }
 
-    if (
-      sessionForSparks?.mode === "ai_dm" &&
-      isMonetizationSpendEnabled() &&
-      sparkPayerUserId
-    ) {
-      try {
-        const r = await tryDebitSparksWithSessionPool({
-          payerUserId: sparkPayerUserId,
-          amount: SPARK_COST_AI_TEXT_TURN,
-          idempotencyKey: `campaign_action:${actionId}`,
-          sessionId,
-          reason: "ai_text_turn",
-        });
-        aiTurnSparkDebited = r.applied;
-        sparkPoolUsedForRefund = r.fromPool;
-      } catch (sparkErr) {
-        if (sparkErr instanceof InsufficientSparksError) {
-          await releaseTurnLock(sessionId);
-          lockHeld = false;
-          return insufficientSparksResponse({
-            balance: sparkErr.balance,
-            required: sparkErr.required,
-          });
-        }
-        throw sparkErr;
-      }
+    const locked = await acquireTurnLock(sessionId);
+    if (!locked) {
+      throw new TurnBeingProcessedError();
+    }
+    lockHeld = true;
+
+    const [markedProcessing] = await db
+      .update(turns)
+      .set({ status: "processing" })
+      .where(
+        and(
+          eq(turns.id, parsed.data.turnId),
+          eq(turns.status, "awaiting_pvp_defense"),
+        ),
+      )
+      .returning({ id: turns.id });
+
+    if (!markedProcessing) {
+      await releaseTurnLock(sessionId);
+      lockHeld = false;
+      return apiError("No PvP defense window open for this turn", 409);
+    }
+
+    const [defenseAction] = await db
+      .insert(actions)
+      .values({
+        turn_id: parsed.data.turnId,
+        raw_input: parsed.data.text,
+        resolution_status: "pending",
+      })
+      .returning({ id: actions.id });
+
+    if (!defenseAction) {
+      await releaseTurnLock(sessionId);
+      lockHeld = false;
+      throw new Error("Failed to record defense action");
     }
 
     const [completedTurnRow] = await db
       .select({ round_number: turns.round_number })
       .from(turns)
-      .where(eq(turns.id, turnId))
+      .where(eq(turns.id, parsed.data.turnId))
       .limit(1);
     const completedTurnRound = completedTurnRow?.round_number ?? 1;
 
-    const pipelineResult = await runTurnPipeline({
-      sessionId,
-      turnId,
-      actionId,
-      playerId: parsed.data.playerId,
-      rawInput: parsed.data.text,
-    });
-
-    if (pipelineResult.kind === "pvp_defense_wait") {
-      const [sessionRowPvP] = await db
-        .select({ state_version: sessions.state_version })
-        .from(sessions)
-        .where(eq(sessions.id, sessionId))
-        .limit(1);
-      try {
-        await broadcastToSession(sessionId, "state-update", {
-          changes: pipelineResult.statePatches,
-          state_version: sessionRowPvP?.state_version ?? 0,
-          turn_id: turnId,
-          round_number: completedTurnRound,
-        });
-      } catch (err) {
-        console.error(err);
-      }
-      if (pipelineResult.consequenceEffects.length > 0) {
-        try {
-          await broadcastToSession(sessionId, "stat-change", {
-            effects: pipelineResult.consequenceEffects,
-            turn_id: turnId,
-            round_number: completedTurnRound,
-          });
-        } catch (err) {
-          console.error("[actions] stat-change broadcast failed:", err);
-        }
-      }
-      await releaseTurnLock(sessionId);
-      lockHeld = false;
-      return NextResponse.json({ actionId, turnId }, { status: 202 });
+    try {
+      await broadcastToSession(sessionId, "action-submitted", {
+        player_id: parsed.data.playerId,
+        raw_input: parsed.data.text,
+        turn_id: parsed.data.turnId,
+        round_number: completedTurnRound,
+      });
+    } catch (err) {
+      console.error(err);
     }
+
+    const pipelineResult = await resumeTurnPipelineAfterPvpDefense({
+      sessionId,
+      turnId: parsed.data.turnId,
+      defenderPlayerId: parsed.data.playerId,
+      defenseActionId: defenseAction.id,
+      defenseRawInput: parsed.data.text,
+    });
 
     for (const diceRoll of pipelineResult.diceRolls) {
       try {
@@ -196,7 +171,7 @@ export async function POST(
           total: diceRoll.total,
           result: diceRoll.result,
           context: diceRoll.context,
-          turn_id: turnId,
+          turn_id: parsed.data.turnId,
           round_number: completedTurnRound,
         });
       } catch (err) {
@@ -211,7 +186,7 @@ export async function POST(
         try {
           await broadcastToSession(sessionId, "dm-notice", {
             message: "The campaign reaches its conclusion.",
-            turn_id: turnId,
+            turn_id: parsed.data.turnId,
             round_number: completedTurnRound,
           });
         } catch (err) {
@@ -221,7 +196,7 @@ export async function POST(
           await broadcastToSession(sessionId, "state-update", {
             changes: pipelineResult.statePatches,
             state_version: stateVersion,
-            turn_id: turnId,
+            turn_id: parsed.data.turnId,
             round_number: completedTurnRound,
           });
         } catch (err) {
@@ -231,19 +206,22 @@ export async function POST(
           try {
             await broadcastToSession(sessionId, "stat-change", {
               effects: pipelineResult.consequenceEffects,
-              turn_id: turnId,
+              turn_id: parsed.data.turnId,
               round_number: completedTurnRound,
             });
           } catch (err) {
-            console.error("[actions] stat-change broadcast failed:", err);
+            console.error("[pvp-defense] stat-change broadcast failed:", err);
           }
         }
         await releaseTurnLock(sessionId);
         lockHeld = false;
-        return NextResponse.json({ actionId, turnId }, { status: 202 });
+        return NextResponse.json(
+          { actionId: defenseAction.id, turnId: parsed.data.turnId },
+          { status: 202 },
+        );
       }
 
-      const [sessionRow] = await db
+      const [sessionRow2] = await db
         .select({ state_version: sessions.state_version })
         .from(sessions)
         .where(eq(sessions.id, sessionId))
@@ -251,8 +229,8 @@ export async function POST(
       try {
         await broadcastToSession(sessionId, "state-update", {
           changes: pipelineResult.statePatches,
-          state_version: sessionRow?.state_version ?? 0,
-          turn_id: turnId,
+          state_version: sessionRow2?.state_version ?? 0,
+          turn_id: parsed.data.turnId,
           round_number: completedTurnRound,
         });
       } catch (err) {
@@ -262,16 +240,19 @@ export async function POST(
         try {
           await broadcastToSession(sessionId, "stat-change", {
             effects: pipelineResult.consequenceEffects,
-            turn_id: turnId,
+            turn_id: parsed.data.turnId,
             round_number: completedTurnRound,
           });
         } catch (err) {
-          console.error("[actions] stat-change broadcast failed:", err);
+          console.error("[pvp-defense] stat-change broadcast failed:", err);
         }
       }
       await releaseTurnLock(sessionId);
       lockHeld = false;
-      return NextResponse.json({ actionId, turnId }, { status: 202 });
+      return NextResponse.json(
+        { actionId: defenseAction.id, turnId: parsed.data.turnId },
+        { status: 202 },
+      );
     }
 
     const shouldEndSession =
@@ -284,7 +265,7 @@ export async function POST(
           scene_text: pipelineResult.narrativeEvent.scene_text,
           visible_changes: pipelineResult.narrativeEvent.visible_changes,
           next_actor: { player_id: parsed.data.playerId },
-          turn_id: turnId,
+          turn_id: parsed.data.turnId,
           round_number: completedTurnRound,
         });
       } catch (err) {
@@ -293,7 +274,7 @@ export async function POST(
       try {
         await broadcastToSession(sessionId, "dm-notice", {
           message: "The campaign reaches its conclusion.",
-          turn_id: turnId,
+          turn_id: parsed.data.turnId,
           round_number: completedTurnRound,
         });
       } catch (err) {
@@ -303,7 +284,7 @@ export async function POST(
         await broadcastToSession(sessionId, "state-update", {
           changes: pipelineResult.statePatches,
           state_version: stateVersion,
-          turn_id: turnId,
+          turn_id: parsed.data.turnId,
           round_number: completedTurnRound,
         });
       } catch (err) {
@@ -311,7 +292,10 @@ export async function POST(
       }
       await releaseTurnLock(sessionId);
       lockHeld = false;
-      return NextResponse.json({ actionId, turnId }, { status: 202 });
+      return NextResponse.json(
+        { actionId: defenseAction.id, turnId: parsed.data.turnId },
+        { status: 202 },
+      );
     }
 
     const expectedNextPlayerId = pipelineResult.narrativeEvent.next_actor_id;
@@ -320,8 +304,10 @@ export async function POST(
       await broadcastToSession(sessionId, "narration-update", {
         scene_text: pipelineResult.narrativeEvent.scene_text,
         visible_changes: pipelineResult.narrativeEvent.visible_changes,
-        next_actor: { player_id: expectedNextPlayerId ?? parsed.data.playerId },
-        turn_id: turnId,
+        next_actor: {
+          player_id: expectedNextPlayerId ?? parsed.data.playerId,
+        },
+        turn_id: parsed.data.turnId,
         round_number: completedTurnRound,
       });
     } catch (err) {
@@ -332,11 +318,11 @@ export async function POST(
       try {
         await broadcastToSession(sessionId, "stat-change", {
           effects: pipelineResult.consequenceEffects,
-          turn_id: turnId,
+          turn_id: parsed.data.turnId,
           round_number: completedTurnRound,
         });
       } catch (err) {
-        console.error("[actions] stat-change broadcast failed:", err);
+        console.error("[pvp-defense] stat-change broadcast failed:", err);
       }
     }
 
@@ -346,7 +332,7 @@ export async function POST(
       try {
         await broadcastToSession(sessionId, "dm-notice", {
           message: "The party has fallen. The adventure ends here.",
-          turn_id: turnId,
+          turn_id: parsed.data.turnId,
           round_number: completedTurnRound,
         });
       } catch (err) {
@@ -356,7 +342,7 @@ export async function POST(
         await broadcastToSession(sessionId, "state-update", {
           changes: pipelineResult.statePatches,
           state_version: stateVersion,
-          turn_id: turnId,
+          turn_id: parsed.data.turnId,
           round_number: completedTurnRound,
         });
       } catch (err) {
@@ -364,7 +350,10 @@ export async function POST(
       }
       await releaseTurnLock(sessionId);
       lockHeld = false;
-      return NextResponse.json({ actionId, turnId }, { status: 202 });
+      return NextResponse.json(
+        { actionId: defenseAction.id, turnId: parsed.data.turnId },
+        { status: 202 },
+      );
     }
 
     const [sessionAfterAdvance] = await db
@@ -376,7 +365,7 @@ export async function POST(
       await broadcastToSession(sessionId, "state-update", {
         changes: pipelineResult.statePatches,
         state_version: sessionAfterAdvance?.state_version ?? 0,
-        turn_id: turnId,
+        turn_id: parsed.data.turnId,
         round_number: completedTurnRound,
       });
     } catch (err) {
@@ -389,7 +378,7 @@ export async function POST(
         await broadcastToSession(sessionId, "scene-image-pending", {
           scene_id: sceneImageId,
           label: COPY.scenePending,
-          turn_id: turnId,
+          turn_id: parsed.data.turnId,
           round_number: completedTurnRound,
         });
       } catch (err) {
@@ -398,7 +387,6 @@ export async function POST(
       const imgPayload = pipelineResult.imageJobPayload;
       after(async () => {
         try {
-          console.log("[image-after] starting image generation for action turn");
           const budget = await assertChapterImageBudget({ sessionId });
           if (!budget.ok) {
             await broadcastToSession(sessionId, "scene-image-failed", {
@@ -414,27 +402,26 @@ export async function POST(
             characterNames: imgPayload.characterNames,
             imageHint: imgPayload.imageHint,
           });
-          console.log("[image-after] pipeline done, imageUrl:", result.imageUrl ?? "null");
           if (result.imageUrl) {
             await incrementChapterSystemImageUsage(sessionId);
             await broadcastToSession(sessionId, "scene-image-ready", {
               scene_id: sceneImageId,
               image_url: result.imageUrl,
             });
-            console.log("[image-after] broadcast scene-image-ready OK");
           } else {
             await broadcastToSession(sessionId, "scene-image-failed", {
               scene_id: sceneImageId,
             });
-            console.log("[image-after] broadcast scene-image-failed");
           }
         } catch (err) {
-          console.error("[image-after] action image failed:", err);
+          console.error("[pvp-defense] action image failed:", err);
           try {
             await broadcastToSession(sessionId, "scene-image-failed", {
               scene_id: sceneImageId,
             });
-          } catch { /* best effort */ }
+          } catch {
+            /* no-op */
+          }
         }
       });
     }
@@ -442,27 +429,11 @@ export async function POST(
     await releaseTurnLock(sessionId);
     lockHeld = false;
 
-    return NextResponse.json({ actionId, turnId }, { status: 202 });
+    return NextResponse.json(
+      { actionId: defenseAction.id, turnId: parsed.data.turnId },
+      { status: 202 },
+    );
   } catch (e) {
-    if (
-      aiTurnSparkDebited &&
-      sparkPayerUserId &&
-      sparkActionIdForRefund &&
-      isMonetizationSpendEnabled()
-    ) {
-      try {
-        await tryRefundSessionSparkDebit({
-          hostUserId: sparkPayerUserId,
-          sessionId,
-          totalAmount: SPARK_COST_AI_TEXT_TURN,
-          idempotencyKey: `refund:campaign_action:${sparkActionIdForRefund}`,
-          reason: "refund_failed_ai_turn",
-          sparkPoolUsed: sparkPoolUsedForRefund,
-        });
-      } catch (refundErr) {
-        console.error("[sparks] refund failed after pipeline error", refundErr);
-      }
-    }
     if (lockHeld) {
       try {
         await releaseTurnLock(sessionId);

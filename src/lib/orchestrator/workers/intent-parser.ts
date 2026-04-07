@@ -83,6 +83,21 @@ function extractTaggedNpcTargets(raw: string): {
   return { cleaned: cleaned.replace(/\s{2,}/g, " ").trim(), targets };
 }
 
+function extractTaggedPlayerTargets(raw: string): {
+  cleaned: string;
+  targets: Array<{ kind: "player"; id: string }>;
+} {
+  const targets: Array<{ kind: "player"; id: string }> = [];
+  const cleaned = raw.replace(
+    /\[target:player:([0-9a-fA-F-]{36})\]/gi,
+    (_full, id: string) => {
+      targets.push({ kind: "player", id: id.toLowerCase() });
+      return "";
+    },
+  );
+  return { cleaned: cleaned.replace(/\s{2,}/g, " ").trim(), targets };
+}
+
 function mergeExplicitNpcTargets(
   intent: ActionIntent,
   explicitNpcTargets: Array<{ kind: "npc"; id: string }>,
@@ -99,18 +114,40 @@ function mergeExplicitNpcTargets(
   });
 }
 
+function mergeExplicitPlayerTargets(
+  intent: ActionIntent,
+  explicitPlayerTargets: Array<{ kind: "player"; id: string }>,
+): ActionIntent {
+  if (explicitPlayerTargets.length === 0) return intent;
+  const existing = Array.isArray(intent.targets) ? [...intent.targets] : [];
+  for (const target of explicitPlayerTargets) {
+    if (existing.some((x) => x.kind === "player" && x.id === target.id)) continue;
+    existing.push({ kind: "player", id: target.id });
+  }
+  return ActionIntentSchema.parse({
+    ...intent,
+    targets: existing,
+  });
+}
+
 function buildHeuristicFallback(raw: string): ActionIntent {
-  const tagged = extractTaggedNpcTargets(raw);
-  const actionType = classifyActionHeuristic(tagged.cleaned);
-  const skill = guessStat(actionType, tagged.cleaned);
-  const needsRoll = shouldRequireRollHeuristic(actionType, tagged.cleaned);
+  const npcTagged = extractTaggedNpcTargets(raw);
+  const plTagged = extractTaggedPlayerTargets(npcTagged.cleaned);
+  const cleanedLine = plTagged.cleaned;
+  const actionType = classifyActionHeuristic(cleanedLine);
+  const skill = guessStat(actionType, cleanedLine);
+  const needsRoll = shouldRequireRollHeuristic(actionType, cleanedLine);
   const targets = [
-    ...detectTargets(tagged.cleaned),
-    ...tagged.targets,
+    ...detectTargets(cleanedLine),
+    ...npcTagged.targets,
+    ...plTagged.targets.map((t) => ({ kind: "player" as const, id: t.id })),
   ];
 
   const selfHarmAttack = targets.some(
-    (t) => t.kind === "player" && t.label === "self",
+    (t) =>
+      t.kind === "player" &&
+      "label" in t &&
+      t.label?.toLowerCase() === "self",
   );
   const contextMap: Partial<Record<ActionIntent["action_type"], string>> = {
     attack: `Attack roll${selfHarmAttack ? " (self-harm)" : ""}`,
@@ -129,7 +166,7 @@ function buildHeuristicFallback(raw: string): ActionIntent {
     skill_or_save: skill,
     requires_roll: needsRoll,
     confidence: 0.6,
-    suggested_roll_context: contextMap[actionType] ?? tagged.cleaned.slice(0, 200),
+    suggested_roll_context: contextMap[actionType] ?? cleanedLine.slice(0, 200),
   });
 }
 
@@ -137,7 +174,7 @@ const INTENT_SYSTEM = `You are the intent parser for a collaborative tabletop RP
 
 Output JSON with these fields:
 - "action_type": one of "attack", "cast_spell", "move", "talk", "inspect", "use_item", "defend", "heal", "other"
-- "targets": array of { "kind": "npc"|"player"|"environment", "label": "target name" } (empty if no target)
+- "targets": array of { "kind": "npc"|"player"|"environment", "label"?: string, "id"?: string } (empty if no target). Optional tags in text: [target:npc:UUID], [target:player:UUID].
 - "skill_or_save": the ability most relevant: "str", "dex", "con", "int", "wis", "cha", "none"
 - "requires_roll": boolean — true unless the action is purely social/narrative with no uncertainty
 - "suggested_roll_context": short description of what the roll represents (e.g. "Attack roll against the goblin")
@@ -164,17 +201,27 @@ export async function parseIntent(params: {
   characterName: string;
   characterClass: string;
   recentEvents: string[];
+  /** Hint: betrayer confrontation open — bias toward player targets when attacking another hero. */
+  betrayalConfrontationActive?: boolean;
   provider?: AIProvider;
 }): Promise<OrchestrationStepResult<ActionIntent>> {
   const raw = params.rawInput.trim();
-  const tagged = extractTaggedNpcTargets(raw);
+  const npcTagged = extractTaggedNpcTargets(raw);
+  const plTagged = extractTaggedPlayerTargets(npcTagged.cleaned);
+  const cleanedAction = plTagged.cleaned;
   const provider = params.provider ?? getAIProvider();
 
   const userPrompt = JSON.stringify({
-    player_action: tagged.cleaned,
+    player_action: cleanedAction,
     character_name: params.characterName,
     character_class: params.characterClass,
     recent_context: params.recentEvents.slice(-2).join("\n").slice(0, 1500),
+    ...(params.betrayalConfrontationActive
+      ? {
+          betrayal_note:
+            "Betrayal confrontation is live. If the hero clearly attacks, shoves, grapples, or casts hostile magic at another party member, add a target with kind \"player\" and that character's name as label (or id if known). Do not target self unless the text says so.",
+        }
+      : {}),
   });
 
   const result = await runOrchestrationStep({
@@ -200,7 +247,10 @@ export async function parseIntent(params: {
       "Low confidence classification — consider rephrasing";
   }
 
-  result.data = mergeExplicitNpcTargets(result.data, tagged.targets);
+  result.data = mergeExplicitPlayerTargets(
+    mergeExplicitNpcTargets(result.data, npcTagged.targets),
+    plTagged.targets,
+  );
   if (result.data.rephrase_reason === null) {
     result.data = ActionIntentSchema.parse({
       ...result.data,
