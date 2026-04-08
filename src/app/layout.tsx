@@ -52,8 +52,10 @@ export const metadata: Metadata = {
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
-  maximumScale: 1,
-  userScalable: false,
+  /** Allow pinch-zoom on phones (accessibility + odd small-viewport cases). */
+  maximumScale: 5,
+  userScalable: true,
+  viewportFit: "cover",
   themeColor: metaBrand === "playromana" ? "#131313" : "#0c0a14",
 };
 
@@ -76,7 +78,7 @@ export default function RootLayout({
           rel="stylesheet"
         />
       </head>
-      <body>
+      <body className="w-full max-w-[100vw] overflow-x-hidden min-h-dvh">
         <AuthProvider>
           <AuthGate>{children}</AuthGate>
           <ToastContainer />

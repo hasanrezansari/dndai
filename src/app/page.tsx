@@ -366,8 +366,8 @@ export default function Home() {
 
   if (authStatus === "loading") {
     return (
-      <main className="min-h-dvh flex flex-col items-center px-6 pt-16 pb-8 bg-[var(--color-obsidian)]">
-        <div className="flex flex-col items-center gap-[var(--void-gap-lg)] w-full max-w-md">
+      <main className="min-h-dvh flex w-full min-w-0 max-w-[100vw] flex-col items-center box-border px-[max(1.5rem,env(safe-area-inset-left))] pr-[max(1.5rem,env(safe-area-inset-right))] pt-[calc(4rem+env(safe-area-inset-top))] pb-[calc(2rem+env(safe-area-inset-bottom))] bg-[var(--color-obsidian)]">
+        <div className="flex min-w-0 w-full max-w-md flex-col items-center gap-[var(--void-gap-lg)]">
           <header className="text-center flex flex-col gap-3 mt-6">
             <h1 className="text-fantasy text-4xl font-bold text-[var(--color-gold-rare)] tracking-[0.15em] uppercase">
               {getBrandName(brand)}
@@ -390,7 +390,7 @@ export default function Home() {
   if (brand === "playromana") {
     return (
       <main
-        className="relative min-h-dvh flex flex-col items-center px-6 pb-8 bg-[var(--color-obsidian)]"
+        className="relative min-h-dvh flex w-full min-w-0 max-w-[100vw] flex-col items-center box-border px-[max(1.5rem,env(safe-area-inset-left))] pr-[max(1.5rem,env(safe-area-inset-right))] pt-[env(safe-area-inset-top)] pb-[calc(2rem+env(safe-area-inset-bottom))] bg-[var(--color-obsidian)]"
         aria-busy={createLoading}
       >
         {createLoading ? (
@@ -426,7 +426,7 @@ export default function Home() {
             </div>
           </div>
         ) : null}
-        <div className="flex flex-col gap-[var(--void-gap-lg)] w-full max-w-md pt-10">
+        <div className="flex min-w-0 w-full max-w-md flex-col gap-[var(--void-gap-lg)] pt-10">
           <header className="text-center flex flex-col gap-2">
             <h1 className="text-fantasy text-4xl font-black text-[var(--color-gold-rare)] tracking-tight uppercase">
               {getBrandName(brand)}
@@ -732,12 +732,12 @@ export default function Home() {
   }
 
   return (
-    <main className="relative z-[1] min-h-dvh flex flex-col items-center px-5 pb-[calc(2rem+env(safe-area-inset-bottom))]">
+    <main className="relative z-[1] min-h-dvh flex w-full min-w-0 max-w-[100vw] flex-col items-center box-border pl-[max(1.25rem,env(safe-area-inset-left))] pr-[max(1.25rem,env(safe-area-inset-right))] pt-[env(safe-area-inset-top)] pb-[calc(2rem+env(safe-area-inset-bottom))]">
       <div
         className="home-atmosphere-layer pointer-events-none fixed inset-0 -z-10 min-h-dvh bg-[var(--color-obsidian)]"
         aria-hidden
       />
-      <div className="flex flex-col gap-[var(--void-gap)] w-full max-w-lg pt-2 sm:pt-4">
+      <div className="flex min-w-0 w-full max-w-lg flex-col gap-[var(--void-gap)] pt-2 sm:pt-4">
         {/* Hero — brand-forward, minimal copy; detail in “How it works” */}
         <header className="relative overflow-hidden rounded-[var(--radius-card)] border border-[var(--border-ui)] bg-[var(--surface-container)]/45 backdrop-blur-[12px] px-4 py-6 sm:px-8 sm:py-9 shadow-[0_20px_60px_rgba(0,0,0,0.35)]">
           <div className="pointer-events-none absolute inset-0 opacity-90">
@@ -757,7 +757,7 @@ export default function Home() {
           ) : null}
 
           <div className="relative z-[1] flex flex-col items-center text-center gap-4 sm:gap-6">
-            <h1 className="text-[clamp(2.75rem,12vw,5.5rem)] font-black leading-[0.95] tracking-[-0.02em] text-[var(--color-gold-rare)] drop-shadow-[0_2px_24px_rgba(0,0,0,0.45)]">
+            <h1 className="w-full max-w-full px-1 text-[clamp(2rem,9vw,5.5rem)] font-black leading-[0.95] tracking-[-0.02em] text-[var(--color-gold-rare)] drop-shadow-[0_2px_24px_rgba(0,0,0,0.45)] break-words hyphens-auto">
               {getBrandName(brand)}
             </h1>
             <p className="max-w-[22rem] text-sm sm:text-base text-[var(--color-silver-dim)] leading-snug font-[family-name:var(--font-gameplay)] px-2">
@@ -877,7 +877,7 @@ export default function Home() {
           </div>
 
           <div
-            className="-mx-1 flex gap-3 overflow-x-auto pb-2 pt-1 snap-x snap-mandatory scroll-pl-1 scroll-pr-1 sm:mx-0 sm:grid sm:grid-cols-3 sm:gap-4 sm:overflow-visible sm:pb-0 sm:pt-0"
+            className="w-full min-w-0 -mx-1 flex gap-3 overflow-x-auto overflow-y-hidden pb-2 pt-1 snap-x snap-mandatory scroll-pl-1 scroll-pr-1 [-webkit-overflow-scrolling:touch] sm:mx-0 sm:grid sm:grid-cols-3 sm:gap-4 sm:overflow-visible sm:pb-0 sm:pt-0"
             role="list"
             aria-label={COPY.landing.modesTitle}
           >
@@ -1235,15 +1235,15 @@ export default function Home() {
               <label className="block text-[10px] font-bold uppercase tracking-[0.2em] text-[var(--outline)] mb-4">
                 {COPY.landing.partyLabel}
               </label>
-              <div className="flex items-center bg-[var(--color-midnight)] p-1.5 rounded-[var(--radius-card)] border border-[var(--border-ui)]">
+              <div className="flex w-full min-w-0 items-center overflow-hidden bg-[var(--color-midnight)] p-1.5 rounded-[var(--radius-card)] border border-[var(--border-ui)]">
                 {PARTY_SIZES.map((n) => (
                   <button
                     key={n}
                     type="button"
                     onClick={() => setMaxPlayers(n)}
-                    className={`flex-1 min-h-[44px] py-3 font-black text-sm transition-all duration-200 rounded-[var(--radius-card)] ${
+                    className={`flex-1 min-w-0 min-h-[44px] py-2.5 sm:py-3 font-black text-xs sm:text-sm transition-all duration-200 rounded-[var(--radius-card)] ${
                       maxPlayers === n
-                        ? "bg-[var(--color-gold-rare)] text-[var(--color-obsidian)] shadow-lg shadow-[rgba(242,202,80,0.2)] scale-105 z-10"
+                        ? "bg-[var(--color-gold-rare)] text-[var(--color-obsidian)] shadow-lg shadow-[rgba(242,202,80,0.2)] z-10"
                         : "text-[var(--outline)] hover:text-[var(--color-silver-muted)]"
                     }`}
                   >
