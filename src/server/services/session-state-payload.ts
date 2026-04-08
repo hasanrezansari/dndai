@@ -50,6 +50,33 @@ import { loadPvpDefenseStage } from "@/server/services/pvp-defense-service";
 /** Cap scene_snapshots loaded per hydrate (feed pairing + latest hero image). */
 export const SCENE_SNAPSHOT_FEED_LIMIT = 100;
 
+/**
+ * Columns for hydrate / scene-status — **excludes `image_url`** so Postgres never
+ * detoasts multi-MB `data:` payloads for up to {@link SCENE_SNAPSHOT_FEED_LIMIT} rows.
+ * Serving URL is always `/api/sessions/.../scene-image/:id` when `image_status === "ready"`.
+ */
+export const sceneSnapshotFeedColumns = {
+  id: sceneSnapshots.id,
+  session_id: sceneSnapshots.session_id,
+  round_number: sceneSnapshots.round_number,
+  state_version: sceneSnapshots.state_version,
+  summary: sceneSnapshots.summary,
+  image_status: sceneSnapshots.image_status,
+  image_prompt: sceneSnapshots.image_prompt,
+  created_at: sceneSnapshots.created_at,
+} as const;
+
+export type SceneSnapshotFeedRow = {
+  id: string;
+  session_id: string;
+  round_number: number;
+  state_version: number;
+  summary: string;
+  image_status: string;
+  image_prompt: string | null;
+  created_at: Date;
+};
+
 /** Recent actions joined to turns for the session feed (chronicle). */
 const FEED_ACTIONS_LIMIT = 90;
 
@@ -267,13 +294,10 @@ function rawToStatEffects(
 
 function sceneImageServingUrlForSession(
   sessionId: string,
-  snap: typeof sceneSnapshots.$inferSelect,
+  snap: Pick<SceneSnapshotFeedRow, "id" | "image_status">,
 ): string | undefined {
-  const raw = snap.image_url;
-  if (!raw?.trim()) return undefined;
-  return raw.startsWith("data:")
-    ? `/api/sessions/${sessionId}/scene-image/${snap.id}`
-    : raw;
+  if (snap.image_status !== "ready") return undefined;
+  return `/api/sessions/${sessionId}/scene-image/${snap.id}`;
 }
 
 export type SessionSceneStatusPayload = {
@@ -291,20 +315,19 @@ export type SessionSceneStatusPayload = {
 function deriveSceneDisplaySlice(args: {
   sessionRow: typeof sessions.$inferSelect;
   sessionId: string;
-  latestScene: typeof sceneSnapshots.$inferSelect | undefined;
+  latestScene: SceneSnapshotFeedRow | undefined;
   latestNarrativeText: string | null;
 }): Omit<SessionSceneStatusPayload, "stateVersion"> {
   const { sessionRow, sessionId, latestScene, latestNarrativeText } = args;
   let narrativeText = latestNarrativeText;
-  const rawSceneImage = latestScene?.image_url ?? null;
-  let sceneImage =
-    rawSceneImage?.startsWith("data:") && latestScene
+  let sceneImage: string | null =
+    latestScene && latestScene.image_status === "ready"
       ? `/api/sessions/${sessionId}/scene-image/${latestScene.id}`
-      : rawSceneImage;
+      : null;
   const sceneStatusPending =
     latestScene?.image_status === "pending" ||
     latestScene?.image_status === "generating";
-  let scenePending = Boolean(rawSceneImage) ? false : sceneStatusPending;
+  let scenePending = Boolean(sceneImage) ? false : sceneStatusPending;
 
   let sceneTitle =
     sessionRow.campaign_title?.trim() ||
@@ -395,7 +418,7 @@ export async function loadSessionSceneStatus(
   }
 
   const [latestScene] = await db
-    .select()
+    .select(sceneSnapshotFeedColumns)
     .from(sceneSnapshots)
     .where(eq(sceneSnapshots.session_id, sessionId))
     .orderBy(desc(sceneSnapshots.created_at))
@@ -618,13 +641,13 @@ export async function loadSessionStatePayload(
     .limit(20);
 
   const snapshotRowsDesc = await db
-    .select()
+    .select(sceneSnapshotFeedColumns)
     .from(sceneSnapshots)
     .where(eq(sceneSnapshots.session_id, sessionId))
     .orderBy(desc(sceneSnapshots.created_at))
     .limit(SCENE_SNAPSHOT_FEED_LIMIT);
 
-  const snapshotRows = [...snapshotRowsDesc].reverse();
+  const snapshotRows: SceneSnapshotFeedRow[] = [...snapshotRowsDesc].reverse();
 
   const latestScene =
     snapshotRows.length > 0
@@ -634,10 +657,7 @@ export async function loadSessionStatePayload(
   const chronological = [...narrativeRows].reverse();
   const narrationFeed: FeedEntry[] = chronological.map(({ ev, turn_round }) => {
     const snap = snapshotRows.find(
-      (s) =>
-        s.created_at >= ev.created_at &&
-        typeof s.image_url === "string" &&
-        s.image_url.trim().length > 0,
+      (s) => s.created_at >= ev.created_at && s.image_status === "ready",
     );
     const imageUrl = snap
       ? sceneImageServingUrlForSession(sessionId, snap)
@@ -752,7 +772,7 @@ export async function loadSessionStatePayload(
     latestScene,
     latestNarrativeText: latestNarrative?.ev.scene_text ?? null,
   });
-  let { narrativeText, sceneImage, scenePending, sceneTitle } = sceneSlice;
+  const { narrativeText, sceneImage, scenePending, sceneTitle } = sceneSlice;
 
   const [dmAwaitingRow] = await db
     .select({

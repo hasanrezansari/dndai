@@ -6,17 +6,42 @@ import { getDisplayTokenFromRequest, verifyDisplayToken } from "@/lib/display-to
 import { db } from "@/lib/db";
 import { sceneSnapshots } from "@/lib/db/schema";
 
-const ALLOWED_IMAGE_HOSTS = new Set([
+const DEFAULT_ALLOWED_IMAGE_HOSTS = [
   "fal.media",
   "v3.fal.media",
   "oaidalleapiprodscus.blob.core.windows.net",
   "replicate.delivery",
-]);
+] as const;
+
+function buildAllowedImageHostSet(): Set<string> {
+  const set = new Set<string>(DEFAULT_ALLOWED_IMAGE_HOSTS);
+  const extra = process.env.SCENE_IMAGE_EXTRA_REDIRECT_HOSTS?.trim();
+  if (extra) {
+    for (const h of extra.split(",")) {
+      const t = h.trim().toLowerCase();
+      if (t) set.add(t);
+    }
+  }
+  const r2Base = process.env.R2_PUBLIC_BASE_URL?.trim();
+  if (r2Base) {
+    try {
+      set.add(new URL(r2Base).hostname.toLowerCase());
+    } catch {
+      /* ignore */
+    }
+  }
+  return set;
+}
+
+const ALLOWED_IMAGE_HOSTS = buildAllowedImageHostSet();
 
 function isAllowedRedirectUrl(url: string): boolean {
   try {
     const parsed = new URL(url);
-    return ALLOWED_IMAGE_HOSTS.has(parsed.hostname) && parsed.protocol === "https:";
+    return (
+      ALLOWED_IMAGE_HOSTS.has(parsed.hostname.toLowerCase()) &&
+      parsed.protocol === "https:"
+    );
   } catch {
     return false;
   }

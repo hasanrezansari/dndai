@@ -1,3 +1,5 @@
+import { randomUUID } from "node:crypto";
+
 import { desc, eq } from "drizzle-orm";
 
 import { generateSceneImage } from "@/lib/ai/image-provider";
@@ -17,6 +19,10 @@ import {
 } from "@/lib/db/schema";
 import { logTrace } from "@/lib/orchestrator/trace";
 import { ClassProfileSchema } from "@/lib/schemas/domain";
+import {
+  isSceneImageObjectStorageConfigured,
+  uploadSceneImageBytes,
+} from "@/lib/storage/scene-image-storage";
 
 const STYLE_PROFILES = {
   /** Sword-and-sorcery / mythic adventure keywords only — not the global default. */
@@ -509,19 +515,37 @@ export async function runImagePipeline(params: {
     sceneContext.trim().slice(0, 4000) ||
     narrativeText.slice(0, 500);
 
-  const dataUrl = `data:image/png;base64,${base64}`;
+  const snapId = randomUUID();
+  const imageBytes = Buffer.from(base64, "base64");
+  let imageUrlForRow: string;
+  if (isSceneImageObjectStorageConfigured()) {
+    try {
+      const key = `sessions/${sessionId}/scenes/${snapId}.png`;
+      imageUrlForRow = await uploadSceneImageBytes({
+        key,
+        body: imageBytes,
+        contentType: "image/png",
+      });
+    } catch (err) {
+      console.error("[image] R2 upload failed, falling back to inline data URL:", err);
+      imageUrlForRow = `data:image/png;base64,${base64}`;
+    }
+  } else {
+    imageUrlForRow = `data:image/png;base64,${base64}`;
+  }
 
   try {
     const [snap] = await db
       .insert(sceneSnapshots)
       .values({
+        id: snapId,
         session_id: sessionId,
         round_number: sessionRow.current_round,
         state_version: sessionRow.state_version,
         summary,
         image_status: "ready",
         image_prompt: composedPrompt,
-        image_url: dataUrl,
+        image_url: imageUrlForRow,
       })
       .returning();
 
