@@ -45,8 +45,7 @@ function buildFallbackChain(primary: string): Array<{ name: string; provider: AI
     strictPrimary === "true" ||
     strictPrimary === "yes" ||
     strictPrimary === "on";
-  const shouldLockToPrimary =
-    strictRequested || (primary === "openrouter" && !allowFallbacks);
+  const shouldLockToPrimary = strictRequested;
 
   function add(name: string) {
     if (added.has(name)) return;

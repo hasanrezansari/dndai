@@ -141,6 +141,72 @@ export type SessionPremiseForClassGen = {
   art_direction?: string;
 };
 
+export class ClassProfileNormalizationError extends Error {
+  constructor(message: string, options?: { cause?: unknown }) {
+    super(message);
+    this.name = "ClassProfileNormalizationError";
+    if (options?.cause !== undefined) {
+      (this as Error & { cause?: unknown }).cause = options.cause;
+    }
+  }
+}
+
+function rebalancePowerBudget<T extends { power_cost: number }>(
+  items: T[],
+  maxBudget: number,
+  minPerItem: number,
+): T[] {
+  const next = items.map((item) => ({ ...item }));
+  const total = () => next.reduce((sum, item) => sum + item.power_cost, 0);
+  while (total() > maxBudget) {
+    let reduceIdx = -1;
+    let highest = minPerItem;
+    for (let i = 0; i < next.length; i++) {
+      if (next[i]!.power_cost > highest) {
+        highest = next[i]!.power_cost;
+        reduceIdx = i;
+      }
+    }
+    if (reduceIdx === -1) break;
+    next[reduceIdx] = {
+      ...next[reduceIdx]!,
+      power_cost: next[reduceIdx]!.power_cost - 1,
+    };
+  }
+  return next;
+}
+
+function rebalancePositiveStatBiasBudget(
+  statBias: {
+    str: number;
+    dex: number;
+    con: number;
+    int: number;
+    wis: number;
+    cha: number;
+  },
+  maxPositiveBudget: number,
+) {
+  const next = { ...statBias };
+  const positiveTotal = () =>
+    Object.values(next).reduce((sum, value) => sum + Math.max(0, value), 0);
+  const keys: Array<keyof typeof next> = ["str", "dex", "con", "int", "wis", "cha"];
+
+  while (positiveTotal() > maxPositiveBudget) {
+    let reduceKey: keyof typeof next | null = null;
+    let highest = 0;
+    for (const key of keys) {
+      if (next[key] > highest) {
+        highest = next[key];
+        reduceKey = key;
+      }
+    }
+    if (!reduceKey || next[reduceKey] <= 0) break;
+    next[reduceKey] = next[reduceKey] - 1;
+  }
+  return next;
+}
+
 export async function generateCustomClassProfileFromAI(params: {
   concept: string;
   rolePreference?: z.infer<typeof ClassProfileRoleSchema>;
@@ -258,20 +324,10 @@ Balance requirements:
     });
   }
 
-  return ClassProfileSchema.parse({
-    source: "custom",
-    concept_prompt: params.concept,
-    display_name: (
-      data.display_name ??
-      data.name ??
-      data.class_name ??
-      data.title ??
-      params.concept
-    ).trim().slice(0, 40),
-    fantasy: (data.fantasy ?? data.description ?? params.concept).trim().slice(0, 180),
-    combat_role: role,
-    resource_model: resource,
-    stat_bias: {
+  const balancedAbilities = rebalancePowerBudget(abilities, 10, 1);
+  const balancedStartingGear = rebalancePowerBudget(startingGear, 7, 1);
+  const balancedStatBias = rebalancePositiveStatBiasBudget(
+    {
       str: clampInt(data.stat_bias?.str, -2, 3, 0),
       dex: clampInt(data.stat_bias?.dex, -2, 3, 0),
       con: clampInt(data.stat_bias?.con, -2, 3, 0),
@@ -279,9 +335,36 @@ Balance requirements:
       wis: clampInt(data.stat_bias?.wis, -2, 3, 0),
       cha: clampInt(data.stat_bias?.cha, -2, 3, 0),
     },
-    abilities,
-    starting_gear: startingGear,
-    visual_tags: normalizeVisualTags(data.visual_tags, params.concept, role),
-  });
+    5,
+  );
+
+  try {
+    return ClassProfileSchema.parse({
+      source: "custom",
+      concept_prompt: params.concept,
+      display_name: (
+        data.display_name ??
+        data.name ??
+        data.class_name ??
+        data.title ??
+        params.concept
+      ).trim().slice(0, 40),
+      fantasy: (data.fantasy ?? data.description ?? params.concept).trim().slice(0, 180),
+      combat_role: role,
+      resource_model: resource,
+      stat_bias: balancedStatBias,
+      abilities: balancedAbilities,
+      starting_gear: balancedStartingGear,
+      visual_tags: normalizeVisualTags(data.visual_tags, params.concept, role),
+    });
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      throw new ClassProfileNormalizationError(
+        "Generated class failed schema normalization",
+        { cause: error },
+      );
+    }
+    throw error;
+  }
 }
 

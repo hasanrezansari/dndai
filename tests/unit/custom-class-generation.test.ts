@@ -5,7 +5,10 @@ vi.mock("@/lib/ai", () => ({
 }));
 
 import { getAIProvider } from "@/lib/ai";
-import { generateCustomClassProfileFromAI } from "@/server/services/custom-class-generation-service";
+import {
+  ClassProfileNormalizationError,
+  generateCustomClassProfileFromAI,
+} from "@/server/services/custom-class-generation-service";
 
 describe("custom class generation is AI-first", () => {
   beforeEach(() => {
@@ -64,6 +67,85 @@ describe("custom class generation is AI-first", () => {
         concept: "electro monk",
       }),
     ).rejects.toThrow("timeout");
+  });
+
+  it("rebalances over-budget abilities, gear, and stat bias before parse", async () => {
+    const generateStructured = vi.fn().mockResolvedValue({
+      data: {
+        display_name: "Overclock Vanguard",
+        fantasy: "A relentless combat specialist.",
+        combat_role: "frontline",
+        resource_model: "stamina",
+        stat_bias: { str: 3, dex: 3, con: 3, int: 0, wis: 0, cha: 0 },
+        abilities: [
+          { name: "A", type: "active", effect_kind: "damage", resource_cost: 1, cooldown: 1, power_cost: 6 },
+          { name: "B", type: "active", effect_kind: "damage", resource_cost: 1, cooldown: 1, power_cost: 6 },
+          { name: "C", type: "passive", effect_kind: "buff", resource_cost: 0, cooldown: 0, power_cost: 6 },
+        ],
+        starting_gear: [
+          { name: "G1", type: "weapon", power_cost: 4 },
+          { name: "G2", type: "armor", power_cost: 4 },
+          { name: "G3", type: "tool", power_cost: 4 },
+        ],
+        visual_tags: ["vanguard", "metal"],
+      },
+      usage: { inputTokens: 1, outputTokens: 1, model: "probe" },
+    });
+
+    vi.mocked(getAIProvider).mockReturnValue({
+      generateStructured,
+      generateText: vi.fn(),
+    });
+
+    const profile = await generateCustomClassProfileFromAI({
+      concept: "frontline overclock bruiser",
+      rolePreference: "frontline",
+    });
+
+    const abilityBudget = profile.abilities.reduce((sum, ability) => sum + ability.power_cost, 0);
+    const gearBudget = profile.starting_gear.reduce((sum, gear) => sum + gear.power_cost, 0);
+    const statBudget = Object.values(profile.stat_bias).reduce(
+      (sum, value) => sum + Math.max(0, value),
+      0,
+    );
+
+    expect(abilityBudget).toBeLessThanOrEqual(10);
+    expect(gearBudget).toBeLessThanOrEqual(7);
+    expect(statBudget).toBeLessThanOrEqual(5);
+  });
+
+  it("wraps post-normalization schema failures with ClassProfileNormalizationError", async () => {
+    vi.mocked(getAIProvider).mockReturnValue({
+      generateStructured: vi.fn().mockResolvedValue({
+        data: {
+          display_name: "   ",
+          fantasy: "ok",
+          combat_role: "support",
+          resource_model: "focus",
+          stat_bias: { str: 0, dex: 0, con: 0, int: 0, wis: 0, cha: 0 },
+          abilities: [
+            { name: "A", type: "active", effect_kind: "heal", resource_cost: 1, cooldown: 1, power_cost: 4 },
+            { name: "B", type: "active", effect_kind: "buff", resource_cost: 1, cooldown: 1, power_cost: 3 },
+            { name: "C", type: "passive", effect_kind: "utility", resource_cost: 0, cooldown: 0, power_cost: 2 },
+          ],
+          starting_gear: [
+            { name: "G1", type: "tool", power_cost: 3 },
+            { name: "G2", type: "armor", power_cost: 2 },
+            { name: "G3", type: "focus", power_cost: 2 },
+          ],
+          visual_tags: ["support"],
+        },
+        usage: { inputTokens: 1, outputTokens: 1, model: "probe" },
+      }),
+      generateText: vi.fn(),
+    });
+
+    await expect(
+      generateCustomClassProfileFromAI({
+        concept: "field medic",
+        rolePreference: "support",
+      }),
+    ).rejects.toBeInstanceOf(ClassProfileNormalizationError);
   });
 });
 

@@ -17,7 +17,10 @@ import {
   tryCreditSparks,
   tryDebitSparks,
 } from "@/server/services/spark-economy-service";
-import { generateCustomClassProfileFromAI } from "@/server/services/custom-class-generation-service";
+import {
+  ClassProfileNormalizationError,
+  generateCustomClassProfileFromAI,
+} from "@/server/services/custom-class-generation-service";
 import { buildPremiseRandomConcept } from "@/server/services/premise-random-concept";
 
 const GenerateClassBodySchema = z
@@ -199,6 +202,10 @@ export async function POST(request: NextRequest) {
       throw genErr;
     }
   } catch (e) {
+    if (e instanceof ClassProfileNormalizationError) {
+      console.error("[class-gen] schema_normalization_failure", e);
+      return apiError("Class generation failed. Please try again.", 500);
+    }
     if (e instanceof Error) {
       const msg = e.message.toLowerCase();
       if (
@@ -206,9 +213,7 @@ export async function POST(request: NextRequest) {
         msg.includes("429") ||
         msg.includes("quota") ||
         msg.includes("credit balance is too low") ||
-        msg.includes("insufficient credits") ||
-        msg.includes("zoderror") ||
-        msg.includes("invalid input")
+        msg.includes("insufficient credits")
       ) {
         return apiError("Class generation is temporarily unavailable. Try again.", 503);
       }
