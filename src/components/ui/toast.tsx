@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useCallback } from "react";
 import { create } from "zustand";
 
 export interface Toast {
@@ -47,9 +48,9 @@ export function useToast(): {
   dismiss: (id: string) => void;
 } {
   const push = useToastStore((s) => s.push);
-  const dismiss = useToastStore((s) => s.dismiss);
-  return {
-    toast: (message, type = "info", options) => {
+  const dismissStore = useToastStore((s) => s.dismiss);
+  const toast = useCallback(
+    (message: string, type: Toast["type"] = "info", options?: ToastOptions) => {
       push({
         message,
         type,
@@ -57,8 +58,10 @@ export function useToast(): {
         action: options?.action,
       });
     },
-    dismiss,
-  };
+    [push],
+  );
+  const dismiss = useCallback((id: string) => dismissStore(id), [dismissStore]);
+  return { toast, dismiss };
 }
 
 function toastAccent(type: Toast["type"]): string {
