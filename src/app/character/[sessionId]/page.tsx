@@ -277,6 +277,7 @@ export default function CharacterCreationPage() {
   }
 
   async function handleGenerateClass() {
+    if (classGenLoading) return;
     if (!CUSTOM_CLASSES_ENABLED) {
       setError("Custom classes are currently disabled.");
       return;
@@ -330,6 +331,7 @@ export default function CharacterCreationPage() {
   }
 
   async function handleRandomFromPremise() {
+    if (classGenLoading) return;
     if (!CUSTOM_CLASSES_ENABLED) {
       setError("Custom classes are currently disabled.");
       return;

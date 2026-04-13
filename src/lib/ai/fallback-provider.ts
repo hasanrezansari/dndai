@@ -19,6 +19,7 @@ export class FallbackProvider implements AIProvider {
     temperature?: number;
   }): Promise<{ data: T; usage: TokenUsage }> {
     let lastError: unknown;
+    const attemptSummaries: string[] = [];
 
     for (const { name, provider } of this.providers) {
       try {
@@ -30,6 +31,9 @@ export class FallbackProvider implements AIProvider {
           msg.includes("quota") ||
           msg.includes("rate") ||
           msg.includes("RESOURCE_EXHAUSTED");
+        attemptSummaries.push(
+          `${name}${isRateLimit ? "[rl]" : ""}:${msg.slice(0, 200)}`,
+        );
         console.warn(
           `[fallback-provider] ${name} failed${isRateLimit ? " (rate limited)" : ""}: ${msg.slice(0, 120)}`,
         );
@@ -37,7 +41,10 @@ export class FallbackProvider implements AIProvider {
       }
     }
 
-    throw lastError instanceof Error ? lastError : new Error(String(lastError));
+    const chainMsg = `AI fallback exhausted (${this.providers.map((p) => p.name).join(" → ")}). Attempts: ${attemptSummaries.join(" || ")}`;
+    const err = new Error(chainMsg);
+    (err as Error & { cause?: unknown }).cause = lastError;
+    throw err;
   }
 
   async generateText(params: {
@@ -48,12 +55,14 @@ export class FallbackProvider implements AIProvider {
     temperature?: number;
   }): Promise<{ text: string; usage: TokenUsage }> {
     let lastError: unknown;
+    const attemptSummaries: string[] = [];
 
     for (const { name, provider } of this.providers) {
       try {
         return await provider.generateText(params);
       } catch (e) {
         const msg = e instanceof Error ? e.message : String(e);
+        attemptSummaries.push(`${name}:${msg.slice(0, 200)}`);
         console.warn(
           `[fallback-provider] ${name} generateText failed: ${msg.slice(0, 120)}`,
         );
@@ -61,6 +70,9 @@ export class FallbackProvider implements AIProvider {
       }
     }
 
-    throw lastError instanceof Error ? lastError : new Error(String(lastError));
+    const chainMsg = `AI fallback exhausted (${this.providers.map((p) => p.name).join(" → ")}). Attempts: ${attemptSummaries.join(" || ")}`;
+    const err = new Error(chainMsg);
+    (err as Error & { cause?: unknown }).cause = lastError;
+    throw err;
   }
 }

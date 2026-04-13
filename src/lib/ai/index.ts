@@ -35,11 +35,15 @@ function buildFallbackChain(primary: string): Array<{ name: string; provider: AI
   const chain: Array<{ name: string; provider: AIProvider }> = [];
   const strictPrimary = (process.env.AI_PROVIDER_STRICT ?? "").trim().toLowerCase();
   const allowFallbacksRaw = (process.env.AI_ALLOW_FALLBACKS ?? "").trim().toLowerCase();
-  const allowFallbacks =
+  const allowFallbacksExplicit =
     allowFallbacksRaw === "1" ||
     allowFallbacksRaw === "true" ||
     allowFallbacksRaw === "yes" ||
     allowFallbacksRaw === "on";
+  const hasOpenRouterKey = Boolean(process.env.OPENROUTER_API_KEY?.trim());
+  // With OpenRouter configured, extra providers (OpenAI, etc.) are off unless AI_ALLOW_FALLBACKS=1.
+  // Otherwise a dead OPENAI_API_KEY causes 429 noise and latency after transient OR failures.
+  const appendKeyBasedFallbacks = allowFallbacksExplicit || !hasOpenRouterKey;
   const strictRequested =
     strictPrimary === "1" ||
     strictPrimary === "true" ||
@@ -60,18 +64,19 @@ function buildFallbackChain(primary: string): Array<{ name: string; provider: AI
 
   // OpenRouter's free router (27 models, auto-routing) is the most
   // reliable free option, so always try it first when available.
-  if (process.env.OPENROUTER_API_KEY) add("openrouter");
+  if (hasOpenRouterKey) add("openrouter");
 
   add(primary);
 
-  const keyToProvider: Array<[string, string]> = [
-    ["GEMINI_API_KEY", "gemini"],
-    ["OPENAI_API_KEY", "openai"],
-    ["ANTHROPIC_API_KEY", "anthropic"],
-  ];
-
-  for (const [envKey, providerName] of keyToProvider) {
-    if (process.env[envKey]) add(providerName);
+  if (appendKeyBasedFallbacks) {
+    const keyToProvider: Array<[string, string]> = [
+      ["GEMINI_API_KEY", "gemini"],
+      ["OPENAI_API_KEY", "openai"],
+      ["ANTHROPIC_API_KEY", "anthropic"],
+    ];
+    for (const [envKey, providerName] of keyToProvider) {
+      if (process.env[envKey]) add(providerName);
+    }
   }
 
   return chain;

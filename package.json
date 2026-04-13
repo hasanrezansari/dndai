@@ -11,7 +11,7 @@
     "test:watch": "vitest",
     "db:generate": "drizzle-kit generate",
     "db:seed:worlds": "tsx --tsconfig tsconfig.json scripts/seed-published-worlds-roma.ts",
-    "db:migrate": "drizzle-kit migrate",
+    "db:migrate": "node scripts/db-migrate.cjs",
     "db:reset": "node scripts/supabase-db-reset.cjs",
     "db:push": "drizzle-kit push",
     "db:studio": "drizzle-kit studio",

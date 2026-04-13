@@ -1,9 +1,18 @@
 import type { AIProvider, ModelTier, TokenUsage, ZodSchema } from "@/lib/ai/types";
 
-const MODEL_MAP = {
-  heavy: "google/gemini-2.0-flash-001",
-  light: "google/gemini-2.0-flash-001",
-} as const;
+/** Defaults; override with OPENROUTER_CHAT_MODEL or OPENROUTER_LIGHT_MODEL / OPENROUTER_HEAVY_MODEL. */
+const DEFAULT_CHAT_MODEL = "google/gemini-2.0-flash-001";
+
+function resolveOpenRouterModel(tier: "light" | "heavy"): string {
+  const shared = process.env.OPENROUTER_CHAT_MODEL?.trim();
+  if (shared) return shared;
+  const specific =
+    tier === "heavy"
+      ? process.env.OPENROUTER_HEAVY_MODEL?.trim()
+      : process.env.OPENROUTER_LIGHT_MODEL?.trim();
+  if (specific) return specific;
+  return DEFAULT_CHAT_MODEL;
+}
 
 const DEFAULT_TIMEOUT_MS = 30_000;
 const BASE_URL = "https://openrouter.ai/api/v1/chat/completions";
@@ -28,7 +37,7 @@ export class OpenRouterProvider implements AIProvider {
   }
 
   private modelName(tier: ModelTier): string {
-    return MODEL_MAP[tier];
+    return resolveOpenRouterModel(tier);
   }
 
   private usageFrom(model: string, usage?: { prompt_tokens?: number; completion_tokens?: number }): TokenUsage {

@@ -77,10 +77,10 @@ interface AIProvider {
 
 ## Provider Resolution (`src/lib/ai/index.ts`)
 `getAIProvider()` builds a fallback chain:
-1. OpenRouter first (if `OPENROUTER_API_KEY` set) — auto-routes across 27+ models
+1. OpenRouter first (if `OPENROUTER_API_KEY` set)
 2. Primary provider from `AI_PROVIDER` env var
-3. All other providers with API keys set (Gemini, OpenAI, Anthropic)
-4. Wraps in `FallbackProvider` if multiple available
+3. Gemini / OpenAI / Anthropic **only if** `AI_ALLOW_FALLBACKS=1` **or** OpenRouter key is unset (avoids dead OpenAI keys when using OpenRouter)
+4. Wraps in `FallbackProvider` if multiple providers ended up in the chain
 
 NEVER instantiate providers directly in business logic. Always: `const provider = getAIProvider();`
 
