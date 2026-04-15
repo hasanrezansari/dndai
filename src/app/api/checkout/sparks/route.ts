@@ -3,15 +3,15 @@ import { z } from "zod";
 
 import { requireUser, unauthorizedResponse } from "@/lib/auth/guards";
 import { getCheckoutBillingRegion } from "@/lib/monetization/checkout-region";
+import { createDodoCheckoutSession } from "@/lib/monetization/dodo-client";
 import { createRazorpaySparkOrder } from "@/lib/monetization/razorpay-order";
 import {
+  getDodoProductIdForPack,
   getPublicRazorpayKeyId,
   getPublicSparkPacks,
   getSparkPackById,
-  getSparkPackCatalog,
   isSparkCheckoutConfigured,
 } from "@/lib/monetization/spark-packs";
-import { createStripeSparkCheckoutSession } from "@/lib/monetization/stripe-checkout";
 
 export const dynamic = "force-dynamic";
 
@@ -27,9 +27,8 @@ function appOrigin(): string {
   );
 }
 
-/** Public pack list + whether server can start checkout (Stripe + Razorpay + catalog). */
+/** Public pack list + whether server can start checkout (Dodo + Razorpay + catalog). */
 export async function GET() {
-  const catalog = getSparkPackCatalog();
   const checkoutEnabled = isSparkCheckoutConfigured();
   return NextResponse.json({
     checkoutEnabled,
@@ -39,7 +38,7 @@ export async function GET() {
 
 /**
  * Starts checkout: India → Razorpay order (+ client opens Checkout.js);
- * global → Stripe Checkout redirect. No provider names in response keys.
+ * global → Dodo hosted checkout redirect.
  */
 export async function POST(request: NextRequest) {
   const user = await requireUser();
@@ -80,7 +79,6 @@ export async function POST(request: NextRequest) {
   const region = getCheckoutBillingRegion(request);
   const origin = appOrigin();
   const successUrl = `${origin}/shop/success`;
-  const cancelUrl = `${origin}/shop`;
 
   if (region === "in") {
     const rzKey = getPublicRazorpayKeyId();
@@ -115,17 +113,35 @@ export async function POST(request: NextRequest) {
     });
   }
 
-  const session = await createStripeSparkCheckoutSession({
-    userId: user.id,
-    email,
-    name: user.name?.trim() || undefined,
-    packId: pack.packId,
-    stripePriceId: pack.stripePriceId,
-    successUrl: `${successUrl}?session_id={CHECKOUT_SESSION_ID}`,
-    cancelUrl,
+  const dodoProductId = getDodoProductIdForPack(pack);
+  if (!dodoProductId) {
+    return NextResponse.json(
+      { error: "Checkout is not configured" },
+      { status: 503 },
+    );
+  }
+
+  const session = await createDodoCheckoutSession({
+    product_cart: [{ product_id: dodoProductId, quantity: 1 }],
+    customer: {
+      email,
+      name: user.name?.trim() || undefined,
+    },
+    return_url: successUrl,
+    metadata: {
+      ashveil_user_id: user.id,
+      ashveil_pack_id: pack.packId,
+    },
   });
 
-  if (!session.url) {
+  if (!session.ok) {
+    return NextResponse.json(
+      { error: "Could not start checkout" },
+      { status: session.status >= 500 ? 502 : 503 },
+    );
+  }
+
+  if (!session.data.checkout_url) {
     return NextResponse.json(
       { error: "Could not start checkout" },
       { status: 502 },
@@ -133,7 +149,7 @@ export async function POST(request: NextRequest) {
   }
 
   return NextResponse.json({
-    flow: "stripe_redirect",
-    checkoutUrl: session.url,
+    flow: "dodo_redirect",
+    checkoutUrl: session.data.checkout_url,
   });
 }

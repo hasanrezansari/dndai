@@ -4,10 +4,12 @@ const packRowSchema = z.object({
   packId: z.string().min(1).max(64),
   label: z.string().min(1).max(120),
   sparks: z.number().int().positive(),
-  /** Stripe Price id (`price_...`) for global checkout. */
-  stripePriceId: z.string().min(1).max(128),
+  /** @deprecated Legacy Stripe Price id (`price_...`) for old global checkout path. */
+  stripePriceId: z.string().min(1).max(128).optional(),
   /** Razorpay order amount in paise (INR smallest unit). */
   razorpayAmountPaise: z.number().int().positive(),
+  /** Dodo dashboard product id for global checkout. */
+  dodoProductId: z.string().min(1).max(128).optional(),
   /** @deprecated Legacy Dodo dashboard product id — only if still processing old webhooks. */
   productId: z.string().min(1).max(128).optional(),
 });
@@ -41,6 +43,12 @@ export function getSparkPackById(
   return getSparkPackCatalog().find((p) => p.packId === packId);
 }
 
+export function getDodoProductIdForPack(
+  pack: SparkPackDefinition,
+): string | null {
+  return pack.dodoProductId?.trim() || pack.productId?.trim() || null;
+}
+
 const legacyDodoRowSchema = z.object({
   packId: z.string().optional(),
   sparks: z.number().int().positive(),
@@ -67,7 +75,9 @@ function legacyDodoProductSparks(): Map<string, number> {
 
 /** Legacy Dodo cart lookup + optional `productId` on unified packs. */
 export function sparksForProductId(productId: string): number | null {
-  const pack = getSparkPackCatalog().find((p) => p.productId === productId);
+  const pack = getSparkPackCatalog().find(
+    (p) => getDodoProductIdForPack(p) === productId,
+  );
   if (pack) return pack.sparks;
   return legacyDodoProductSparks().get(productId) ?? null;
 }
@@ -89,6 +99,17 @@ export function isStripeConfigured(): boolean {
   return Boolean(process.env.STRIPE_SECRET_KEY?.trim());
 }
 
+export function isDodoCheckoutConfigured(): boolean {
+  return Boolean(process.env.DODO_PAYMENTS_API_KEY?.trim());
+}
+
+export function isDodoGlobalReady(): boolean {
+  const packs = getSparkPackCatalog();
+  if (packs.length === 0) return false;
+  if (!isDodoCheckoutConfigured()) return false;
+  return packs.every((p) => Boolean(getDodoProductIdForPack(p)));
+}
+
 export function isRazorpayConfigured(): boolean {
   return Boolean(
     process.env.RAZORPAY_KEY_ID?.trim() &&
@@ -102,19 +123,13 @@ export function getPublicRazorpayKeyId(): string | null {
 }
 
 /**
- * New checkout: catalog + both providers (routing is server-side by region).
+ * New checkout readiness: catalog + Razorpay (India) + Dodo (global).
  */
 export function isSparkCheckoutConfigured(): boolean {
   const packs = getSparkPackCatalog();
   if (packs.length === 0) return false;
-  if (!isStripeConfigured() || !isRazorpayConfigured()) return false;
+  if (!isRazorpayConfigured()) return false;
   if (!getPublicRazorpayKeyId()) return false;
-  return packs.every(
-    (p) => p.stripePriceId.length > 0 && p.razorpayAmountPaise > 0,
-  );
-}
-
-/** @deprecated */
-export function isDodoCheckoutConfigured(): boolean {
-  return Boolean(process.env.DODO_PAYMENTS_API_KEY?.trim());
+  if (!packs.every((p) => p.razorpayAmountPaise > 0)) return false;
+  return isDodoGlobalReady();
 }

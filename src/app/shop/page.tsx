@@ -9,7 +9,7 @@ import { COPY } from "@/lib/copy/ashveil";
 type PublicPack = { packId: string; label: string; sparks: number };
 
 type CheckoutPostOk =
-  | { flow: "stripe_redirect"; checkoutUrl: string }
+  | { flow: "dodo_redirect"; checkoutUrl: string }
   | {
       flow: "razorpay";
       orderId: string;
@@ -100,7 +100,7 @@ export default function ShopPage() {
         setError(j.error ?? COPY.spark.shopErrorGeneric);
         return;
       }
-      if (j.flow === "stripe_redirect" && j.checkoutUrl) {
+      if (j.flow === "dodo_redirect" && j.checkoutUrl) {
         window.location.href = j.checkoutUrl;
         return;
       }

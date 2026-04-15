@@ -21,6 +21,7 @@ import { estimateHostSparksPerChapter } from "@/lib/chapter/chapter-config";
 import { useSparkBalance } from "@/hooks/use-spark-balance";
 import { DEFAULT_PARTY_TOTAL_ROUNDS } from "@/lib/party/party-templates";
 import { LOBBY_TONE_TAG_OPTIONS } from "@/lib/session/tone-tag-options";
+import { SiteFooterLinks } from "@/components/legal/site-footer-links";
 
 const CAMPAIGN_OPTIONS: { value: CampaignMode; label: string }[] = [
   { value: "user_prompt", label: "User Prompt" },
@@ -727,6 +728,9 @@ export default function Home() {
             )}
           </section>
         </div>
+        <div className="w-full max-w-md">
+          <SiteFooterLinks />
+        </div>
       </main>
     );
   }
@@ -1363,6 +1367,7 @@ export default function Home() {
           </div>
         </section>
         </section>
+        <SiteFooterLinks />
       </div>
     </main>
   );

@@ -84,6 +84,7 @@ function ShopSuccessContent() {
     (search.get("payment_id") || search.get("paymentId") || "").trim() || null;
   const sessionId =
     (
+      search.get("checkout_id") ||
       search.get("session_id") ||
       search.get("sessionId") ||
       search.get("checkout_session_id") ||
