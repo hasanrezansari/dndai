@@ -184,7 +184,10 @@ export async function createSession(params: {
       world_snapshot: params.worldFork?.snapshot ?? null,
       visual_rhythm_preset: "standard",
       chapter_max_turns: chapterCaps.chapterMaxTurns,
-      chapter_system_image_budget: chapterCaps.chapterSystemImageBudget,
+      chapter_system_image_budget: Math.max(
+        chapterCaps.chapterSystemImageBudget,
+        params.maxPlayers,
+      ),
     })
     .returning();
   if (!session) {
@@ -520,7 +523,10 @@ export async function updateSessionVisualRhythmPreset(params: {
     .set({
       visual_rhythm_preset: params.preset,
       chapter_max_turns: caps.chapterMaxTurns,
-      chapter_system_image_budget: caps.chapterSystemImageBudget,
+      chapter_system_image_budget: Math.max(
+        caps.chapterSystemImageBudget,
+        row.max_players,
+      ),
       state_version: sql`${sessions.state_version} + 1`,
       updated_at: new Date(),
     })

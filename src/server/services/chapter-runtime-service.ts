@@ -70,6 +70,7 @@ export async function assertChapterImageBudget(params: {
       game_kind: sessions.game_kind,
       used: sessions.chapter_system_images_used,
       budget: sessions.chapter_system_image_budget,
+      max_players: sessions.max_players,
     })
     .from(sessions)
     .where(eq(sessions.id, params.sessionId))
@@ -81,7 +82,8 @@ export async function assertChapterImageBudget(params: {
   if (row.game_kind !== "campaign" && row.game_kind !== "party") {
     return { ok: true };
   }
-  if (row.used >= row.budget) {
+  const effectiveBudget = Math.max(row.budget, row.max_players);
+  if (row.used >= effectiveBudget) {
     return {
       ok: false,
       status: 409,

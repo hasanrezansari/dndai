@@ -3,6 +3,8 @@ import { randomUUID } from "node:crypto";
 import { desc, eq } from "drizzle-orm";
 
 import { generateSceneImage } from "@/lib/ai/image-provider";
+import { generateSceneImageFreepik } from "@/lib/ai/freepik-provider";
+import { generateSceneImageOpenAI } from "@/lib/ai/openai-image-provider";
 import {
   buildOpenRouterSceneSystemPrompt,
 } from "@/lib/ai/narrative-session-profile";
@@ -426,8 +428,56 @@ export async function runImagePipeline(params: {
 
   const tStart = Date.now();
   let base64 = "";
-  let generatedBy: "openrouter" | "fal_fallback" | null = null;
-  try {
+  let generatedBy:
+    | "openrouter"
+    | "openai_fallback"
+    | "fal_fallback"
+    | "freepik_fallback"
+    | null = null;
+  const preferOpenAiImage =
+    (process.env.AI_PROVIDER ?? "").trim().toLowerCase() === "openai";
+  if (preferOpenAiImage) {
+    try {
+      const openAiOut = await generateSceneImageOpenAI({
+        prompt: composedPrompt,
+        negativePrompt: composedNegative,
+      });
+      base64 = openAiOut.base64;
+      generatedBy = "openai_fallback";
+      await logTrace({
+        sessionId,
+        turnId,
+        stepName: "scene_image_openai_primary",
+        input: { prompt_prefix: composedPrompt.slice(0, 120) },
+        output: { has_data: true },
+        modelUsed: process.env.OPENAI_IMAGE_MODEL?.trim() || "gpt-image-1",
+        tokensIn: 0,
+        tokensOut: 0,
+        latencyMs: Date.now() - tStart,
+        success: true,
+      });
+    } catch (openAiPrimaryErr) {
+      const openAiPrimaryMsg =
+        openAiPrimaryErr instanceof Error
+          ? openAiPrimaryErr.message
+          : String(openAiPrimaryErr);
+      await logTrace({
+        sessionId,
+        turnId,
+        stepName: "scene_image_openai_primary",
+        input: { prompt_prefix: composedPrompt.slice(0, 120) },
+        output: {},
+        modelUsed: process.env.OPENAI_IMAGE_MODEL?.trim() || "gpt-image-1",
+        tokensIn: 0,
+        tokensOut: 0,
+        latencyMs: Date.now() - tStart,
+        success: false,
+        errorMessage: openAiPrimaryMsg,
+      });
+    }
+  }
+  if (!base64) {
+    try {
     const out = await generateSceneImageOpenRouter({
       prompt: composedPrompt,
       negativePrompt: composedNegative,
@@ -435,7 +485,7 @@ export async function runImagePipeline(params: {
     });
     base64 = out.base64;
     generatedBy = "openrouter";
-  } catch (e) {
+    } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     await logTrace({
       sessionId,
@@ -451,47 +501,122 @@ export async function runImagePipeline(params: {
       errorMessage: msg,
     });
     try {
-      const falOut = await generateSceneImage({
+      const openAiOut = await generateSceneImageOpenAI({
         prompt: composedPrompt,
         negativePrompt: composedNegative,
-        width: 1024,
-        height: 576,
       });
-      const falRes = await fetch(falOut.imageUrl);
-      if (!falRes.ok) {
-        throw new Error(`FAL image fetch failed ${falRes.status}`);
-      }
-      const falArr = await falRes.arrayBuffer();
-      base64 = Buffer.from(falArr).toString("base64");
-      generatedBy = "fal_fallback";
+      base64 = openAiOut.base64;
+      generatedBy = "openai_fallback";
       await logTrace({
         sessionId,
         turnId,
-        stepName: "scene_image_fal_fallback",
+        stepName: "scene_image_openai_fallback",
         input: { prompt_prefix: composedPrompt.slice(0, 120) },
         output: { has_data: true },
-        modelUsed: "fal-ai/fast-sdxl",
+        modelUsed: process.env.OPENAI_IMAGE_MODEL?.trim() || "gpt-image-1",
         tokensIn: 0,
         tokensOut: 0,
         latencyMs: Date.now() - tStart,
         success: true,
       });
-    } catch (fallbackErr) {
-      const fallbackMsg = fallbackErr instanceof Error ? fallbackErr.message : String(fallbackErr);
+    } catch (openAiErr) {
+      const openAiMsg = openAiErr instanceof Error ? openAiErr.message : String(openAiErr);
       await logTrace({
         sessionId,
         turnId,
-        stepName: "scene_image_fal_fallback",
+        stepName: "scene_image_openai_fallback",
         input: { prompt_prefix: composedPrompt.slice(0, 120) },
         output: {},
-        modelUsed: "fal-ai/fast-sdxl",
+        modelUsed: process.env.OPENAI_IMAGE_MODEL?.trim() || "gpt-image-1",
         tokensIn: 0,
         tokensOut: 0,
         latencyMs: Date.now() - tStart,
         success: false,
-        errorMessage: fallbackMsg,
+        errorMessage: openAiMsg,
       });
-      return { imageUrl: null };
+    }
+    if (!base64) {
+      try {
+        const falOut = await generateSceneImage({
+          prompt: composedPrompt,
+          negativePrompt: composedNegative,
+          width: 1024,
+          height: 576,
+        });
+        const falRes = await fetch(falOut.imageUrl);
+        if (!falRes.ok) {
+          throw new Error(`FAL image fetch failed ${falRes.status}`);
+        }
+        const falArr = await falRes.arrayBuffer();
+        base64 = Buffer.from(falArr).toString("base64");
+        generatedBy = "fal_fallback";
+        await logTrace({
+          sessionId,
+          turnId,
+          stepName: "scene_image_fal_fallback",
+          input: { prompt_prefix: composedPrompt.slice(0, 120) },
+          output: { has_data: true },
+          modelUsed: "fal-ai/fast-sdxl",
+          tokensIn: 0,
+          tokensOut: 0,
+          latencyMs: Date.now() - tStart,
+          success: true,
+        });
+      } catch (fallbackErr) {
+        const fallbackMsg = fallbackErr instanceof Error ? fallbackErr.message : String(fallbackErr);
+        await logTrace({
+          sessionId,
+          turnId,
+          stepName: "scene_image_fal_fallback",
+          input: { prompt_prefix: composedPrompt.slice(0, 120) },
+          output: {},
+          modelUsed: "fal-ai/fast-sdxl",
+          tokensIn: 0,
+          tokensOut: 0,
+          latencyMs: Date.now() - tStart,
+          success: false,
+          errorMessage: fallbackMsg,
+        });
+      }
+    }
+    if (!base64) {
+      try {
+        const freepikOut = await generateSceneImageFreepik({
+          prompt: composedPrompt,
+          negativePrompt: composedNegative,
+        });
+        base64 = freepikOut.base64;
+        generatedBy = "freepik_fallback";
+        await logTrace({
+          sessionId,
+          turnId,
+          stepName: "scene_image_freepik_fallback",
+          input: { prompt_prefix: composedPrompt.slice(0, 120) },
+          output: { has_data: true },
+          modelUsed: "freepik/text-to-image",
+          tokensIn: 0,
+          tokensOut: 0,
+          latencyMs: Date.now() - tStart,
+          success: true,
+        });
+      } catch (freepikErr) {
+        const freepikMsg = freepikErr instanceof Error ? freepikErr.message : String(freepikErr);
+        await logTrace({
+          sessionId,
+          turnId,
+          stepName: "scene_image_freepik_fallback",
+          input: { prompt_prefix: composedPrompt.slice(0, 120) },
+          output: {},
+          modelUsed: "freepik/text-to-image",
+          tokensIn: 0,
+          tokensOut: 0,
+          latencyMs: Date.now() - tStart,
+          success: false,
+          errorMessage: freepikMsg,
+        });
+        return { imageUrl: null };
+      }
+    }
     }
   }
 

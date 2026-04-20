@@ -100,6 +100,10 @@ function mapSession(row: typeof sessions.$inferSelect): GameSessionView {
     currentRound: row.current_round,
     chapterStartRound: row.chapter_start_round,
   });
+  const chapterImageBudget = Math.max(
+    row.chapter_system_image_budget,
+    row.max_players,
+  );
   return {
     status: row.status,
     mode: row.mode,
@@ -124,7 +128,7 @@ function mapSession(row: typeof sessions.$inferSelect): GameSessionView {
     chapterTurnsElapsed: turnsThisChapter,
     chapterMaxTurns: row.chapter_max_turns,
     chapterImagesUsed: row.chapter_system_images_used,
-    chapterImageBudget: row.chapter_system_image_budget,
+    chapterImageBudget,
     chapterBreakOffered: row.chapter_break_offered === true,
     betrayalMode:
       gameKind === "campaign" &&
