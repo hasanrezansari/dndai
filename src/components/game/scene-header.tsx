@@ -114,7 +114,7 @@ function SceneHeaderRoomImages({
           src={prevSrc ?? previousSceneImage}
           alt=""
           onError={onPrevError}
-          className="absolute inset-0 z-0 h-full w-full object-cover"
+          className="absolute inset-0 z-0 h-full w-full bg-[var(--color-obsidian)] object-contain object-center"
         />
       ) : null}
 
@@ -130,7 +130,7 @@ function SceneHeaderRoomImages({
               setFrontReady(true);
             }}
             onError={onFrontError}
-            className={`absolute inset-0 z-[1] h-full w-full object-cover ${
+            className={`absolute inset-0 z-[1] h-full w-full bg-[var(--color-obsidian)] object-contain object-center ${
               !frontReady ? "opacity-0" : ""
             }`}
             initial={{ opacity: 1 }}
@@ -148,7 +148,7 @@ function SceneHeaderRoomImages({
           onError={onPrevError}
           loading="eager"
           decoding="async"
-          className="absolute inset-0 z-0 h-full w-full object-cover"
+          className="absolute inset-0 z-0 h-full w-full bg-[var(--color-obsidian)] object-contain object-center"
         />
       ) : null}
 
