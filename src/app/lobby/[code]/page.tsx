@@ -778,7 +778,7 @@ export default function LobbyPage() {
           <div className="relative aspect-[16/10]">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
-              src="/images/ashveil-start-cover.png"
+              src="/images/whatif-choice-engine-hero.png"
               alt={
                 getBuildTimeBrand() === "playromana"
                   ? "PlayRomana adventure key art"

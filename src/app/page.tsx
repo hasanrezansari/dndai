@@ -746,9 +746,9 @@ export default function Home() {
         {/* Hero — brand-forward, minimal copy; detail in “How it works” */}
         <header className="relative overflow-hidden rounded-[var(--radius-card)] border border-[var(--border-ui)] bg-[var(--surface-container)]/45 backdrop-blur-[12px] px-4 py-6 sm:px-8 sm:py-9 shadow-[0_20px_60px_rgba(0,0,0,0.35)]">
           <div className="pointer-events-none absolute inset-0 opacity-90">
-            <div className="absolute -top-16 left-1/2 h-64 w-64 -translate-x-1/2 rounded-full bg-[color-mix(in_srgb,var(--color-gold-rare)_18%,transparent)] blur-3xl" />
-            <div className="absolute -bottom-24 -right-20 h-72 w-72 rounded-full bg-[color-mix(in_srgb,var(--atmosphere-mystery)_20%,transparent)] blur-3xl" />
-            <div className="absolute inset-0 bg-gradient-to-b from-transparent via-transparent to-[var(--color-obsidian)]/75" />
+            <div className="absolute -top-20 left-1/2 h-64 w-64 -translate-x-1/2 rounded-full bg-[color-mix(in_srgb,var(--color-gold-rare)_9%,transparent)] blur-3xl" />
+            <div className="absolute -bottom-24 -right-24 h-72 w-72 rounded-full bg-[color-mix(in_srgb,var(--atmosphere-mystery)_14%,transparent)] blur-3xl" />
+            <div className="absolute inset-0 bg-gradient-to-b from-transparent via-transparent to-[var(--color-obsidian)]/58" />
           </div>
 
           {authStatus === "authenticated" ? (
@@ -762,17 +762,17 @@ export default function Home() {
           ) : null}
 
           <div className="relative z-[1] flex flex-col items-center text-center gap-4 sm:gap-6">
-            <h1 className="w-full max-w-full px-1 text-[clamp(2rem,9vw,5.5rem)] font-black leading-[0.95] tracking-[-0.02em] text-[var(--color-gold-rare)] drop-shadow-[0_2px_24px_rgba(0,0,0,0.45)] break-words hyphens-auto">
+            <h1 className="sr-only">
               {getBrandName(brand)}
             </h1>
-            <div className="w-full max-w-[280px] sm:max-w-[340px] mx-auto">
+            <div className="w-full max-w-[300px] sm:max-w-[360px] mx-auto rounded-[var(--radius-card)] border border-[var(--border-ui-strong)] bg-[color-mix(in_srgb,var(--color-obsidian)_72%,transparent)]/90 p-2 shadow-[0_22px_42px_rgba(0,0,0,0.45)]">
               <Image
                 src="/images/whatif-choice-engine-hero.png"
                 alt="WhatIf Choice Engine hero mark"
                 width={1024}
                 height={1024}
                 priority
-                className="h-auto w-full select-none"
+                className="h-auto w-full select-none rounded-[calc(var(--radius-card)-6px)]"
               />
             </div>
 
