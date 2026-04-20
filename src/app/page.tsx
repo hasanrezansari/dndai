@@ -1,6 +1,7 @@
 "use client";
 
 import { useSession } from "next-auth/react";
+import Image from "next/image";
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -764,9 +765,16 @@ export default function Home() {
             <h1 className="w-full max-w-full px-1 text-[clamp(2rem,9vw,5.5rem)] font-black leading-[0.95] tracking-[-0.02em] text-[var(--color-gold-rare)] drop-shadow-[0_2px_24px_rgba(0,0,0,0.45)] break-words hyphens-auto">
               {getBrandName(brand)}
             </h1>
-            <p className="max-w-[22rem] text-sm sm:text-base text-[var(--color-silver-dim)] leading-snug font-[family-name:var(--font-gameplay)] px-2">
-              {COPY.landing.heroTitle}
-            </p>
+            <div className="w-full max-w-[280px] sm:max-w-[340px] mx-auto">
+              <Image
+                src="/images/whatif-choice-engine-hero.png"
+                alt="WhatIf Choice Engine hero mark"
+                width={1024}
+                height={1024}
+                priority
+                className="h-auto w-full select-none"
+              />
+            </div>
 
             <div className="flex w-full max-w-md flex-col gap-3 sm:flex-row sm:flex-wrap sm:justify-center">
               <GoldButton
