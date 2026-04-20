@@ -5,6 +5,7 @@ import { useCallback, useMemo, useState } from "react";
 import { isChapterTurnCapExceeded } from "@/lib/chapter/chapter-config";
 import {
   isQuestFinaleThreshold,
+  questMilestoneStep,
   questProgressBarWidth,
   questProgressPrimaryLine,
 } from "@/lib/quest-display";
@@ -448,8 +449,12 @@ export function QuestPill({
           {quest.objective}
         </p>
         <p className="mt-1 text-[9px] leading-snug text-[var(--outline)]">
-          Progress is <span className="font-bold text-[var(--color-silver-dim)]">mission momentum</span> from
-          dice and actions — not the same as reaching a place in the story.
+          <span className="font-bold text-[var(--color-silver-dim)]">Mission momentum</span> tracks how close
+          the objective is (dice + actions).{" "}
+          <span className="font-bold text-[var(--color-gold-rare)]">
+            Story beat {questMilestoneStep(quest.progress)}/5
+          </span>{" "}
+          marks major beats; scene art fires every turn in AI campaign mode.
         </p>
       </div>
       {session?.gameKind === "campaign" && session.status === "active" ? (

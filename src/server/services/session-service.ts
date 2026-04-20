@@ -14,7 +14,10 @@ import {
   DEFAULT_PARTY_TOTAL_ROUNDS,
   getDefaultPartyTemplateKeyForBrand,
 } from "@/lib/party/party-templates";
-import { CHAPTER_PRESETS } from "@/lib/chapter/chapter-config";
+import {
+  CHAPTER_PRESETS,
+  resolveChapterSystemImageBudget,
+} from "@/lib/chapter/chapter-config";
 import {
   mergeViewerUserFieldsForPlayer,
   resolvePlayerDisplayName,
@@ -184,10 +187,10 @@ export async function createSession(params: {
       world_snapshot: params.worldFork?.snapshot ?? null,
       visual_rhythm_preset: "standard",
       chapter_max_turns: chapterCaps.chapterMaxTurns,
-      chapter_system_image_budget: Math.max(
-        chapterCaps.chapterSystemImageBudget,
-        params.maxPlayers,
-      ),
+      chapter_system_image_budget: resolveChapterSystemImageBudget({
+        preset: "standard",
+        maxPlayers: params.maxPlayers,
+      }),
     })
     .returning();
   if (!session) {
@@ -523,10 +526,10 @@ export async function updateSessionVisualRhythmPreset(params: {
     .set({
       visual_rhythm_preset: params.preset,
       chapter_max_turns: caps.chapterMaxTurns,
-      chapter_system_image_budget: Math.max(
-        caps.chapterSystemImageBudget,
-        row.max_players,
-      ),
+      chapter_system_image_budget: resolveChapterSystemImageBudget({
+        preset: params.preset,
+        maxPlayers: row.max_players,
+      }),
       state_version: sql`${sessions.state_version} + 1`,
       updated_at: new Date(),
     })

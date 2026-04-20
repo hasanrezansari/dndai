@@ -851,9 +851,9 @@ export default function LobbyPage() {
                   Chapter pacing
                 </p>
                 <p className="text-[10px] text-[var(--outline)] leading-relaxed">
-                  Standard keeps chapters shorter with fewer automatic scene
-                  images; Cinematic stretches the beat and budgets more art per
-                  chapter.
+                  Both presets generate scene art on every AI campaign turn. Standard
+                  uses a shorter chapter window; Cinematic runs longer with the same
+                  per-turn art cadence.
                 </p>
                 <div className="flex flex-wrap gap-2">
                   {(["standard", "cinematic"] as const).map((p) => {

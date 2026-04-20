@@ -6,12 +6,25 @@ import {
 
 export type VisualRhythmPreset = "standard" | "cinematic";
 
+/**
+ * Campaign chapter turn window. Image budget is turns + 1 so the async opening splash
+ * (`start` route) and every AI turn in the window can each consume one slot.
+ */
+const STANDARD_CHAPTER_TURNS = 28;
+const CINEMATIC_CHAPTER_TURNS = 42;
+
 export const CHAPTER_PRESETS: Record<
   VisualRhythmPreset,
   { chapterMaxTurns: number; chapterSystemImageBudget: number }
 > = {
-  standard: { chapterMaxTurns: 28, chapterSystemImageBudget: 2 },
-  cinematic: { chapterMaxTurns: 42, chapterSystemImageBudget: 6 },
+  standard: {
+    chapterMaxTurns: STANDARD_CHAPTER_TURNS,
+    chapterSystemImageBudget: STANDARD_CHAPTER_TURNS + 1,
+  },
+  cinematic: {
+    chapterMaxTurns: CINEMATIC_CHAPTER_TURNS,
+    chapterSystemImageBudget: CINEMATIC_CHAPTER_TURNS + 1,
+  },
 };
 
 export const MANUAL_SCENE_IMAGE_COOLDOWN_SEC = 45;
@@ -20,6 +33,15 @@ export function normalizeVisualRhythmPreset(
   v: string | null | undefined,
 ): VisualRhythmPreset {
   return v === "cinematic" ? "cinematic" : "standard";
+}
+
+/** Matches session insert / chapter roll: at least one slot per seat; budget is preset + opening headroom. */
+export function resolveChapterSystemImageBudget(params: {
+  preset: string | null | undefined;
+  maxPlayers: number;
+}): number {
+  const caps = CHAPTER_PRESETS[normalizeVisualRhythmPreset(params.preset)];
+  return Math.max(caps.chapterSystemImageBudget, params.maxPlayers);
 }
 
 export function turnsElapsedInChapter(params: {

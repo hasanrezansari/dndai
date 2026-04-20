@@ -5,6 +5,7 @@ import {
   isChapterTurnCapExceeded,
   MANUAL_SCENE_IMAGE_COOLDOWN_SEC,
   normalizeVisualRhythmPreset,
+  resolveChapterSystemImageBudget,
   type VisualRhythmPreset,
 } from "@/lib/chapter/chapter-config";
 import { db } from "@/lib/db";
@@ -203,6 +204,10 @@ export async function continueChapterNarrative(params: {
   const objective =
     recapQuest?.objective?.trim() || "The path ahead still unwinds.";
   const recapText = `— Chapter ${row.chapter_index} closes —\n\n${objective}\n\nThe table steadies itself and walks into the next movement of the tale.`;
+  const nextImageBudget = resolveChapterSystemImageBudget({
+    preset: row.visual_rhythm_preset,
+    maxPlayers: row.max_players,
+  });
 
   const [updated] = await db
     .update(sessions)
@@ -210,6 +215,7 @@ export async function continueChapterNarrative(params: {
       chapter_index: nextChapterIndex,
       chapter_start_round: row.current_round,
       chapter_system_images_used: 0,
+      chapter_system_image_budget: nextImageBudget,
       chapter_break_offered: false,
       state_version: sql`${sessions.state_version} + 1`,
       updated_at: new Date(),
@@ -251,6 +257,10 @@ export async function rollChapterWindowAfterVoteCooldown(
   if (!row) return 0;
 
   const nextChapterIndex = row.chapter_index + 1;
+  const nextImageBudget = resolveChapterSystemImageBudget({
+    preset: row.visual_rhythm_preset,
+    maxPlayers: row.max_players,
+  });
 
   const [updated] = await db
     .update(sessions)
@@ -258,6 +268,7 @@ export async function rollChapterWindowAfterVoteCooldown(
       chapter_index: nextChapterIndex,
       chapter_start_round: row.current_round,
       chapter_system_images_used: 0,
+      chapter_system_image_budget: nextImageBudget,
       chapter_break_offered: false,
       state_version: sql`${sessions.state_version} + 1`,
       updated_at: new Date(),

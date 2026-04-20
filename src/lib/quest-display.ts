@@ -1,3 +1,22 @@
+/** Five beats for UI + world-shift lines (20% bands up to finale). */
+export const QUEST_MILESTONE_LABELS = [
+  "Trail holds — clues compound",
+  "Mid-chapter push — stakes sharpen",
+  "Turning point — costs rise",
+  "Endgame pressure — loose ends tighten",
+  "Finale threshold — resolve or vote",
+] as const;
+
+export function questMilestoneStep(progress: number): number {
+  const p = Math.max(0, Math.min(100, progress));
+  if (p >= 100) return 5;
+  if (p >= 80) return 4;
+  if (p >= 60) return 3;
+  if (p >= 40) return 2;
+  if (p >= 20) return 1;
+  return 0;
+}
+
 /** Finale / vote state — progress hit the story threshold, not “game over.” */
 export function isQuestFinaleThreshold(quest: {
   status: string;

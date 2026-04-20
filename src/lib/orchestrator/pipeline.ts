@@ -80,6 +80,14 @@ export type SessionImageJobPayload = {
   };
 };
 
+/** One async scene-image job every campaign AI turn (chapter image budget matches turn cap). */
+function shouldAlwaysGenerateCampaignAiSceneArt(params: {
+  gameKind: string;
+  mode: string;
+}): boolean {
+  return params.gameKind === "campaign" && params.mode === "ai_dm";
+}
+
 function resolveAppOrigin(): string | null {
   const internal = process.env.INTERNAL_APP_URL?.replace(/\/$/, "");
   if (internal) return internal;
@@ -1359,7 +1367,16 @@ export async function runTurnPipeline(params: {
       newSituationAnchor: narration.situation_anchor,
       narrativeBeat: narration.narrative_beat,
     });
-  const imageNeeded = visualDeltaResult?.data.image_needed ?? false;
+  const heuristicImage = visualDeltaResult?.data.image_needed ?? false;
+  const forceCampaignTurnArt = shouldAlwaysGenerateCampaignAiSceneArt({
+    gameKind: ctx.session.gameKind,
+    mode: ctx.session.mode,
+  });
+  const imageNeeded = forceCampaignTurnArt || heuristicImage;
+  const imageReasons = [
+    ...(visualDeltaResult?.data.reasons ?? []),
+    ...(forceCampaignTurnArt ? ["campaign_ai_dm_per_turn_art"] : []),
+  ];
 
   await logTrace({
     sessionId,
@@ -1368,7 +1385,7 @@ export async function runTurnPipeline(params: {
     input: { narrative_len: narration.scene_text.length },
     output: {
       image_needed: imageNeeded,
-      reasons: visualDeltaResult?.data.reasons ?? [],
+      reasons: imageReasons,
       beat: narration.narrative_beat,
     },
     modelUsed: "deterministic",
@@ -2025,7 +2042,16 @@ export async function resumeTurnPipelineAfterPvpDefense(params: {
       newSituationAnchor: narration.situation_anchor,
       narrativeBeat: narration.narrative_beat,
     });
-  const imageNeeded = visualDeltaResult?.data.image_needed ?? false;
+  const heuristicImagePvP = visualDeltaResult?.data.image_needed ?? false;
+  const forceCampaignTurnArtPvP = shouldAlwaysGenerateCampaignAiSceneArt({
+    gameKind: ctxAttacker.session.gameKind,
+    mode: ctxAttacker.session.mode,
+  });
+  const imageNeeded = forceCampaignTurnArtPvP || heuristicImagePvP;
+  const imageReasonsPvP = [
+    ...(visualDeltaResult?.data.reasons ?? []),
+    ...(forceCampaignTurnArtPvP ? ["campaign_ai_dm_per_turn_art"] : []),
+  ];
 
   await logTrace({
     sessionId: params.sessionId,
@@ -2034,7 +2060,7 @@ export async function resumeTurnPipelineAfterPvpDefense(params: {
     input: { narrative_len: narration.scene_text.length, pvp_resume: true },
     output: {
       image_needed: imageNeeded,
-      reasons: visualDeltaResult?.data.reasons ?? [],
+      reasons: imageReasonsPvP,
       beat: narration.narrative_beat,
     },
     modelUsed: "deterministic",

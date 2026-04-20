@@ -1,6 +1,7 @@
 import { and, desc, eq, sql } from "drizzle-orm";
 
 import type { AIProvider } from "@/lib/ai/types";
+import { QUEST_MILESTONE_LABELS, questMilestoneStep } from "@/lib/quest-display";
 import { db } from "@/lib/db";
 import { generateQuestSignal } from "@/lib/orchestrator/workers/quest-signaler";
 import { characters, memorySummaries, players, sessions } from "@/lib/db/schema";
@@ -11,8 +12,11 @@ const QUEST_KIND = "quest_state_v1";
 const MAX_PROGRESS = 100;
 const MAX_RISK = 100;
 
-/** Max quest % that can come from dice rolls within one narrative chapter (resets on chapter advance). */
-export const CHAPTER_ROLL_PROGRESS_CAP = 36;
+/**
+ * Max quest % that can come from dice rolls within one narrative chapter (resets on chapter advance).
+ * Set to the global max so a single chapter can reach finale/vote threshold without a fake 36% ceiling.
+ */
+export const CHAPTER_ROLL_PROGRESS_CAP = MAX_PROGRESS;
 
 /** After this many turns at 100% without AI closure_ready, allow ending vote eligibility anyway. */
 export const TURNS_AT_FULL_BEFORE_READY = 3;
@@ -844,8 +848,18 @@ export async function applyTurnQuestProgress(params: {
     `Quest progress ${finalState.progress}%`,
     `Danger ${finalState.risk}%`,
   ];
+  const prevMs = questMilestoneStep(current.progress);
+  const nextMs = questMilestoneStep(progress);
+  for (let s = prevMs + 1; s <= nextMs; s++) {
+    const label = QUEST_MILESTONE_LABELS[s - 1];
+    if (label) {
+      visibleChanges.push(`Milestone ${s}/5 — ${label}`);
+    }
+  }
   if (trimmedByChapterCap) {
-    visibleChanges.push("Chapter momentum cap — progress from this turn was trimmed");
+    visibleChanges.push(
+      "Chapter momentum cap — this beat’s extra progress was banked for the next chapter (host: Continue chapter when the table moves to a new act).",
+    );
   }
   if (finalState.status === "ready_to_end" && current.status !== "ready_to_end") {
     visibleChanges.push("Objective threshold reached");
