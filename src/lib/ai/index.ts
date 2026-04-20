@@ -62,11 +62,11 @@ function buildFallbackChain(primary: string): Array<{ name: string; provider: AI
     return chain;
   }
 
-  // OpenRouter's free router (27 models, auto-routing) is the most
-  // reliable free option, so always try it first when available.
-  if (hasOpenRouterKey) add("openrouter");
-
   add(primary);
+
+  // Keep AI_PROVIDER as first priority; OpenRouter can still be used as a backup
+  // when configured and different from the selected primary provider.
+  if (hasOpenRouterKey) add("openrouter");
 
   if (appendKeyBasedFallbacks) {
     const keyToProvider: Array<[string, string]> = [
