@@ -18,11 +18,13 @@ import {
 function DisplaySkeleton() {
   return (
     <div className="flex min-h-dvh flex-col bg-[var(--color-obsidian)]">
-      <div className="relative z-[1] h-[min(52vh,560px)] w-full shrink-0 overflow-hidden">
-        <span
-          className="absolute inset-0 animate-shimmer opacity-25 pointer-events-none"
-          aria-hidden
-        />
+      <div className="relative z-[1] w-full shrink-0 overflow-hidden">
+        <div className="relative w-full overflow-hidden bg-[var(--color-deep-void)] [aspect-ratio:16/9] max-h-[62vh]">
+          <span
+            className="absolute inset-0 animate-shimmer opacity-25 pointer-events-none"
+            aria-hidden
+          />
+        </div>
       </div>
       <div className="relative z-[2] flex min-h-0 flex-1 flex-col gap-4 px-4 pb-8 pt-6 sm:px-8">
         <div
@@ -195,26 +197,28 @@ function SessionRoomDisplayContent() {
   return (
     <div className="relative flex min-h-dvh flex-col bg-[var(--color-obsidian)]">
       <DiceOverlay />
-      <div className="relative z-[1] h-[min(52vh,560px)] w-full shrink-0 overflow-hidden sm:h-[min(55vh,620px)]">
-        <SceneHeader
-          sceneImage={visible.sceneImage}
-          previousSceneImage={visible.previousSceneImage}
-          sceneTitle={sceneTitle}
-          roundNumber={session?.currentRound ?? 1}
-          currentPlayerName={null}
-          scenePending={visible.scenePending}
-          phase={null}
-          phaseLabel={isPartyDisplay ? "Party" : null}
-          teaser={
-            isPartyDisplay && party
-              ? `${party.partyPhase} · round ${party.roundIndex}/${party.totalRounds}`
-              : null
-          }
-          showMetaChips={Boolean(isPartyDisplay)}
-          showTapHint={false}
-          showTurnWhenNoTeaser={false}
-          roomDisplay
-        />
+      <div className="relative z-[1] w-full shrink-0 overflow-hidden">
+        <div className="relative w-full overflow-hidden bg-[var(--color-deep-void)] [aspect-ratio:16/9] max-h-[62vh]">
+          <SceneHeader
+            sceneImage={visible.sceneImage}
+            previousSceneImage={visible.previousSceneImage}
+            sceneTitle={sceneTitle}
+            roundNumber={session?.currentRound ?? 1}
+            currentPlayerName={null}
+            scenePending={visible.scenePending}
+            phase={null}
+            phaseLabel={isPartyDisplay ? "Party" : null}
+            teaser={
+              isPartyDisplay && party
+                ? `${party.partyPhase} · round ${party.roundIndex}/${party.totalRounds}`
+                : null
+            }
+            showMetaChips={Boolean(isPartyDisplay)}
+            showTapHint={false}
+            showTurnWhenNoTeaser={false}
+            roomDisplay
+          />
+        </div>
       </div>
       <div className="relative z-[2] flex min-h-0 flex-1 flex-col px-4 pb-8 pt-4 sm:px-8 sm:pt-6">
         <RoomDisplayNarration
