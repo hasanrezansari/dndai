@@ -797,6 +797,76 @@ export default function Home() {
               </Link>
             </div>
 
+            {joinOpen ? (
+              <form
+                onSubmit={handleJoinSubmit}
+                className="w-full max-w-md rounded-[var(--radius-card)] border border-[var(--border-ui-strong)] bg-[var(--surface-high)]/80 p-4 sm:p-5 shadow-[0_14px_36px_rgba(0,0,0,0.35)]"
+              >
+                <div className="text-center mb-2">
+                  <h3 className="text-fantasy text-lg text-[var(--color-silver-muted)] tracking-tight">
+                    {COPY.landing.joinTitle}
+                  </h3>
+                  <p className="text-[var(--color-silver-dim)] text-xs mt-1">
+                    {COPY.landing.joinSubtitle}
+                  </p>
+                </div>
+                <div>
+                  <label className="block text-[10px] font-bold uppercase tracking-[0.2em] text-[var(--color-gold-rare)]/70 mb-2 ml-1">
+                    Join Code
+                  </label>
+                  <input
+                    key={joinShakeKey}
+                    type="text"
+                    value={joinCode}
+                    onChange={(e) => {
+                      setJoinCode(e.target.value.toUpperCase());
+                      setJoinError(null);
+                    }}
+                    placeholder="A7-G42"
+                    autoComplete="off"
+                    autoCapitalize="characters"
+                    maxLength={8}
+                    className={`w-full h-14 bg-[var(--color-deep-void)] border-none text-center text-xl font-serif tracking-[0.3em] text-[var(--color-gold-rare)] placeholder:text-[var(--outline)]/40 rounded-[var(--radius-card)] focus:ring-1 focus:ring-[var(--color-failure)]/50 shadow-[inset_0_2px_8px_rgba(0,0,0,0.8)] transition-all uppercase ${joinShakeKey > 0 ? "animate-shake-once" : ""}`}
+                  />
+                </div>
+                {joinError ? (
+                  <p className="text-sm text-[var(--color-failure)] text-center mt-2">
+                    {joinError}
+                  </p>
+                ) : null}
+                <div className="mt-3 flex flex-col gap-2">
+                  <GoldButton
+                    type="submit"
+                    size="lg"
+                    className="w-full min-h-[48px] flex items-center justify-center gap-3"
+                    disabled={joinLoading}
+                  >
+                    <span>
+                      {joinLoading ? "Joining…" : COPY.landing.ctaEnterSession}
+                    </span>
+                    {!joinLoading && (
+                      <span className="material-symbols-outlined text-lg">
+                        login
+                      </span>
+                    )}
+                  </GoldButton>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setJoinOpen(false);
+                      setJoinError(null);
+                    }}
+                    className="w-full py-2 text-[var(--color-silver-dim)] hover:text-[var(--color-gold-rare)] text-xs uppercase tracking-[0.15em] transition-colors flex items-center justify-center gap-2"
+                  >
+                    <span className="material-symbols-outlined text-sm">
+                      arrow_back
+                    </span>
+                    {COPY.landing.backToCreate}
+                  </button>
+                </div>
+              </form>
+            ) : null}
+
             <div className="flex flex-wrap items-center justify-center gap-2">
               {HOME_NAV_CHIPS.map((item) => (
                 <Link
@@ -1300,70 +1370,6 @@ export default function Home() {
               )}
             </GoldButton>
 
-            {joinOpen ? (
-              <form onSubmit={handleJoinSubmit} className="flex flex-col gap-3 w-full">
-                <div className="text-center mb-2">
-                  <h3 className="text-fantasy text-xl text-[var(--color-silver-muted)] tracking-tight">
-                    {COPY.landing.joinTitle}
-                  </h3>
-                  <p className="text-[var(--color-silver-dim)] text-xs mt-1">
-                    {COPY.landing.joinSubtitle}
-                  </p>
-                </div>
-                <div>
-                  <label className="block text-[10px] font-bold uppercase tracking-[0.2em] text-[var(--color-gold-rare)]/70 mb-2 ml-1">
-                    Join Code
-                  </label>
-                  <input
-                    key={joinShakeKey}
-                    type="text"
-                    value={joinCode}
-                    onChange={(e) => {
-                      setJoinCode(e.target.value.toUpperCase());
-                      setJoinError(null);
-                    }}
-                    placeholder="A7-G42"
-                    autoComplete="off"
-                    autoCapitalize="characters"
-                    maxLength={8}
-                    className={`w-full h-16 bg-[var(--color-deep-void)] border-none text-center text-2xl font-serif tracking-[0.3em] text-[var(--color-gold-rare)] placeholder:text-[var(--outline)]/40 rounded-[var(--radius-card)] focus:ring-1 focus:ring-[var(--color-failure)]/50 shadow-[inset_0_2px_8px_rgba(0,0,0,0.8)] transition-all uppercase ${joinShakeKey > 0 ? "animate-shake-once" : ""}`}
-                  />
-                </div>
-                {joinError ? (
-                  <p className="text-sm text-[var(--color-failure)] text-center">
-                    {joinError}
-                  </p>
-                ) : null}
-                <GoldButton
-                  type="submit"
-                  size="lg"
-                  className="w-full min-h-[48px] flex items-center justify-center gap-3"
-                  disabled={joinLoading}
-                >
-                  <span>
-                    {joinLoading ? "Joining…" : COPY.landing.ctaEnterSession}
-                  </span>
-                  {!joinLoading && (
-                    <span className="material-symbols-outlined text-lg">
-                      login
-                    </span>
-                  )}
-                </GoldButton>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setJoinOpen(false);
-                    setJoinError(null);
-                  }}
-                  className="w-full py-2 text-[var(--color-silver-dim)] hover:text-[var(--color-gold-rare)] text-xs uppercase tracking-[0.15em] transition-colors flex items-center justify-center gap-2"
-                >
-                  <span className="material-symbols-outlined text-sm">
-                    arrow_back
-                  </span>
-                  {COPY.landing.backToCreate}
-                </button>
-              </form>
-            ) : null}
           </div>
         </section>
         </section>
