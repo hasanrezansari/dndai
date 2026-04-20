@@ -58,6 +58,34 @@ describe("orchestration workers", () => {
     expect(r.data.action_type).toBe("attack");
   });
 
+  it("intent parser classifies betrayal phrasing as attack", async () => {
+    const r = await parseIntent({
+      sessionId: SESSION_ID,
+      turnId: TURN_ID,
+      rawInput: "I betray rez",
+      characterName: "Pez",
+      characterClass: "Rogue",
+      recentEvents: ["Round 1 starts."],
+    });
+    expect(r.data.action_type).toBe("attack");
+  });
+
+  it("intent parser extracts named betrayal target as player label", async () => {
+    const r = await parseIntent({
+      sessionId: SESSION_ID,
+      turnId: TURN_ID,
+      rawInput: "I backstab rez",
+      characterName: "Pez",
+      characterClass: "Rogue",
+      recentEvents: ["Rez trusts Pez."],
+    });
+    expect(
+      r.data.targets.some(
+        (t) => t.kind === "player" && "label" in t && t.label?.toLowerCase() === "rez",
+      ),
+    ).toBe(true);
+  });
+
   it("rules interpreter returns at least one roll for an attack intent", async () => {
     const intent = ActionIntentSchema.parse({
       action_type: "attack",

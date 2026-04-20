@@ -4,6 +4,7 @@ import { runOrchestrationStep } from "@/lib/orchestrator/step-runner";
 import { ActionIntentSchema, type ActionIntent } from "@/lib/schemas/ai-io";
 
 const ATTACK_PATTERNS = /\b(a{1,2}t{1,2}a?c?k|hit|strike|slash|stab|punch|kick|shoot|smash|fight|swing|cleave|smite|slay|kill|murder|wound|damage|harm|hurt|bite|claw|charge|assault|battle|combat|duel)\b/i;
+const BETRAY_PATTERNS = /\b(betray|backstab|turn\s+on|double[-\s]?cross)\b/i;
 const SPELL_PATTERNS = /\b(cast|spell|fireball|magic|conjure|summon|enchant|invoke|lightning|thunder|eldritch|cantrip|arcane|hex|curse|blast|bolt|ray|teleport|wards?|dispel|ritual)\b/i;
 const HEAL_PATTERNS = /\b(heal|mend|cure|restore|bandage|patch\s?up|lay\s+on\s+hands|prayer|revive|recover|potion|medic|first\s+aid|tend\s+wounds?|rest\s+and\s+heal)\b/i;
 const DEFEND_PATTERNS = /\b(defend|block|parry|shield|brace|guard|protect|dodge|deflect|hunker|take\s+cover|fortify|barricade)\b/i;
@@ -15,6 +16,7 @@ const SELF_HARM_PATTERNS = /\b(myself|self|my\s+own|i\s+(take|lose|sacrifice|hur
 
 function classifyActionHeuristic(raw: string): ActionIntent["action_type"] {
   const lower = raw.toLowerCase();
+  if (BETRAY_PATTERNS.test(lower)) return "attack";
   if (ATTACK_PATTERNS.test(lower)) return "attack";
   if (SPELL_PATTERNS.test(lower)) return "cast_spell";
   if (HEAL_PATTERNS.test(lower)) return "heal";
@@ -52,6 +54,22 @@ function detectTargets(raw: string): ActionIntent["targets"] {
     targets.push({ kind: "player", label: "self" });
   } else if (/\b(door|chest|lock|wall|trap|lever|gate|altar|shrine|statue|boulder|tree|bush|rope)\b/i.test(lower)) {
     targets.push({ kind: "environment", label: "object" });
+  }
+
+  // Friendly-fire phrasing should still resolve to a player target by label.
+  const hostileNameMatch = raw.match(
+    /\b(?:betray|backstab|attack|strike|hit|shoot|slash|stab)\s+([a-z][a-z0-9_'’-]{1,24}(?:\s+[a-z][a-z0-9_'’-]{1,24})?)/i,
+  );
+  if (hostileNameMatch?.[1]) {
+    const label = hostileNameMatch[1].trim();
+    if (
+      !/^the\s+/i.test(label) &&
+      !["enemy", "foe", "monster", "target", "someone", "them", "it", "self", "me", "myself"].includes(
+        label.toLowerCase(),
+      )
+    ) {
+      targets.push({ kind: "player", label });
+    }
   }
   return targets;
 }

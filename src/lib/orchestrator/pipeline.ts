@@ -44,6 +44,7 @@ import type {
   NarratorOutput,
   RulesInterpreterOutput,
 } from "@/lib/schemas/ai-io";
+import { ActionIntentSchema } from "@/lib/schemas/ai-io";
 import type { OrchestrationStepResult } from "@/lib/ai/types";
 import {
   BETRAYAL_PC_TARGET_DC_BONUS,
@@ -223,6 +224,47 @@ function resolveOtherPlayerTarget(
     if (sub) return { playerId: sub.playerId, name: sub.name };
   }
   return null;
+}
+
+function normalizeNameForMatch(value: string): string {
+  return value
+    .trim()
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}\s'’-]/gu, "")
+    .replace(/\s{2,}/g, " ");
+}
+
+/**
+ * If intent labeled a party member as npc (common with "betray rez"), convert that
+ * target to player before NPC creation/PvP gating.
+ */
+function normalizeIntentTargetsForPartyPvp(
+  intent: ActionIntent,
+  actingPlayerId: string,
+  partyMembers: PartyMemberInfo[],
+): ActionIntent {
+  if (!intent.targets?.length) return intent;
+
+  const otherMembers = partyMembers.filter((p) => p.playerId !== actingPlayerId);
+  const byName = new Map(
+    otherMembers.map((p) => [normalizeNameForMatch(p.name), p.playerId]),
+  );
+
+  let changed = false;
+  const nextTargets = intent.targets.map((t) => {
+    if (!("label" in t) || typeof t.label !== "string" || !t.label.trim()) return t;
+    const pid = byName.get(normalizeNameForMatch(t.label));
+    if (!pid) return t;
+    if (t.kind === "player" && t.id === pid) return t;
+    changed = true;
+    return {
+      kind: "player" as const,
+      id: pid,
+      label: t.label,
+    };
+  });
+
+  return changed ? ActionIntentSchema.parse({ ...intent, targets: nextTargets }) : intent;
 }
 
 function sanitizeNpcName(label: string): string {
@@ -722,7 +764,11 @@ export async function runTurnPipeline(params: {
       ctx.betrayalPhase === "confronting",
     provider,
   });
-  const intent = intentResult.data;
+  const intent = normalizeIntentTargetsForPartyPvp(
+    intentResult.data,
+    playerId,
+    ctx.partyMembers,
+  );
   await ensureNpcTargetsExist({
     sessionId,
     turnId,
