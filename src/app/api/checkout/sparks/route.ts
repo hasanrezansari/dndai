@@ -10,6 +10,7 @@ import {
   getPublicRazorpayKeyId,
   getPublicSparkPacks,
   getSparkPackById,
+  isRazorpayReadyForCatalog,
   isSparkCheckoutConfigured,
 } from "@/lib/monetization/spark-packs";
 
@@ -37,8 +38,8 @@ export async function GET() {
 }
 
 /**
- * Starts checkout: India → Razorpay order (+ client opens Checkout.js);
- * global → Dodo hosted checkout redirect.
+ * Starts checkout: India → Razorpay order when configured;
+ * otherwise (and globally) → Dodo hosted checkout redirect.
  */
 export async function POST(request: NextRequest) {
   const user = await requireUser();
@@ -80,7 +81,11 @@ export async function POST(request: NextRequest) {
   const origin = appOrigin();
   const successUrl = `${origin}/shop/success`;
 
-  if (region === "in") {
+  if (
+    region === "in" &&
+    isRazorpayReadyForCatalog() &&
+    typeof pack.razorpayAmountPaise === "number"
+  ) {
     const rzKey = getPublicRazorpayKeyId();
     if (!rzKey) {
       return NextResponse.json(

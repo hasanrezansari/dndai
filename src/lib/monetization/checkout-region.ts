@@ -3,7 +3,7 @@ import type { NextRequest } from "next/server";
 export type CheckoutBillingRegion = "in" | "global";
 
 /**
- * India → Razorpay; everything else → Stripe.
+ * India → Razorpay (when configured); everything else → global checkout.
  * Uses `x-vercel-ip-country` / `cf-ipcountry` when present.
  * Override with `CHECKOUT_REGION_OVERRIDE=in|global` for local testing.
  */

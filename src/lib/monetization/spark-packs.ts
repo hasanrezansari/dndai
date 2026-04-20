@@ -6,8 +6,8 @@ const packRowSchema = z.object({
   sparks: z.number().int().positive(),
   /** @deprecated Legacy Stripe Price id (`price_...`) for old global checkout path. */
   stripePriceId: z.string().min(1).max(128).optional(),
-  /** Razorpay order amount in paise (INR smallest unit). */
-  razorpayAmountPaise: z.number().int().positive(),
+  /** Razorpay order amount in paise (INR smallest unit), optional for Dodo-only packs. */
+  razorpayAmountPaise: z.number().int().positive().optional(),
   /** Dodo dashboard product id for global checkout. */
   dodoProductId: z.string().min(1).max(128).optional(),
   /** @deprecated Legacy Dodo dashboard product id — only if still processing old webhooks. */
@@ -117,6 +117,14 @@ export function isRazorpayConfigured(): boolean {
   );
 }
 
+export function isRazorpayReadyForCatalog(): boolean {
+  const packs = getSparkPackCatalog();
+  if (packs.length === 0) return false;
+  if (!isRazorpayConfigured()) return false;
+  if (!getPublicRazorpayKeyId()) return false;
+  return packs.every((p) => typeof p.razorpayAmountPaise === "number" && p.razorpayAmountPaise > 0);
+}
+
 /** Publishes to browser for Razorpay Checkout (safe key id only). */
 export function getPublicRazorpayKeyId(): string | null {
   return process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID?.trim() || null;
@@ -126,10 +134,6 @@ export function getPublicRazorpayKeyId(): string | null {
  * New checkout readiness: catalog + Razorpay (India) + Dodo (global).
  */
 export function isSparkCheckoutConfigured(): boolean {
-  const packs = getSparkPackCatalog();
-  if (packs.length === 0) return false;
-  if (!isRazorpayConfigured()) return false;
-  if (!getPublicRazorpayKeyId()) return false;
-  if (!packs.every((p) => p.razorpayAmountPaise > 0)) return false;
+  // Dodo is the default path; Razorpay is optional and only used when fully configured.
   return isDodoGlobalReady();
 }
