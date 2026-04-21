@@ -223,6 +223,11 @@ async function fetchPartyDescriptions(sessionId: string): Promise<{
     .map((r) => {
       const vp = (r.visual_profile ?? {}) as Record<string, unknown>;
       const traits = Array.isArray(vp.traits) ? vp.traits.map(String).join(", ") : "";
+      const appearanceRaw = vp.appearance;
+      const appearance =
+        typeof appearanceRaw === "string" && appearanceRaw.trim().length > 0
+          ? appearanceRaw.trim().slice(0, 160)
+          : "";
       const parsedProfile = ClassProfileSchema.safeParse(vp.class_profile);
       const canUseProfile = customClassesEnabled && parsedProfile.success;
       const classLabel = canUseProfile
@@ -237,9 +242,12 @@ async function fetchPartyDescriptions(sessionId: string): Promise<{
         allConcepts.push(parsedProfile.data.fantasy.trim());
       }
       const base = `${r.name} (${classLabel})`;
-      return traits ? `${base} [${traits}]` : base;
+      const parts = [base];
+      if (traits) parts.push(`traits: ${traits}`);
+      if (appearance) parts.push(`look: ${appearance}`);
+      return parts.join("; ");
     })
-    .join(", ");
+    .join(" | ");
 
   return {
     partyDescription,
@@ -279,7 +287,7 @@ function buildPrompt(params: {
   const action = narrativeText.slice(0, 250);
 
   const continuityHint = previousPrompt
-    ? `\nMaintain the same environment, architecture, and color palette as the previous scene. Show visual progression, not a new location unless the story moved.`
+    ? `\nMaintain the same environment, architecture, and color palette as the previous scene. Keep recurring characters' faces, hair, and base outfits consistent with that scene unless the story clearly states a wardrobe change. Show visual progression, not a new location unless the story moved.`
     : "";
 
   const subjectLine =
@@ -307,17 +315,21 @@ function buildPrompt(params: {
   });
   const styleDirectiveLine = `Art style directives (ordered): ${styleArbitration.orderedStyleDirectives.join(" | ")}.`;
 
+  const wardrobeRule =
+    "Wardrobe lock: For every named hero in \"Characters present\", match clothing and hair to that line (and prior scene continuity). Use \"Current moment\" for pose, action, and expression — do not let one-off color or fabric words there replace a PC's established outfit unless the moment text explicitly says they changed clothes.";
+
   const prompt = [
     styleDirectiveLine,
     styleArbitration.policyLine,
     `Scene: ${scene}`,
-    `Current moment: ${action}`,
+    `Characters present: ${partyDescription}.`,
+    partyStyleLine,
+    classConceptLine,
     subjectLine,
     envLine,
     moodLine,
-    partyStyleLine,
-    classConceptLine,
-    `Characters present: ${partyDescription}.`,
+    wardrobeRule,
+    `Current moment (action / dialogue — do not override locked PC wardrobe): ${action}`,
     continuityHint,
     `Keep character appearances consistent. Wide cinematic composition, 16:9 aspect ratio, no text or UI overlays.`,
   ].filter(Boolean).join("\n");
