@@ -125,6 +125,8 @@ export interface GamePlayerView {
   isConnected: boolean;
   isHost: boolean;
   isDm: boolean;
+  /** Uses of "Need more time" this chapter (campaign RPG). */
+  turnExtensionsUsed: number;
   character?: {
     name: string;
     /** Raw DB class column (may be preset key or legacy display slug). */
@@ -232,6 +234,13 @@ export type SessionStatePayload = {
   npcs?: NpcCombatantView[];
   /** Open turn id for Pusher event matching (`turn-started` / `narration-update`). */
   activeTurnId?: string | null;
+  /** ISO deadline for the current `awaiting_input` turn (campaign only). */
+  currentTurnDeadlineAt?: string | null;
+  /**
+   * Extensions left for the viewing user this chapter when they are the current actor;
+   * otherwise omitted / null.
+   */
+  turnExtensionsRemaining?: number | null;
 };
 
 interface GameState {
@@ -259,6 +268,10 @@ interface GameState {
   hpFlash: Record<string, "damage" | "heal">;
   /** Latest turn from `turn-started` — fallback when events omit `turn_id`. */
   activeTurnId: string | null;
+  /** Campaign: server-side auto-resolve deadline for the open player turn. */
+  currentTurnDeadlineAt: string | null;
+  /** When this client is the current actor: +30s uses left this chapter. */
+  turnExtensionsRemaining: number | null;
   npcs: NpcCombatantView[];
 
   setSessionId: (id: string) => void;
@@ -306,6 +319,10 @@ interface GameState {
   removeStatPopup: (id: string) => void;
   setHpFlash: (flash: Record<string, "damage" | "heal">) => void;
   setActiveTurnId: (id: string | null) => void;
+  setTurnClock: (params: {
+    deadlineAt: string | null;
+    extensionsRemaining: number | null;
+  }) => void;
 }
 
 /** Round rollup rows use `detail: "Round N"` — skip when attaching scene art. */
@@ -341,6 +358,8 @@ const emptyState = {
   statPopups: [] as StatPopup[],
   hpFlash: {} as Record<string, "damage" | "heal">,
   activeTurnId: null as string | null,
+  currentTurnDeadlineAt: null as string | null,
+  turnExtensionsRemaining: null as number | null,
   npcs: [] as NpcCombatantView[],
 };
 
@@ -428,6 +447,12 @@ export const useGameStore = create<GameState>((set) => ({
 
   setActiveTurnId: (id) => set({ activeTurnId: id }),
 
+  setTurnClock: ({ deadlineAt, extensionsRemaining }) =>
+    set({
+      currentTurnDeadlineAt: deadlineAt,
+      turnExtensionsRemaining: extensionsRemaining,
+    }),
+
   updateSessionField: (field, value) =>
     set((s) => {
       if (!s.session) return s;
@@ -452,6 +477,14 @@ export const useGameStore = create<GameState>((set) => ({
       npcs: data.npcs ?? [],
       activeTurnId:
         data.activeTurnId === undefined ? null : data.activeTurnId,
+      currentTurnDeadlineAt:
+        data.currentTurnDeadlineAt === undefined
+          ? null
+          : data.currentTurnDeadlineAt,
+      turnExtensionsRemaining:
+        data.turnExtensionsRemaining === undefined
+          ? null
+          : data.turnExtensionsRemaining,
     }),
 
   patchSessionFromStateApi: (data) =>
@@ -477,6 +510,14 @@ export const useGameStore = create<GameState>((set) => ({
         rollingMemories: data.rollingMemories ?? [],
         activeTurnId:
           data.activeTurnId === undefined ? null : data.activeTurnId,
+        currentTurnDeadlineAt:
+          data.currentTurnDeadlineAt === undefined
+            ? s.currentTurnDeadlineAt
+            : data.currentTurnDeadlineAt,
+        turnExtensionsRemaining:
+          data.turnExtensionsRemaining === undefined
+            ? s.turnExtensionsRemaining
+            : data.turnExtensionsRemaining,
       };
     }),
 

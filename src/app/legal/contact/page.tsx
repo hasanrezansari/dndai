@@ -5,7 +5,7 @@ export default function ContactPage() {
     <LegalPageShell title="Contact Us" lastUpdated="2026-04-15">
       <section className="space-y-2">
         <h2 className="text-base font-semibold">Support</h2>
-        <p>Email: support@example.com</p>
+        <p>Email: hasanrezansari@gmail.com</p>
         <p>Phone: +1-000-000-0000</p>
       </section>
       <section className="space-y-2">

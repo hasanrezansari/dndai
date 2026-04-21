@@ -384,6 +384,9 @@ export const players = pgTable(
     seat_index: integer("seat_index").notNull(),
     is_ready: boolean("is_ready").notNull().default(false),
     is_connected: boolean("is_connected").notNull().default(true),
+    is_away: boolean("is_away").notNull().default(false),
+    timeout_streak: integer("timeout_streak").notNull().default(0),
+    last_seen_at: timestamp("last_seen_at", { withTimezone: true }),
     is_host: boolean("is_host").notNull().default(false),
     is_dm: boolean("is_dm").notNull().default(false),
     joined_at: timestamp("joined_at", { withTimezone: true })
@@ -393,6 +396,8 @@ export const players = pgTable(
     free_premise_random_used: boolean("free_premise_random_used")
       .notNull()
       .default(false),
+    /** Per chapter: "Need more time" (+30s) uses; reset on chapter advance. */
+    turn_extensions_used: integer("turn_extensions_used").notNull().default(0),
   },
   (t) => [index("players_session_id_idx").on(t.session_id)],
 );
@@ -469,6 +474,10 @@ export const turns = pgTable(
       .references(() => players.id),
     phase: text("phase").notNull(),
     status: text("status").notNull().default("awaiting_input"),
+    deadline_at: timestamp("deadline_at", { withTimezone: true }),
+    warned_at: timestamp("warned_at", { withTimezone: true }),
+    auto_resolved: boolean("auto_resolved").notNull().default(false),
+    auto_resolve_reason: text("auto_resolve_reason"),
     started_at: timestamp("started_at", { withTimezone: true })
       .notNull()
       .defaultNow(),

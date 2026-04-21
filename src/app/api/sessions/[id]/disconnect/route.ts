@@ -5,8 +5,9 @@ import { z } from "zod";
 import { apiError, handleApiError } from "@/lib/api/errors";
 import { requireUser, unauthorizedResponse } from "@/lib/auth/guards";
 import { db } from "@/lib/db";
-import { players } from "@/lib/db/schema";
+import { players, sessions, turns } from "@/lib/db/schema";
 import { broadcastToSession } from "@/lib/socket/server";
+import { TURN_DISCONNECT_GRACE_SEC, turnDeadlineFromNow } from "@/lib/turn/timeout-config";
 
 const BodySchema = z.object({
   playerId: z.string().uuid(),
@@ -51,8 +52,26 @@ export async function POST(
 
     await db
       .update(players)
-      .set({ is_connected: false })
+      .set({ is_connected: false, is_away: true })
       .where(eq(players.id, parsed.data.playerId));
+
+    const [sessionRow] = await db
+      .select({ current_player_id: sessions.current_player_id })
+      .from(sessions)
+      .where(eq(sessions.id, sessionId))
+      .limit(1);
+    if (sessionRow?.current_player_id === parsed.data.playerId) {
+      await db
+        .update(turns)
+        .set({ deadline_at: turnDeadlineFromNow(TURN_DISCONNECT_GRACE_SEC) })
+        .where(
+          and(
+            eq(turns.session_id, sessionId),
+            eq(turns.player_id, parsed.data.playerId),
+            eq(turns.status, "awaiting_input"),
+          ),
+        );
+    }
 
     try {
       await broadcastToSession(sessionId, "player-disconnected", {

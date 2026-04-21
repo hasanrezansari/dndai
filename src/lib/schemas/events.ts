@@ -52,8 +52,25 @@ export const TurnStartedEventSchema = z.object({
   turn_id: z.string().uuid(),
   player_id: z.string().uuid(),
   round_number: z.number().int().min(1),
+  /** ISO timestamp when the turn auto-resolves if no action (campaign RPG). */
+  deadline_at: z.iso.datetime().nullable().optional(),
+  /**
+   * Uses of "Need more time" left for the acting player this chapter (same value
+   * for every subscriber; only the actor's client uses it).
+   */
+  turn_extensions_remaining: z.number().int().min(0).max(20).optional(),
 });
 export type TurnStartedEvent = output<typeof TurnStartedEventSchema>;
+
+export const TurnDeadlineUpdatedEventSchema = z.object({
+  turn_id: z.string().uuid(),
+  deadline_at: z.iso.datetime(),
+  player_id: z.string().uuid(),
+  turn_extensions_remaining: z.number().int().min(0),
+});
+export type TurnDeadlineUpdatedEvent = output<
+  typeof TurnDeadlineUpdatedEventSchema
+>;
 
 export const ActionSubmittedEventSchema = z.object({
   player_id: z.string().uuid(),

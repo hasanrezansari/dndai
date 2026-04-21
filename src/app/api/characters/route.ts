@@ -16,6 +16,10 @@ import {
   createCharacter,
   PlayerNotFoundForCharacterError,
 } from "@/server/services/character-service";
+import {
+  ProfileHeroSlotLimitError,
+  upsertSingleProfileHero,
+} from "@/server/services/profile-hero-service";
 
 const classSet = new Set<string>(CLASSES.map((c) => c.value));
 const CreateBodySchema = z.object({
@@ -91,6 +95,27 @@ export async function POST(request: NextRequest) {
       appearance,
       classProfile,
     });
+    try {
+      await upsertSingleProfileHero({
+        userId: user.id,
+        name: name.trim(),
+        heroClass: cls,
+        race: raceNorm.value,
+        statsTemplate: stats,
+        visualProfile: {
+          portrait_url: undefined,
+          pronouns: pronouns?.trim() || "they/them",
+          traits: (traits ?? []).filter(Boolean).slice(0, 5),
+          backstory: (backstory ?? "").trim().slice(0, 500),
+          appearance: (appearance ?? "").trim().slice(0, 220),
+          class_profile: classProfile ?? null,
+        },
+      });
+    } catch (err) {
+      if (!(err instanceof ProfileHeroSlotLimitError)) {
+        console.error("[characters] auto-save profile hero skipped:", err);
+      }
+    }
     try {
       await broadcastToSession(sessionId, "player-ready", {
         player_id: playerId,

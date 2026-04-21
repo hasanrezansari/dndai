@@ -183,6 +183,20 @@
       "when": 1776200000000,
       "tag": "0025_sessions_betrayal_mode",
       "breakpoints": true
+    },
+    {
+      "idx": 26,
+      "version": "7",
+      "when": 1776300000000,
+      "tag": "0026_turn_timeouts_and_presence",
+      "breakpoints": true
+    },
+    {
+      "idx": 27,
+      "version": "7",
+      "when": 1776310000000,
+      "tag": "0027_players_turn_extensions_used",
+      "breakpoints": true
     }
   ]
 }

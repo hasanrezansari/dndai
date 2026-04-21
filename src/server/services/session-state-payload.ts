@@ -21,6 +21,7 @@ import {
   partyConfigForSessionPayload,
 } from "@/lib/schemas/party";
 import { CharacterStatsSchema } from "@/lib/schemas/domain";
+import { MAX_TURN_EXTENSIONS_PER_CHAPTER } from "@/lib/turn/timeout-config";
 import { mapNpcRowToCombatantView } from "@/lib/state/npc-combatant-mapper";
 import type {
   DmAwaitingState,
@@ -166,6 +167,7 @@ function mapPlayerRow(
     isConnected: p.is_connected,
     isHost: p.is_host,
     isDm: p.is_dm,
+    turnExtensionsUsed: p.turn_extensions_used ?? 0,
   };
   if (c) {
     const visualProfile =
@@ -807,9 +809,12 @@ export async function loadSessionStatePayload(
     .limit(1);
 
   let activeTurnId: string | null = null;
+  let currentTurnDeadlineAt: string | null = null;
+  let turnExtensionsRemaining: number | null = null;
+
   if (sessionRow.current_player_id) {
     const [awaitingTurnRow] = await db
-      .select({ id: turns.id })
+      .select({ id: turns.id, deadline_at: turns.deadline_at })
       .from(turns)
       .where(
         and(
@@ -821,6 +826,19 @@ export async function loadSessionStatePayload(
       .orderBy(desc(turns.started_at))
       .limit(1);
     activeTurnId = awaitingTurnRow?.id ?? null;
+    if (sessionRow.game_kind !== "party") {
+      currentTurnDeadlineAt =
+        awaitingTurnRow?.deadline_at?.toISOString() ?? null;
+      if (viewer?.userId) {
+        const me = mappedPlayers.find((p) => p.userId === viewer.userId);
+        if (me?.id === sessionRow.current_player_id) {
+          turnExtensionsRemaining = Math.max(
+            0,
+            MAX_TURN_EXTENSIONS_PER_CHAPTER - me.turnExtensionsUsed,
+          );
+        }
+      }
+    }
   }
   if (!activeTurnId) {
     const [processingTurnRow] = await db
@@ -932,5 +950,7 @@ export async function loadSessionStatePayload(
     activeTurnId,
     quest,
     rollingMemories,
+    currentTurnDeadlineAt,
+    turnExtensionsRemaining,
   };
 }

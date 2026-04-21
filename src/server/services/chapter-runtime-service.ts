@@ -9,7 +9,7 @@ import {
   type VisualRhythmPreset,
 } from "@/lib/chapter/chapter-config";
 import { db } from "@/lib/db";
-import { narrativeEvents, sessions } from "@/lib/db/schema";
+import { narrativeEvents, players, sessions } from "@/lib/db/schema";
 import {
   getQuestState,
   syncQuestStateAfterChapterAdvance,
@@ -239,6 +239,11 @@ export async function continueChapterNarrative(params: {
     round: row.current_round,
   });
 
+  await db
+    .update(players)
+    .set({ turn_extensions_used: 0 })
+    .where(eq(players.session_id, params.sessionId));
+
   return { ok: true, stateVersion: updated?.stateVersion ?? row.state_version + 1 };
 }
 
@@ -281,6 +286,11 @@ export async function rollChapterWindowAfterVoteCooldown(
     chapterIndex: nextChapterIndex,
     round: row.current_round,
   });
+
+  await db
+    .update(players)
+    .set({ turn_extensions_used: 0 })
+    .where(eq(players.session_id, sessionId));
 
   return updated?.stateVersion ?? 0;
 }

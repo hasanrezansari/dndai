@@ -1,7 +1,7 @@
-import { and, count, desc, eq, sql } from "drizzle-orm";
+import { and, asc, count, desc, eq, sql } from "drizzle-orm";
 
 import { db } from "@/lib/db";
-import { profileHeroes, userProfileSettings } from "@/lib/db/schema";
+import { players, profileHeroes, sessions, userProfileSettings } from "@/lib/db/schema";
 import { CharacterStatsSchema, ClassProfileSchema } from "@/lib/schemas/domain";
 import type { CharacterStats, ClassProfile } from "@/lib/schemas/domain";
 import { normalizeCharacterRace } from "@/lib/rules/character";
@@ -371,5 +371,54 @@ export async function instantiateProfileHeroIntoSession(params: {
     classProfile,
   });
   return res;
+}
+
+/**
+ * If a user re-enters a table with no linked session character, restore their latest
+ * profile hero into that seat so gameplay can continue without a dead turn.
+ */
+export async function restoreLatestProfileHeroToSessionSeat(params: {
+  userId: string;
+  sessionId: string;
+}): Promise<{ restored: boolean; playerId?: string; characterId?: string }> {
+  const [sessionRow] = await db
+    .select({ status: sessions.status })
+    .from(sessions)
+    .where(eq(sessions.id, params.sessionId))
+    .limit(1);
+  if (!sessionRow || (sessionRow.status !== "active" && sessionRow.status !== "lobby")) {
+    return { restored: false };
+  }
+
+  const [seat] = await db
+    .select({
+      playerId: players.id,
+      characterId: players.character_id,
+    })
+    .from(players)
+    .where(
+      and(
+        eq(players.session_id, params.sessionId),
+        eq(players.user_id, params.userId),
+      ),
+    )
+    .orderBy(asc(players.seat_index))
+    .limit(1);
+  if (!seat || seat.characterId) {
+    return { restored: false };
+  }
+
+  const heroes = await listProfileHeroesForUser(params.userId);
+  const latest = heroes[0];
+  if (!latest) return { restored: false };
+
+  const { characterId } = await instantiateProfileHeroIntoSession({
+    userId: params.userId,
+    heroId: latest.id,
+    sessionId: params.sessionId,
+    playerId: seat.playerId,
+    statsOverride: latest.statsTemplate ?? null,
+  });
+  return { restored: true, playerId: seat.playerId, characterId };
 }
 

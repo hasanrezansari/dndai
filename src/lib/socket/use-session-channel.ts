@@ -21,6 +21,7 @@ import {
   SessionStartedEventSchema,
   StatChangeEventSchema,
   StateUpdateEventSchema,
+  TurnDeadlineUpdatedEventSchema,
   TurnStartedEventSchema,
 } from "@/lib/schemas/events";
 import type {
@@ -30,6 +31,8 @@ import type {
   StatPopup,
 } from "@/lib/state/game-store";
 import { useGameStore } from "@/lib/state/game-store";
+
+import { MAX_TURN_EXTENSIONS_PER_CHAPTER } from "@/lib/turn/timeout-config";
 
 import {
   createPusherClientWithDisplayAuth,
@@ -287,6 +290,16 @@ export function useSessionChannel(
       const parsed = TurnStartedEventSchema.safeParse(raw);
       if (!parsed.success) return;
       useGameStore.getState().setActiveTurnId(parsed.data.turn_id);
+      const myId = useGameStore.getState().currentPlayerId;
+      const isMine = myId === parsed.data.player_id;
+      const ext =
+        parsed.data.turn_extensions_remaining === undefined
+          ? null
+          : parsed.data.turn_extensions_remaining;
+      useGameStore.getState().setTurnClock({
+        deadlineAt: parsed.data.deadline_at ?? null,
+        extensionsRemaining: isMine ? ext : null,
+      });
       const players = useGameStore.getState().players;
       const name = playerDisplayName(players, parsed.data.player_id);
       useGameStore.getState().setWaitingForDm(false);
@@ -309,6 +322,23 @@ export function useSessionChannel(
         turnId: parsed.data.turn_id,
         roundNumber: parsed.data.round_number,
         playerId: parsed.data.player_id,
+      });
+    };
+
+    const onTurnDeadlineUpdated = (raw: unknown) => {
+      const parsed = TurnDeadlineUpdatedEventSchema.safeParse(raw);
+      if (!parsed.success) return;
+      const myId = useGameStore.getState().currentPlayerId;
+      if (parsed.data.player_id === myId) {
+        useGameStore.getState().setTurnClock({
+          deadlineAt: parsed.data.deadline_at,
+          extensionsRemaining: parsed.data.turn_extensions_remaining,
+        });
+      }
+      useGameStore.getState().updatePlayer(parsed.data.player_id, {
+        turnExtensionsUsed:
+          MAX_TURN_EXTENSIONS_PER_CHAPTER -
+          parsed.data.turn_extensions_remaining,
       });
     };
 
@@ -715,6 +745,7 @@ export function useSessionChannel(
       channel.bind("player-disconnected", onPlayerDisconnected);
       channel.bind("session-started", onSessionStarted);
       channel.bind("turn-started", onTurnStarted);
+      channel.bind("turn-deadline-updated", onTurnDeadlineUpdated);
       channel.bind("action-submitted", onActionSubmitted);
       channel.bind("dice-rolling", onDiceRolling);
       channel.bind("dice-result", onDiceResult);
@@ -783,6 +814,7 @@ export function useSessionChannel(
         channel.unbind("player-disconnected", onPlayerDisconnected);
         channel.unbind("session-started", onSessionStarted);
         channel.unbind("turn-started", onTurnStarted);
+        channel.unbind("turn-deadline-updated", onTurnDeadlineUpdated);
         channel.unbind("action-submitted", onActionSubmitted);
         channel.unbind("dice-rolling", onDiceRolling);
         channel.unbind("dice-result", onDiceResult);

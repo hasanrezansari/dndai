@@ -36,6 +36,7 @@ import {
   advanceTurn,
   NotYourTurnError,
   PartySessionRpgActionError,
+  processExpiredTurnForSession,
   resolveCurrentProcessingTurn,
   resolveAwaitingDmTurn,
   releaseTurnLock,
@@ -93,6 +94,12 @@ export async function POST(
   let sparkActionIdForRefund = "";
 
   try {
+    try {
+      await processExpiredTurnForSession(sessionId);
+    } catch (err) {
+      console.error("[actions] timeout tick failed:", err);
+    }
+
     const { actionId, turnId } = await submitAction({
       sessionId,
       playerId: parsed.data.playerId,

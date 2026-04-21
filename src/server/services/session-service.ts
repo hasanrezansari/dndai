@@ -220,7 +220,7 @@ export async function joinSession(params: {
   const [session] = await db
     .select()
     .from(sessions)
-    .where(and(eq(sessions.join_code, normalized), eq(sessions.status, "lobby")))
+    .where(eq(sessions.join_code, normalized))
     .limit(1);
   if (!session) {
     throw new JoinSessionError("Session not found", 404);
@@ -232,6 +232,12 @@ export async function joinSession(params: {
     .limit(1);
   if (existing) {
     return { sessionId: session.id, playerId: existing.id };
+  }
+  if (session.status !== "lobby") {
+    throw new JoinSessionError(
+      "This adventure has already started. Rejoin with the same account that joined this table.",
+      409,
+    );
   }
   const countRows = await db
     .select({ value: count() })

@@ -148,6 +148,8 @@ export default function SessionGameplayPage() {
   const narrativeText = useGameStore((s) => s.narrativeText);
   const isThinking = useGameStore((s) => s.isThinking);
   const currentPlayerId = useGameStore((s) => s.currentPlayerId);
+  const currentTurnDeadlineAt = useGameStore((s) => s.currentTurnDeadlineAt);
+  const turnExtensionsRemaining = useGameStore((s) => s.turnExtensionsRemaining);
   const activeSheet = useGameStore((s) => s.activeSheet);
   const closeSheet = useGameStore((s) => s.closeSheet);
   const isDm = useGameStore((s) => s.isDm);
@@ -1297,7 +1299,17 @@ export default function SessionGameplayPage() {
         />
         <footer className="sticky bottom-0 z-20 mt-auto shrink-0 border-t border-[var(--border-divide)] bg-[var(--color-obsidian)]/92 pt-2 pb-[max(0.25rem,env(safe-area-inset-bottom))] backdrop-blur-md supports-[backdrop-filter]:bg-[var(--color-obsidian)]/85">
           {quest ? <QuestDock quest={quest} onOpen={() => setQuestOpen(true)} /> : null}
-          <TurnBanner visible={isMyTurn && !(session?.mode === "human_dm" && isDm)} />
+          <TurnBanner
+            visible={isMyTurn && !(session?.mode === "human_dm" && isDm)}
+            deadlineAt={
+              session?.gameKind === "party" ? null : currentTurnDeadlineAt
+            }
+            extensionsRemaining={
+              session?.gameKind === "party" ? null : turnExtensionsRemaining
+            }
+            sessionId={sessionId || null}
+            playerId={currentPlayerId}
+          />
           {session?.mode === "human_dm" && isDm && currentPlayerId ? (
             <DmActionBar
               sessionId={sessionId}

@@ -16,6 +16,13 @@ import {
   playablePlayersInSeatOrder,
 } from "@/lib/rules/turn-logic";
 import { broadcastToSession } from "@/lib/socket/server";
+import {
+  MAX_TURN_EXTENSIONS_PER_CHAPTER,
+  TURN_AWAY_STREAK_THRESHOLD,
+  TURN_EXTENSION_SEC,
+  TURN_TIMEOUT_SEC,
+  turnDeadlineFromNow,
+} from "@/lib/turn/timeout-config";
 import type { Turn } from "@/lib/schemas/domain";
 import type { GamePhase } from "@/lib/schemas/enums";
 import { SessionNotFoundError } from "@/server/services/session-service";
@@ -72,10 +79,28 @@ function mapTurnRow(row: typeof turns.$inferSelect): Turn {
   };
 }
 
+const AUTO_TIMEOUT_FALLBACK_INPUT =
+  "[AUTO] The hero loses the initiative and holds position.";
+
+async function turnExtensionsRemainingForPlayer(
+  playerId: string,
+): Promise<number> {
+  const [row] = await db
+    .select({ turn_extensions_used: players.turn_extensions_used })
+    .from(players)
+    .where(eq(players.id, playerId))
+    .limit(1);
+  return Math.max(
+    0,
+    MAX_TURN_EXTENSIONS_PER_CHAPTER - (row?.turn_extensions_used ?? 0),
+  );
+}
+
 function isCharacterIncapacitated(
   row: typeof characters.$inferSelect | null,
 ): boolean {
-  if (!row) return false;
+  // A seat without a linked character cannot take a turn.
+  if (!row) return true;
   if (row.hp <= 0) return true;
   const conditions = Array.isArray(row.conditions) ? row.conditions : [];
   const lowered = conditions.map((c) => c.toLowerCase());
@@ -194,6 +219,7 @@ export async function createFirstTurn(sessionId: string): Promise<string> {
       player_id: first.id,
       phase: sessionRow.phase,
       status: "awaiting_input",
+      deadline_at: turnDeadlineFromNow(TURN_TIMEOUT_SEC),
     })
     .returning();
 
@@ -218,10 +244,15 @@ export async function createFirstTurn(sessionId: string): Promise<string> {
   }
 
   try {
+    const turnExtensionsRemaining = await turnExtensionsRemainingForPlayer(
+      first.id,
+    );
     await broadcastToSession(sessionId, "turn-started", {
       turn_id: turn.id,
       player_id: first.id,
       round_number: updatedSession.current_round,
+      deadline_at: turn.deadline_at?.toISOString() ?? null,
+      turn_extensions_remaining: turnExtensionsRemaining,
     });
   } catch (err) {
     console.error(err);
@@ -367,6 +398,15 @@ export async function submitAction(params: {
     throw new Error("Failed to record action");
   }
 
+  await db
+    .update(players)
+    .set({
+      timeout_streak: 0,
+      is_away: false,
+      last_seen_at: new Date(),
+    })
+    .where(eq(players.id, params.playerId));
+
   try {
     await broadcastToSession(params.sessionId, "action-submitted", {
       player_id: params.playerId,
@@ -455,6 +495,7 @@ export async function advanceTurn(
       player_id: nextPlayer.id,
       phase: sessionRow.phase,
       status: "awaiting_input",
+      deadline_at: turnDeadlineFromNow(TURN_TIMEOUT_SEC),
     })
     .returning();
 
@@ -491,16 +532,232 @@ export async function advanceTurn(
   }
 
   try {
+    const turnExtensionsRemaining = await turnExtensionsRemainingForPlayer(
+      nextPlayer.id,
+    );
     await broadcastToSession(sessionId, "turn-started", {
       turn_id: newTurn.id,
       player_id: nextPlayer.id,
       round_number: nextRound,
+      deadline_at: newTurn.deadline_at?.toISOString() ?? null,
+      turn_extensions_remaining: turnExtensionsRemaining,
     });
   } catch (err) {
     console.error(err);
   }
 
   return { nextPlayerId: nextPlayer.id, roundAdvanced };
+}
+
+/**
+ * Best-effort timeout tick: if current awaiting turn is expired, auto-resolve it
+ * so the table can keep playing even when the active player drops/AFKs.
+ */
+export async function processExpiredTurnForSession(sessionId: string): Promise<boolean> {
+  const [sessionRow] = await db
+    .select({ current_player_id: sessions.current_player_id })
+    .from(sessions)
+    .where(eq(sessions.id, sessionId))
+    .limit(1);
+  const currentPlayerId = sessionRow?.current_player_id;
+  if (!currentPlayerId) return false;
+
+  const [awaitingTurn] = await db
+    .select({
+      id: turns.id,
+      player_id: turns.player_id,
+      deadline_at: turns.deadline_at,
+      round_number: turns.round_number,
+    })
+    .from(turns)
+    .where(
+      and(
+        eq(turns.session_id, sessionId),
+        eq(turns.player_id, currentPlayerId),
+        eq(turns.status, "awaiting_input"),
+      ),
+    )
+    .orderBy(desc(turns.started_at))
+    .limit(1);
+  if (!awaitingTurn) return false;
+
+  if (!awaitingTurn.deadline_at) {
+    await db
+      .update(turns)
+      .set({ deadline_at: turnDeadlineFromNow(TURN_TIMEOUT_SEC) })
+      .where(eq(turns.id, awaitingTurn.id));
+    return false;
+  }
+
+  const deadlineMs = awaitingTurn.deadline_at.getTime();
+  if (deadlineMs > Date.now()) return false;
+
+  const locked = await acquireTurnLock(sessionId);
+  if (!locked) return false;
+  try {
+    const [processingTurn] = await db
+      .update(turns)
+      .set({
+        status: "processing",
+        auto_resolved: true,
+        auto_resolve_reason: "timeout",
+      })
+      .where(and(eq(turns.id, awaitingTurn.id), eq(turns.status, "awaiting_input")))
+      .returning({ id: turns.id, player_id: turns.player_id });
+    if (!processingTurn) return false;
+
+    await db.insert(actions).values({
+      turn_id: processingTurn.id,
+      raw_input: AUTO_TIMEOUT_FALLBACK_INPUT,
+      resolution_status: "applied",
+    });
+
+    const [actor] = await db
+      .select({ timeout_streak: players.timeout_streak })
+      .from(players)
+      .where(eq(players.id, processingTurn.player_id))
+      .limit(1);
+    const nextStreak = (actor?.timeout_streak ?? 0) + 1;
+    await db
+      .update(players)
+      .set({
+        timeout_streak: nextStreak,
+        is_away: nextStreak >= TURN_AWAY_STREAK_THRESHOLD,
+      })
+      .where(eq(players.id, processingTurn.player_id));
+
+    try {
+      await broadcastToSession(sessionId, "dm-notice", {
+        message: "Turn auto-resolved due to timeout.",
+        turn_id: processingTurn.id,
+        round_number: awaitingTurn.round_number,
+      });
+    } catch (err) {
+      console.error("[turn-service] timeout notice broadcast failed:", err);
+    }
+
+    await advanceTurn(sessionId);
+    return true;
+  } finally {
+    await releaseTurnLock(sessionId);
+  }
+}
+
+export class ExtendTurnNotAllowedError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "ExtendTurnNotAllowedError";
+  }
+}
+
+/**
+ * Current actor may add {@link TURN_EXTENSION_SEC}s to the open turn deadline,
+ * up to {@link MAX_TURN_EXTENSIONS_PER_CHAPTER} times per chapter per player.
+ */
+export async function extendTurnDeadlineForSession(params: {
+  sessionId: string;
+  playerId: string;
+}): Promise<{ deadlineAt: string; extensionsRemaining: number }> {
+  const locked = await acquireTurnLock(params.sessionId);
+  if (!locked) {
+    throw new ExtendTurnNotAllowedError("Turn lock busy");
+  }
+  try {
+    const [sessionRow] = await db
+      .select({
+        current_player_id: sessions.current_player_id,
+        status: sessions.status,
+        game_kind: sessions.game_kind,
+      })
+      .from(sessions)
+      .where(eq(sessions.id, params.sessionId))
+      .limit(1);
+    if (!sessionRow) throw new SessionNotFoundError();
+    if (sessionRow.status !== "active") {
+      throw new ExtendTurnNotAllowedError("Session is not active");
+    }
+    if (sessionRow.game_kind === "party") {
+      throw new ExtendTurnNotAllowedError("Party mode has no RPG turn timer");
+    }
+    if (sessionRow.current_player_id !== params.playerId) {
+      throw new ExtendTurnNotAllowedError("Not your turn");
+    }
+
+    const [awaiting] = await db
+      .select({
+        id: turns.id,
+        deadline_at: turns.deadline_at,
+      })
+      .from(turns)
+      .where(
+        and(
+          eq(turns.session_id, params.sessionId),
+          eq(turns.player_id, params.playerId),
+          eq(turns.status, "awaiting_input"),
+        ),
+      )
+      .orderBy(desc(turns.started_at))
+      .limit(1);
+    if (!awaiting) {
+      throw new ExtendTurnNotAllowedError("No active turn awaiting input");
+    }
+
+    const [actor] = await db
+      .select({ turn_extensions_used: players.turn_extensions_used })
+      .from(players)
+      .where(eq(players.id, params.playerId))
+      .limit(1);
+    const used = actor?.turn_extensions_used ?? 0;
+    if (used >= MAX_TURN_EXTENSIONS_PER_CHAPTER) {
+      throw new ExtendTurnNotAllowedError(
+        "No turn extensions remaining this chapter",
+      );
+    }
+
+    const newDeadline = !awaiting.deadline_at
+      ? turnDeadlineFromNow(TURN_TIMEOUT_SEC + TURN_EXTENSION_SEC)
+      : new Date(
+          Math.max(Date.now(), awaiting.deadline_at.getTime()) +
+            TURN_EXTENSION_SEC * 1000,
+        );
+
+    await db
+      .update(turns)
+      .set({ deadline_at: newDeadline })
+      .where(eq(turns.id, awaiting.id));
+
+    const nextUsed = used + 1;
+    await db
+      .update(players)
+      .set({ turn_extensions_used: nextUsed })
+      .where(eq(players.id, params.playerId));
+
+    const extensionsRemaining = Math.max(
+      0,
+      MAX_TURN_EXTENSIONS_PER_CHAPTER - nextUsed,
+    );
+
+    try {
+      await broadcastToSession(params.sessionId, "turn-deadline-updated", {
+        turn_id: awaiting.id,
+        deadline_at: newDeadline.toISOString(),
+        player_id: params.playerId,
+        turn_extensions_remaining: extensionsRemaining,
+      });
+    } catch (err) {
+      console.error(
+        "[turn-service] turn-deadline-updated broadcast failed:",
+        err,
+      );
+    }
+
+    return {
+      deadlineAt: newDeadline.toISOString(),
+      extensionsRemaining,
+    };
+  } finally {
+    await releaseTurnLock(params.sessionId);
+  }
 }
 
 export async function resolveCurrentProcessingTurn(
@@ -659,6 +916,7 @@ export async function resolveHumanDmTurn(params: {
       player_id: nextPlayer.id,
       phase: sessionRow.phase,
       status: "awaiting_input",
+      deadline_at: turnDeadlineFromNow(TURN_TIMEOUT_SEC),
     })
     .returning();
 
@@ -683,10 +941,15 @@ export async function resolveHumanDmTurn(params: {
   }
 
   try {
+    const turnExtensionsRemaining = await turnExtensionsRemainingForPlayer(
+      nextPlayer.id,
+    );
     await broadcastToSession(params.sessionId, "turn-started", {
       turn_id: newTurn.id,
       player_id: nextPlayer.id,
       round_number: nextRound,
+      deadline_at: newTurn.deadline_at?.toISOString() ?? null,
+      turn_extensions_remaining: turnExtensionsRemaining,
     });
   } catch (err) {
     console.error(err);

@@ -8,6 +8,7 @@ import {
   unauthorizedResponse,
 } from "@/lib/auth/guards";
 import { loadSessionStatePayload } from "@/server/services/session-state-payload";
+import { processExpiredTurnForSession } from "@/server/services/turn-service";
 
 export async function GET(
   _request: NextRequest,
@@ -22,6 +23,12 @@ export async function GET(
     }
     if (!(await isSessionMember(sessionId, user.id))) {
       return apiError("Forbidden", 403);
+    }
+
+    try {
+      await processExpiredTurnForSession(sessionId);
+    } catch (err) {
+      console.error("[state] timeout tick failed:", err);
     }
 
     const payload = await loadSessionStatePayload(sessionId, {

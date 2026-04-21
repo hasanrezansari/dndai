@@ -132,10 +132,20 @@ export default function LobbyPage() {
           return;
         }
         const full = (await sessionRes.json()) as SessionWithPlayers;
+        const me = full.players.find((p) => p.id === pid);
         if (!cancelled) {
           setSessionId(sid);
           setCurrentPlayerId(pid);
           setSession(full);
+          if (full.status === "active") {
+            if (full.game_kind === "party") {
+              router.replace(`/session/${sid}`);
+            } else if (me?.character_id) {
+              router.replace(`/session/${sid}`);
+            } else {
+              router.replace(`/character/${sid}?playerId=${pid}`);
+            }
+          }
         }
       } catch {
         if (!cancelled) setLoadError("Something went wrong");

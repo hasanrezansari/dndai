@@ -297,6 +297,69 @@ describe("computeNextPlayableTurnState", () => {
       roundAdvanced: true,
     });
   });
+
+  it("six-player table skips two downed seats and still wraps rounds correctly", () => {
+    const ordered = [
+      {
+        id: "p0-00000000-0000-4000-8000-000000000000",
+        is_dm: false,
+        seat_index: 0,
+        is_incapacitated: false,
+      },
+      {
+        id: "p1-00000000-0000-4000-8000-000000000001",
+        is_dm: false,
+        seat_index: 1,
+        is_incapacitated: true,
+      },
+      {
+        id: "p2-00000000-0000-4000-8000-000000000002",
+        is_dm: false,
+        seat_index: 2,
+        is_incapacitated: false,
+      },
+      {
+        id: "p3-00000000-0000-4000-8000-000000000003",
+        is_dm: false,
+        seat_index: 3,
+        is_incapacitated: true,
+      },
+      {
+        id: "p4-00000000-0000-4000-8000-000000000004",
+        is_dm: false,
+        seat_index: 4,
+        is_incapacitated: false,
+      },
+      {
+        id: "p5-00000000-0000-4000-8000-000000000005",
+        is_dm: false,
+        seat_index: 5,
+        is_incapacitated: false,
+      },
+    ];
+    const fromP4 = computeNextPlayableTurnState({
+      orderedBySeat: ordered,
+      sessionMode: "ai_dm",
+      currentPlayerId: "p4-00000000-0000-4000-8000-000000000004",
+      currentRound: 7,
+    });
+    expect(fromP4).toMatchObject({
+      nextPlayerId: "p5-00000000-0000-4000-8000-000000000005",
+      nextRound: 7,
+      roundAdvanced: false,
+    });
+    const fromP5 = computeNextPlayableTurnState({
+      orderedBySeat: ordered,
+      sessionMode: "ai_dm",
+      currentPlayerId: "p5-00000000-0000-4000-8000-000000000005",
+      currentRound: 7,
+    });
+    expect(fromP5).toMatchObject({
+      nextPlayerId: "p0-00000000-0000-4000-8000-000000000000",
+      nextRound: 8,
+      roundAdvanced: true,
+    });
+  });
 });
 
 describe("acquireTurnLock", () => {

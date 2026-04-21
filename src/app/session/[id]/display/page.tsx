@@ -17,18 +17,18 @@ import {
 
 function DisplaySkeleton() {
   return (
-    <div className="flex min-h-dvh flex-col bg-[var(--color-obsidian)]">
-      <div className="relative z-[1] w-full shrink-0 overflow-hidden">
-        <div className="relative w-full overflow-hidden bg-[var(--color-deep-void)] [aspect-ratio:16/9] max-h-[62vh]">
+    <div className="relative min-h-dvh bg-[var(--color-obsidian)]">
+      <div className="absolute inset-0 z-[1] overflow-hidden">
+        <div className="relative h-full w-full overflow-hidden bg-[var(--color-deep-void)]">
           <span
             className="absolute inset-0 animate-shimmer opacity-25 pointer-events-none"
             aria-hidden
           />
         </div>
       </div>
-      <div className="relative z-[2] flex min-h-0 flex-1 flex-col gap-4 px-4 pb-8 pt-6 sm:px-8">
+      <div className="pointer-events-none absolute inset-x-0 bottom-0 z-[2] px-4 pb-6 pt-12 sm:px-8 sm:pb-8">
         <div
-          className="flex min-h-[200px] flex-1 flex-col rounded-[var(--radius-card)] border border-[var(--border-ui)] bg-[var(--surface-container)]/35 px-6 py-6 sm:px-10 sm:py-8"
+          className="flex min-h-[200px] max-h-[42dvh] flex-col rounded-[var(--radius-card)] border border-[var(--border-ui)] bg-[var(--surface-container)]/45 px-6 py-6 backdrop-blur-md sm:px-10 sm:py-8"
           aria-hidden
         >
           <SkeletonText lines={8} />
@@ -195,10 +195,10 @@ function SessionRoomDisplayContent() {
   }
 
   return (
-    <div className="relative flex min-h-dvh flex-col bg-[var(--color-obsidian)]">
+    <div className="relative min-h-dvh bg-[var(--color-obsidian)]">
       <DiceOverlay />
-      <div className="relative z-[1] w-full shrink-0 overflow-hidden">
-        <div className="relative w-full overflow-hidden bg-[var(--color-deep-void)] [aspect-ratio:16/9] max-h-[62vh]">
+      <div className="absolute inset-0 z-[1] overflow-hidden">
+        <div className="relative h-full w-full overflow-hidden bg-[var(--color-deep-void)]">
           <SceneHeader
             sceneImage={visible.sceneImage}
             previousSceneImage={visible.previousSceneImage}
@@ -220,12 +220,14 @@ function SessionRoomDisplayContent() {
           />
         </div>
       </div>
-      <div className="relative z-[2] flex min-h-0 flex-1 flex-col px-4 pb-8 pt-4 sm:px-8 sm:pt-6">
+      <div className="pointer-events-none absolute inset-x-0 bottom-0 z-[2] px-4 pb-6 pt-12 sm:px-8 sm:pb-8">
+        <div className="pointer-events-auto max-h-[42dvh] overflow-y-auto">
         <RoomDisplayNarration
           narrativeText={visible.narrativeText}
           isThinking={isThinking}
           partyMode={isPartyDisplay}
         />
+        </div>
       </div>
     </div>
   );
