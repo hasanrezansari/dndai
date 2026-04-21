@@ -34,6 +34,8 @@ export interface SceneHeaderProps {
    * icon never shows; optional loading shimmer over the frame while fetching.
    */
   roomDisplay?: boolean;
+  /** Room display: fired with intrinsic pixel size when the front scene image has loaded. */
+  onRoomDisplayImageIntrinsicSize?: (width: number, height: number) => void;
 }
 
 function phaseChipClass(phase: string | undefined): string {
@@ -55,10 +57,12 @@ function SceneHeaderRoomImages({
   sceneImage,
   previousSceneImage,
   scenePending,
+  onIntrinsicSize,
 }: {
   sceneImage: string;
   previousSceneImage: string | null;
   scenePending: boolean;
+  onIntrinsicSize?: (width: number, height: number) => void;
 }) {
   const [frontReady, setFrontReady] = useState(false);
   const [frontSrc, setFrontSrc] = useState(sceneImage);
@@ -106,6 +110,10 @@ function SceneHeaderRoomImages({
   const showGate =
     Boolean(sceneImage) && !frontReady && !scenePending;
 
+  /** Room / TV: show full frame — never crop heads; letterbox/pillarbox with scene bg. */
+  const roomFit =
+    "h-full w-full bg-[var(--color-deep-void)] object-contain object-center";
+
   return (
     <>
       {previousSceneImage && sceneImage ? (
@@ -114,7 +122,7 @@ function SceneHeaderRoomImages({
           src={prevSrc ?? previousSceneImage}
           alt=""
           onError={onPrevError}
-          className="absolute inset-0 z-0 h-full w-full bg-[var(--color-obsidian)] object-cover object-center"
+          className={`absolute inset-0 z-0 ${roomFit}`}
         />
       ) : null}
 
@@ -126,11 +134,19 @@ function SceneHeaderRoomImages({
             alt=""
             loading="eager"
             decoding="async"
-            onLoad={() => {
+            onLoad={(e) => {
               setFrontReady(true);
+              const el = e.currentTarget;
+              if (
+                onIntrinsicSize &&
+                el.naturalWidth > 0 &&
+                el.naturalHeight > 0
+              ) {
+                onIntrinsicSize(el.naturalWidth, el.naturalHeight);
+              }
             }}
             onError={onFrontError}
-            className={`absolute inset-0 z-[1] h-full w-full bg-[var(--color-obsidian)] object-cover object-center ${
+            className={`absolute inset-0 z-[1] ${roomFit} ${
               !frontReady ? "opacity-0" : ""
             }`}
             initial={{ opacity: 1 }}
@@ -148,7 +164,7 @@ function SceneHeaderRoomImages({
           onError={onPrevError}
           loading="eager"
           decoding="async"
-          className="absolute inset-0 z-0 h-full w-full bg-[var(--color-obsidian)] object-cover object-center"
+          className={`absolute inset-0 z-0 ${roomFit}`}
         />
       ) : null}
 
@@ -182,6 +198,7 @@ export function SceneHeader({
   showTapHint = true,
   showTurnWhenNoTeaser = true,
   roomDisplay = false,
+  onRoomDisplayImageIntrinsicSize,
 }: SceneHeaderProps) {
   const turnShort = currentPlayerName
     ? `${currentPlayerName}'s turn`
@@ -211,6 +228,10 @@ export function SceneHeader({
   }
   const visibleChips = showMetaChips ? chips.slice(0, 3) : [];
 
+  const sessionImageFit = roomDisplay
+    ? "h-full w-full bg-[var(--color-deep-void)] object-contain object-center"
+    : "h-full w-full object-cover";
+
   return (
     <div className="relative h-full w-full overflow-hidden">
       <div className="absolute inset-0">
@@ -230,6 +251,7 @@ export function SceneHeader({
             sceneImage={sceneImage}
             previousSceneImage={previousSceneImage}
             scenePending={scenePending}
+            onIntrinsicSize={onRoomDisplayImageIntrinsicSize}
           />
         ) : (
           <>
@@ -238,7 +260,7 @@ export function SceneHeader({
               <img
                 src={previousSceneImage}
                 alt=""
-                className="absolute inset-0 z-0 h-full w-full object-cover"
+                className={`absolute inset-0 z-0 ${sessionImageFit}`}
               />
             ) : null}
 
@@ -250,7 +272,7 @@ export function SceneHeader({
                   alt=""
                   loading="eager"
                   decoding="async"
-                  className="absolute inset-0 z-[1] h-full w-full object-cover"
+                  className={`absolute inset-0 z-[1] ${sessionImageFit}`}
                   initial={{ opacity: 1 }}
                   animate={{ opacity: 1 }}
                   transition={{ duration: 0.4 }}
@@ -265,7 +287,7 @@ export function SceneHeader({
                 alt=""
                 loading="eager"
                 decoding="async"
-                className="absolute inset-0 z-0 h-full w-full object-cover"
+                className={`absolute inset-0 z-0 ${sessionImageFit}`}
               />
             ) : null}
           </>

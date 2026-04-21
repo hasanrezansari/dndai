@@ -4,6 +4,7 @@ import { useSession } from "next-auth/react";
 import { useParams, useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useState } from "react";
 
+import { RoomDisplayArtFrame } from "@/components/display/room-display-art-frame";
 import { RoomDisplayNarration } from "@/components/display/room-display-narration";
 import { DiceOverlay } from "@/components/dice/dice-overlay";
 import { SkeletonText } from "@/components/ui/loading-skeleton";
@@ -17,16 +18,16 @@ import {
 
 function DisplaySkeleton() {
   return (
-    <div className="grid min-h-dvh w-full grid-rows-[minmax(0,1fr)_auto] bg-[var(--color-obsidian)]">
-      <div className="relative min-h-0 w-full overflow-hidden bg-[var(--color-deep-void)]">
+    <div className="flex min-h-dvh w-full flex-col bg-[var(--color-obsidian)] xl:h-[100dvh] xl:max-h-[100dvh] xl:flex-row xl:overflow-hidden">
+      <div className="relative flex min-h-0 max-sm:min-h-[42dvh] flex-1 flex-col overflow-hidden bg-[var(--color-deep-void)]">
         <span
           className="absolute inset-0 animate-shimmer opacity-25 pointer-events-none"
           aria-hidden
         />
       </div>
-      <div className="max-h-[46dvh] min-h-0 border-t border-[var(--border-divide)] px-4 py-4 sm:px-8">
+      <div className="max-h-[46dvh] min-h-0 w-full border-t border-[var(--border-divide)] px-4 py-4 sm:px-8 xl:max-h-none xl:flex xl:h-[100dvh] xl:max-h-[100dvh] xl:w-[min(440px,38vw)] xl:max-w-[min(520px,42vw)] xl:shrink-0 xl:flex-col xl:border-l xl:border-t-0 xl:px-6 xl:py-6">
         <div
-          className="flex min-h-[180px] flex-col rounded-[var(--radius-card)] border border-[var(--border-ui)] bg-[var(--surface-container)]/45 px-6 py-6 backdrop-blur-md sm:px-10 sm:py-8"
+          className="flex min-h-[180px] flex-col rounded-[var(--radius-card)] border border-[var(--border-ui)] bg-[var(--surface-container)]/45 px-6 py-6 backdrop-blur-md sm:px-10 sm:py-8 xl:min-h-0 xl:flex-1"
           aria-hidden
         >
           <SkeletonText lines={8} />
@@ -77,10 +78,15 @@ function SessionRoomDisplayContent() {
   const { data: authSession, status: authStatus } = useSession();
   const [hydrated, setHydrated] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [sceneAspect, setSceneAspect] = useState<number | null>(null);
 
   useEffect(() => {
     setHydrated(false);
   }, [sessionId, displayToken]);
+
+  useEffect(() => {
+    setSceneAspect(null);
+  }, [visible.sceneImage]);
 
   useEffect(() => {
     if (!sessionId) return;
@@ -195,31 +201,38 @@ function SessionRoomDisplayContent() {
   const roundNumber = session?.currentRound ?? 1;
 
   return (
-    <div className="relative grid min-h-dvh w-full grid-rows-[minmax(0,1fr)_auto] bg-[var(--color-obsidian)]">
+    <div className="relative flex min-h-dvh w-full flex-col bg-[var(--color-obsidian)] xl:h-[100dvh] xl:max-h-[100dvh] xl:flex-row xl:overflow-hidden">
       <DiceOverlay />
-      {/* Full-bleed art: row fills all space above narration; object-cover in SceneHeader. */}
-      <div className="relative min-h-0 w-full overflow-hidden bg-[var(--color-deep-void)]">
-        <SceneHeader
-          sceneImage={visible.sceneImage}
-          previousSceneImage={visible.previousSceneImage}
-          sceneTitle={sceneTitle}
-          roundNumber={roundNumber}
-          currentPlayerName={null}
-          scenePending={visible.scenePending}
-          phase={null}
-          phaseLabel={isPartyDisplay ? "Party" : null}
-          teaser={
-            isPartyDisplay && party
-              ? `${party.partyPhase} · round ${party.roundIndex}/${party.totalRounds}`
-              : null
-          }
-          showMetaChips={Boolean(isPartyDisplay)}
-          showTapHint={false}
-          showTurnWhenNoTeaser={false}
-          roomDisplay
-        />
+      <div className="relative z-0 flex min-h-0 max-sm:min-h-[42dvh] flex-1 flex-col overflow-hidden bg-[var(--color-deep-void)]">
+        <RoomDisplayArtFrame
+          naturalAspect={sceneAspect}
+          className="min-h-0 flex-1"
+        >
+          <SceneHeader
+            sceneImage={visible.sceneImage}
+            previousSceneImage={visible.previousSceneImage}
+            sceneTitle={sceneTitle}
+            roundNumber={roundNumber}
+            currentPlayerName={null}
+            scenePending={visible.scenePending}
+            phase={null}
+            phaseLabel={isPartyDisplay ? "Party" : null}
+            teaser={
+              isPartyDisplay && party
+                ? `${party.partyPhase} · round ${party.roundIndex}/${party.totalRounds}`
+                : null
+            }
+            showMetaChips={Boolean(isPartyDisplay)}
+            showTapHint={false}
+            showTurnWhenNoTeaser={false}
+            roomDisplay
+            onRoomDisplayImageIntrinsicSize={(w, h) => {
+              if (w > 0 && h > 0) setSceneAspect(w / h);
+            }}
+          />
+        </RoomDisplayArtFrame>
       </div>
-      <div className="relative z-10 flex max-h-[46dvh] min-h-0 w-full flex-col border-t border-[var(--border-divide)] bg-[var(--color-obsidian)]">
+      <div className="relative z-10 flex max-h-[46dvh] min-h-0 w-full flex-col border-t border-[var(--border-divide)] bg-[var(--color-obsidian)] xl:max-h-none xl:h-[100dvh] xl:max-h-[100dvh] xl:w-[min(440px,38vw)] xl:max-w-[min(520px,42vw)] xl:shrink-0 xl:border-l xl:border-t-0">
         {isPartyDisplay && party ? (
           <div className="flex flex-wrap items-center gap-1.5 px-4 pt-3 sm:px-6">
             <span className="rounded-[var(--radius-pill)] border border-[var(--border-ui-strong)] bg-[var(--color-obsidian)]/90 px-2.5 py-1 text-[9px] font-black uppercase tracking-[0.14em] text-[var(--outline)] backdrop-blur-sm">
@@ -238,11 +251,11 @@ function SessionRoomDisplayContent() {
             {sceneTitle.trim()}
           </h2>
         ) : null}
-        <div className="min-h-0 flex-1 overflow-y-auto px-4 pb-4 pt-2 sm:px-6 sm:pb-6">
+        <div className="min-h-0 flex-1 overflow-y-auto px-4 pb-4 pt-2 sm:px-6 sm:pb-6 xl:pt-3">
           <RoomDisplayNarration
             narrativeText={visible.narrativeText}
             isThinking={isThinking}
-            partyMode={isPartyDisplay}
+            partyMode={Boolean(isPartyDisplay)}
           />
         </div>
       </div>

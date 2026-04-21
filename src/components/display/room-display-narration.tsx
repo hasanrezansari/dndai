@@ -14,7 +14,7 @@ export interface RoomDisplayNarrationProps {
 }
 
 /**
- * Cinematic narrator block for `/session/[id]/display` only — full AI prose, no turn UI.
+ * Narrator block for `/session/[id]/display` only — not used on phone gameplay.
  */
 export function RoomDisplayNarration({
   narrativeText,
@@ -36,7 +36,7 @@ export function RoomDisplayNarration({
 
   return (
     <section
-      className="flex min-h-0 flex-1 flex-col rounded-[var(--radius-card)] border border-[var(--border-ui)] bg-[var(--surface-container)]/35 px-6 py-6 backdrop-blur-md sm:px-10 sm:py-8"
+      className="flex min-h-0 flex-1 flex-col rounded-[var(--radius-card)] border border-[var(--border-ui)] bg-[var(--surface-container)]/35 px-6 py-6 backdrop-blur-md sm:px-10 sm:py-8 xl:rounded-l-none xl:border-l-0 xl:border-y xl:border-r xl:bg-[var(--surface-container)]/20"
       aria-label="Narration"
     >
       <div className="mb-4 flex items-center gap-2">
@@ -52,7 +52,7 @@ export function RoomDisplayNarration({
         </p>
       </div>
 
-      <div className="min-h-[12rem] flex-1 overflow-y-auto pr-1">
+      <div className="min-h-[6rem] flex-1 overflow-y-auto pr-1 sm:min-h-[8rem]">
         {isThinking ? (
           <AnimatePresence mode="wait">
             <motion.p
