@@ -205,9 +205,19 @@ html[data-app-skin="whatifplay"] .home-atmosphere-layer {
 }
 
 .room-display-rail {
-  background: color-mix(in srgb, var(--glass-bg) 52%, transparent);
-  backdrop-filter: blur(22px) saturate(1.22);
-  -webkit-backdrop-filter: blur(22px) saturate(1.22);
+  background: linear-gradient(
+      185deg,
+      color-mix(in srgb, var(--surface-high) 24%, transparent) 0%,
+      transparent 40%
+    ),
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--color-midnight) 35%, transparent) 70%,
+      color-mix(in srgb, var(--color-deep-void) 55%, transparent) 100%
+    ),
+    color-mix(in srgb, var(--glass-bg) 48%, transparent);
+  backdrop-filter: blur(24px) saturate(1.25);
+  -webkit-backdrop-filter: blur(24px) saturate(1.25);
   box-shadow: var(--glass-inner-shadow),
     inset 0 1px 0 rgba(255, 255, 255, 0.055);
   border-top: 1px solid color-mix(in srgb, var(--outline) 14%, transparent);
@@ -222,21 +232,55 @@ html[data-app-skin="whatifplay"] .home-atmosphere-layer {
   }
 }
 
+/* Narration card: same “cinematic slab” read as hero-bottom overlay — vertical charcoal → deep void */
 .room-display-narration-glass {
   position: relative;
   isolation: isolate;
+  overflow: hidden;
   border-radius: var(--radius-card);
   background: linear-gradient(
-    152deg,
-    color-mix(in srgb, #fff 8%, transparent) 0%,
-    color-mix(in srgb, var(--glass-bg) 42%, transparent) 42%,
-    color-mix(in srgb, var(--surface-container) 28%, transparent) 100%
-  );
-  backdrop-filter: blur(20px) saturate(1.18);
-  -webkit-backdrop-filter: blur(20px) saturate(1.18);
-  border: 1px solid color-mix(in srgb, var(--outline) 19%, transparent);
-  box-shadow: var(--glass-inner-shadow), 0 12px 44px rgba(0, 0, 0, 0.32),
+      180deg,
+      color-mix(in srgb, var(--surface-high) 58%, transparent) 0%,
+      color-mix(in srgb, var(--surface-container) 52%, transparent) 22%,
+      color-mix(in srgb, var(--color-midnight) 76%, transparent) 55%,
+      color-mix(in srgb, var(--color-deep-void) 94%, transparent) 100%
+    ),
+    linear-gradient(
+      105deg,
+      color-mix(in srgb, var(--atmosphere-mystery) 22%, transparent) 0%,
+      transparent 50%
+    ),
+    linear-gradient(
+      0deg,
+      color-mix(in srgb, #fff 5%, transparent) 0%,
+      transparent 14%
+    );
+  backdrop-filter: blur(28px) saturate(1.28);
+  -webkit-backdrop-filter: blur(28px) saturate(1.28);
+  border: 1px solid color-mix(in srgb, var(--outline) 24%, transparent);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.1),
+    inset 0 -18px 36px rgba(0, 0, 0, 0.42), 0 18px 52px rgba(0, 0, 0, 0.42),
     var(--glass-edge-glow);
+}
+
+.room-display-narration-glass::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  background: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.07) 0%,
+    transparent 16%
+  );
+  opacity: 0.85;
+}
+
+.room-display-narration-glass > * {
+  position: relative;
+  z-index: 1;
 }
 
 @media (min-width: 1280px) {
@@ -244,6 +288,11 @@ html[data-app-skin="whatifplay"] .home-atmosphere-layer {
     border-top-left-radius: 0;
     border-bottom-left-radius: 0;
     border-left: none;
+  }
+
+  .room-display-narration-glass::before {
+    border-top-left-radius: 0;
+    border-bottom-left-radius: 0;
   }
 }
 
