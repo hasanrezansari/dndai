@@ -17,18 +17,16 @@ import {
 
 function DisplaySkeleton() {
   return (
-    <div className="relative min-h-dvh bg-[var(--color-obsidian)]">
-      <div className="absolute inset-0 z-[1] overflow-hidden">
-        <div className="relative h-full w-full overflow-hidden bg-[var(--color-deep-void)]">
-          <span
-            className="absolute inset-0 animate-shimmer opacity-25 pointer-events-none"
-            aria-hidden
-          />
-        </div>
+    <div className="grid min-h-dvh w-full grid-rows-[minmax(0,1fr)_auto] bg-[var(--color-obsidian)]">
+      <div className="relative min-h-0 w-full overflow-hidden bg-[var(--color-deep-void)]">
+        <span
+          className="absolute inset-0 animate-shimmer opacity-25 pointer-events-none"
+          aria-hidden
+        />
       </div>
-      <div className="pointer-events-none absolute inset-x-0 bottom-0 z-[2] px-4 pb-6 pt-12 sm:px-8 sm:pb-8">
+      <div className="max-h-[46dvh] min-h-0 border-t border-[var(--border-divide)] px-4 py-4 sm:px-8">
         <div
-          className="flex min-h-[200px] max-h-[42dvh] flex-col rounded-[var(--radius-card)] border border-[var(--border-ui)] bg-[var(--surface-container)]/45 px-6 py-6 backdrop-blur-md sm:px-10 sm:py-8"
+          className="flex min-h-[180px] flex-col rounded-[var(--radius-card)] border border-[var(--border-ui)] bg-[var(--surface-container)]/45 px-6 py-6 backdrop-blur-md sm:px-10 sm:py-8"
           aria-hidden
         >
           <SkeletonText lines={8} />
@@ -194,39 +192,58 @@ function SessionRoomDisplayContent() {
     );
   }
 
+  const roundNumber = session?.currentRound ?? 1;
+
   return (
-    <div className="relative min-h-dvh bg-[var(--color-obsidian)]">
+    <div className="relative grid min-h-dvh w-full grid-rows-[minmax(0,1fr)_auto] bg-[var(--color-obsidian)]">
       <DiceOverlay />
-      <div className="absolute inset-0 z-[1] overflow-hidden">
-        <div className="relative h-full w-full overflow-hidden bg-[var(--color-deep-void)]">
-          <SceneHeader
-            sceneImage={visible.sceneImage}
-            previousSceneImage={visible.previousSceneImage}
-            sceneTitle={sceneTitle}
-            roundNumber={session?.currentRound ?? 1}
-            currentPlayerName={null}
-            scenePending={visible.scenePending}
-            phase={null}
-            phaseLabel={isPartyDisplay ? "Party" : null}
-            teaser={
-              isPartyDisplay && party
-                ? `${party.partyPhase} · round ${party.roundIndex}/${party.totalRounds}`
-                : null
-            }
-            showMetaChips={Boolean(isPartyDisplay)}
-            showTapHint={false}
-            showTurnWhenNoTeaser={false}
-            roomDisplay
-          />
-        </div>
-      </div>
-      <div className="pointer-events-none absolute inset-x-0 bottom-0 z-[2] px-4 pb-6 pt-12 sm:px-8 sm:pb-8">
-        <div className="pointer-events-auto max-h-[42dvh] overflow-y-auto">
-        <RoomDisplayNarration
-          narrativeText={visible.narrativeText}
-          isThinking={isThinking}
-          partyMode={isPartyDisplay}
+      {/* Full-bleed art: row fills all space above narration; object-cover in SceneHeader. */}
+      <div className="relative min-h-0 w-full overflow-hidden bg-[var(--color-deep-void)]">
+        <SceneHeader
+          sceneImage={visible.sceneImage}
+          previousSceneImage={visible.previousSceneImage}
+          sceneTitle={sceneTitle}
+          roundNumber={roundNumber}
+          currentPlayerName={null}
+          scenePending={visible.scenePending}
+          phase={null}
+          phaseLabel={isPartyDisplay ? "Party" : null}
+          teaser={
+            isPartyDisplay && party
+              ? `${party.partyPhase} · round ${party.roundIndex}/${party.totalRounds}`
+              : null
+          }
+          showMetaChips={Boolean(isPartyDisplay)}
+          showTapHint={false}
+          showTurnWhenNoTeaser={false}
+          roomDisplay
         />
+      </div>
+      <div className="relative z-10 flex max-h-[46dvh] min-h-0 w-full flex-col border-t border-[var(--border-divide)] bg-[var(--color-obsidian)]">
+        {isPartyDisplay && party ? (
+          <div className="flex flex-wrap items-center gap-1.5 px-4 pt-3 sm:px-6">
+            <span className="rounded-[var(--radius-pill)] border border-[var(--border-ui-strong)] bg-[var(--color-obsidian)]/90 px-2.5 py-1 text-[9px] font-black uppercase tracking-[0.14em] text-[var(--outline)] backdrop-blur-sm">
+              Party
+            </span>
+            <span className="rounded-[var(--radius-pill)] border border-[var(--border-ui-strong)] bg-[var(--color-obsidian)]/90 px-2.5 py-1 text-[9px] font-black uppercase tracking-[0.14em] text-[var(--outline)] backdrop-blur-sm">
+              Round {roundNumber}
+            </span>
+            <span className="rounded-[var(--radius-pill)] border border-[var(--border-ui-strong)] bg-[var(--color-obsidian)]/90 px-2.5 py-1 text-[9px] font-black uppercase tracking-[0.14em] text-[var(--color-silver-muted)] backdrop-blur-sm">
+              {party.partyPhase} · {party.roundIndex}/{party.totalRounds}
+            </span>
+          </div>
+        ) : null}
+        {sceneTitle?.trim() ? (
+          <h2 className="text-fantasy px-4 pt-3 text-base font-black leading-tight tracking-tight text-[var(--color-silver-muted)] sm:px-6 sm:text-lg">
+            {sceneTitle.trim()}
+          </h2>
+        ) : null}
+        <div className="min-h-0 flex-1 overflow-y-auto px-4 pb-4 pt-2 sm:px-6 sm:pb-6">
+          <RoomDisplayNarration
+            narrativeText={visible.narrativeText}
+            isThinking={isThinking}
+            partyMode={isPartyDisplay}
+          />
         </div>
       </div>
     </div>

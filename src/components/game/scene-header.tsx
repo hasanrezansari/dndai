@@ -114,7 +114,7 @@ function SceneHeaderRoomImages({
           src={prevSrc ?? previousSceneImage}
           alt=""
           onError={onPrevError}
-          className="absolute inset-0 z-0 h-full w-full bg-[var(--color-obsidian)] object-contain object-center"
+          className="absolute inset-0 z-0 h-full w-full bg-[var(--color-obsidian)] object-cover object-center"
         />
       ) : null}
 
@@ -130,7 +130,7 @@ function SceneHeaderRoomImages({
               setFrontReady(true);
             }}
             onError={onFrontError}
-            className={`absolute inset-0 z-[1] h-full w-full bg-[var(--color-obsidian)] object-contain object-center ${
+            className={`absolute inset-0 z-[1] h-full w-full bg-[var(--color-obsidian)] object-cover object-center ${
               !frontReady ? "opacity-0" : ""
             }`}
             initial={{ opacity: 1 }}
@@ -148,7 +148,7 @@ function SceneHeaderRoomImages({
           onError={onPrevError}
           loading="eager"
           decoding="async"
-          className="absolute inset-0 z-0 h-full w-full bg-[var(--color-obsidian)] object-contain object-center"
+          className="absolute inset-0 z-0 h-full w-full bg-[var(--color-obsidian)] object-cover object-center"
         />
       ) : null}
 
@@ -272,7 +272,9 @@ export function SceneHeader({
         )}
       </div>
 
-      <div className="absolute inset-0 bg-gradient-to-t from-[var(--color-obsidian)] via-[var(--color-obsidian)]/55 to-transparent" />
+      {!roomDisplay ? (
+        <div className="absolute inset-0 bg-gradient-to-t from-[var(--color-obsidian)] via-[var(--color-obsidian)]/55 to-transparent" />
+      ) : null}
 
       {showServerPendingOverlay ? (
         <div
@@ -286,47 +288,49 @@ export function SceneHeader({
         </div>
       ) : null}
 
-      <div className="pointer-events-none absolute inset-x-0 bottom-0 top-0 z-[2] flex flex-col justify-end pb-4 pl-4 pr-4 pt-14">
-        {visibleChips.length > 0 ? (
-          <div className="flex flex-wrap items-center gap-1.5">
-            {visibleChips.map((c, i) => (
-              <span
-                key={`${c.text}-${i}`}
-                className={`rounded-[var(--radius-pill)] border bg-[var(--color-obsidian)]/75 px-2.5 py-1 text-[9px] font-black uppercase tracking-[0.14em] backdrop-blur-sm ${
-                  c.accentPhase
-                    ? phaseChipClass(c.accentPhase)
-                    : "border-[var(--border-ui-strong)] text-[var(--outline)]"
-                }`}
-              >
-                {c.text}
-              </span>
-            ))}
-          </div>
-        ) : null}
-        <h1
-          className="text-fantasy mt-2 line-clamp-1 text-lg font-black leading-tight tracking-tight text-[var(--color-silver-muted)] sm:text-xl"
-          style={{
-            textShadow:
-              "0 2px 20px rgba(0,0,0,0.98), 0 1px 6px rgba(0,0,0,0.95)",
-          }}
-        >
-          {sceneTitle ?? "The world awaits…"}
-        </h1>
-        {teaser?.trim() ? (
-          <p className="mt-1 line-clamp-1 text-[11px] leading-snug text-[var(--color-silver-dim)]">
-            {teaser}
-          </p>
-        ) : showTurnWhenNoTeaser ? (
-          <p className="mt-1 line-clamp-1 text-[10px] font-bold uppercase tracking-wider text-[var(--color-gold-rare)]">
-            {turnShort}
-          </p>
-        ) : null}
-        {showTapHint ? (
-          <p className="mt-2 text-[9px] font-bold uppercase tracking-[0.18em] text-[var(--outline)]">
-            Tap for scene &amp; lore
-          </p>
-        ) : null}
-      </div>
+      {!roomDisplay ? (
+        <div className="pointer-events-none absolute inset-x-0 bottom-0 top-0 z-[2] flex flex-col justify-end pb-4 pl-4 pr-4 pt-14">
+          {visibleChips.length > 0 ? (
+            <div className="flex flex-wrap items-center gap-1.5">
+              {visibleChips.map((c, i) => (
+                <span
+                  key={`${c.text}-${i}`}
+                  className={`rounded-[var(--radius-pill)] border bg-[var(--color-obsidian)]/75 px-2.5 py-1 text-[9px] font-black uppercase tracking-[0.14em] backdrop-blur-sm ${
+                    c.accentPhase
+                      ? phaseChipClass(c.accentPhase)
+                      : "border-[var(--border-ui-strong)] text-[var(--outline)]"
+                  }`}
+                >
+                  {c.text}
+                </span>
+              ))}
+            </div>
+          ) : null}
+          <h1
+            className="text-fantasy mt-2 line-clamp-1 text-lg font-black leading-tight tracking-tight text-[var(--color-silver-muted)] sm:text-xl"
+            style={{
+              textShadow:
+                "0 2px 20px rgba(0,0,0,0.98), 0 1px 6px rgba(0,0,0,0.95)",
+            }}
+          >
+            {sceneTitle ?? "The world awaits…"}
+          </h1>
+          {teaser?.trim() ? (
+            <p className="mt-1 line-clamp-1 text-[11px] leading-snug text-[var(--color-silver-dim)]">
+              {teaser}
+            </p>
+          ) : showTurnWhenNoTeaser ? (
+            <p className="mt-1 line-clamp-1 text-[10px] font-bold uppercase tracking-wider text-[var(--color-gold-rare)]">
+              {turnShort}
+            </p>
+          ) : null}
+          {showTapHint ? (
+            <p className="mt-2 text-[9px] font-bold uppercase tracking-[0.18em] text-[var(--outline)]">
+              Tap for scene &amp; lore
+            </p>
+          ) : null}
+        </div>
+      ) : null}
 
       {onOpenDetails && !showBlockingPaintOverlay ? (
         <button
