@@ -1,7 +1,14 @@
 import { and, asc, count, desc, eq, sql } from "drizzle-orm";
 
+import { ApiError } from "@/lib/api/errors";
 import { db } from "@/lib/db";
-import { players, profileHeroes, sessions, userProfileSettings } from "@/lib/db/schema";
+import {
+  authUsers,
+  players,
+  profileHeroes,
+  sessions,
+  userProfileSettings,
+} from "@/lib/db/schema";
 import { CharacterStatsSchema, ClassProfileSchema } from "@/lib/schemas/domain";
 import type { CharacterStats, ClassProfile } from "@/lib/schemas/domain";
 import { normalizeCharacterRace } from "@/lib/rules/character";
@@ -78,6 +85,17 @@ export async function getOrCreateProfileSettings(userId: string): Promise<{
       freePortraitUses: row.free_portrait_uses ?? 0,
       purchasedHeroSlots: row.purchased_hero_slots ?? 0,
     };
+  }
+  const [authRow] = await db
+    .select({ id: authUsers.id })
+    .from(authUsers)
+    .where(eq(authUsers.id, userId))
+    .limit(1);
+  if (!authRow) {
+    throw new ApiError(
+      "Your sign-in is out of sync with the database. Sign out and sign in again.",
+      401,
+    );
   }
   try {
     const [created] = await db

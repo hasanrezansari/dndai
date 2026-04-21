@@ -6,6 +6,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   MAX_TURN_EXTENSIONS_PER_CHAPTER,
   TURN_EXTENSION_SEC,
+  TURN_READING_GRACE_SEC,
   TURN_SOFT_WARN_SEC,
 } from "@/lib/turn/timeout-config";
 
@@ -13,6 +14,8 @@ export interface TurnBannerProps {
   visible: boolean;
   /** ISO deadline from server (`currentTurnDeadlineAt`). */
   deadlineAt: string | null;
+  /** ISO turn start for reading grace (`currentTurnStartedAt`). */
+  turnStartedAt: string | null;
   /** Uses left this chapter for the viewing actor, or null. */
   extensionsRemaining: number | null;
   sessionId: string | null;
@@ -29,6 +32,7 @@ function formatRemain(seconds: number): string {
 export function TurnBanner({
   visible,
   deadlineAt,
+  turnStartedAt,
   extensionsRemaining,
   sessionId,
   playerId,
@@ -41,7 +45,24 @@ export function TurnBanner({
     return () => window.clearInterval(id);
   }, []);
 
-  const secondsLeft = useMemo(() => {
+  const readingEndMs = useMemo(() => {
+    if (!turnStartedAt || TURN_READING_GRACE_SEC <= 0) return null;
+    const t = new Date(turnStartedAt).getTime();
+    if (!Number.isFinite(t)) return null;
+    return t + TURN_READING_GRACE_SEC * 1000;
+  }, [turnStartedAt]);
+
+  const inReadingPhase = useMemo(() => {
+    if (readingEndMs == null) return false;
+    return now < readingEndMs;
+  }, [readingEndMs, now]);
+
+  const secondsToReadingEnd = useMemo(() => {
+    if (readingEndMs == null) return null;
+    return (readingEndMs - now) / 1000;
+  }, [readingEndMs, now]);
+
+  const secondsToDeadline = useMemo(() => {
     if (!deadlineAt) return null;
     const end = new Date(deadlineAt).getTime();
     if (!Number.isFinite(end)) return null;
@@ -69,12 +90,22 @@ export function TurnBanner({
 
   if (!visible) return null;
 
+  const actionPhase = !inReadingPhase;
+  const displaySeconds =
+    inReadingPhase && secondsToReadingEnd !== null
+      ? secondsToReadingEnd
+      : secondsToDeadline;
+
   const warn =
-    secondsLeft !== null &&
-    secondsLeft <= TURN_SOFT_WARN_SEC &&
-    secondsLeft > 0;
+    actionPhase &&
+    secondsToDeadline !== null &&
+    secondsToDeadline <= TURN_SOFT_WARN_SEC &&
+    secondsToDeadline > 0;
   const urgent =
-    secondsLeft !== null && secondsLeft <= 10 && secondsLeft > 0;
+    actionPhase &&
+    secondsToDeadline !== null &&
+    secondsToDeadline <= 10 &&
+    secondsToDeadline > 0;
 
   const showExtend =
     extensionsRemaining !== null &&
@@ -105,20 +136,24 @@ export function TurnBanner({
             swords
           </span>
           <span className="text-[10px] font-black uppercase tracking-[0.2em] text-[var(--color-gold-rare)]">
-            Your Turn
+            {inReadingPhase ? "Reading time" : "Your turn"}
           </span>
         </div>
-        {secondsLeft !== null ? (
+        {displaySeconds !== null ? (
           <div
             className={`pointer-events-none min-w-[2.75rem] text-center font-mono text-xs font-bold tabular-nums ${
               urgent ? "text-red-200" : warn ? "text-amber-200" : "text-[var(--color-gold-support)]"
             }`}
             aria-live="polite"
           >
-            {formatRemain(secondsLeft)}
+            {formatRemain(displaySeconds)}
             {warn ? (
               <span className="ml-1.5 text-[9px] font-semibold uppercase tracking-wide opacity-90">
                 {urgent ? "Hurry" : "Wrapping"}
+              </span>
+            ) : inReadingPhase ? (
+              <span className="ml-1.5 text-[9px] font-semibold uppercase tracking-wide opacity-80">
+                Scene
               </span>
             ) : null}
           </div>

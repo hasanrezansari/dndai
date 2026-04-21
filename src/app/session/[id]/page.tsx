@@ -149,6 +149,7 @@ export default function SessionGameplayPage() {
   const isThinking = useGameStore((s) => s.isThinking);
   const currentPlayerId = useGameStore((s) => s.currentPlayerId);
   const currentTurnDeadlineAt = useGameStore((s) => s.currentTurnDeadlineAt);
+  const currentTurnStartedAt = useGameStore((s) => s.currentTurnStartedAt);
   const turnExtensionsRemaining = useGameStore((s) => s.turnExtensionsRemaining);
   const activeSheet = useGameStore((s) => s.activeSheet);
   const closeSheet = useGameStore((s) => s.closeSheet);
@@ -1303,6 +1304,9 @@ export default function SessionGameplayPage() {
             visible={isMyTurn && !(session?.mode === "human_dm" && isDm)}
             deadlineAt={
               session?.gameKind === "party" ? null : currentTurnDeadlineAt
+            }
+            turnStartedAt={
+              session?.gameKind === "party" ? null : currentTurnStartedAt
             }
             extensionsRemaining={
               session?.gameKind === "party" ? null : turnExtensionsRemaining

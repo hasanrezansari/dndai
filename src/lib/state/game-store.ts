@@ -236,6 +236,8 @@ export type SessionStatePayload = {
   activeTurnId?: string | null;
   /** ISO deadline for the current `awaiting_input` turn (campaign only). */
   currentTurnDeadlineAt?: string | null;
+  /** ISO turn `started_at` for reading-grace UI (campaign `awaiting_input` only). */
+  currentTurnStartedAt?: string | null;
   /**
    * Extensions left for the viewing user this chapter when they are the current actor;
    * otherwise omitted / null.
@@ -270,6 +272,8 @@ interface GameState {
   activeTurnId: string | null;
   /** Campaign: server-side auto-resolve deadline for the open player turn. */
   currentTurnDeadlineAt: string | null;
+  /** Campaign: turn start time for reading phase vs action countdown. */
+  currentTurnStartedAt: string | null;
   /** When this client is the current actor: +30s uses left this chapter. */
   turnExtensionsRemaining: number | null;
   npcs: NpcCombatantView[];
@@ -322,6 +326,8 @@ interface GameState {
   setTurnClock: (params: {
     deadlineAt: string | null;
     extensionsRemaining: number | null;
+    /** When set (including `null`), updates `currentTurnStartedAt`; omit to leave unchanged. */
+    turnStartedAt?: string | null;
   }) => void;
 }
 
@@ -359,6 +365,7 @@ const emptyState = {
   hpFlash: {} as Record<string, "damage" | "heal">,
   activeTurnId: null as string | null,
   currentTurnDeadlineAt: null as string | null,
+  currentTurnStartedAt: null as string | null,
   turnExtensionsRemaining: null as number | null,
   npcs: [] as NpcCombatantView[],
 };
@@ -447,11 +454,14 @@ export const useGameStore = create<GameState>((set) => ({
 
   setActiveTurnId: (id) => set({ activeTurnId: id }),
 
-  setTurnClock: ({ deadlineAt, extensionsRemaining }) =>
-    set({
+  setTurnClock: ({ deadlineAt, extensionsRemaining, turnStartedAt }) =>
+    set((s) => ({
       currentTurnDeadlineAt: deadlineAt,
       turnExtensionsRemaining: extensionsRemaining,
-    }),
+      ...(turnStartedAt !== undefined
+        ? { currentTurnStartedAt: turnStartedAt }
+        : {}),
+    })),
 
   updateSessionField: (field, value) =>
     set((s) => {
@@ -481,6 +491,10 @@ export const useGameStore = create<GameState>((set) => ({
         data.currentTurnDeadlineAt === undefined
           ? null
           : data.currentTurnDeadlineAt,
+      currentTurnStartedAt:
+        data.currentTurnStartedAt === undefined
+          ? null
+          : data.currentTurnStartedAt,
       turnExtensionsRemaining:
         data.turnExtensionsRemaining === undefined
           ? null
@@ -514,6 +528,10 @@ export const useGameStore = create<GameState>((set) => ({
           data.currentTurnDeadlineAt === undefined
             ? s.currentTurnDeadlineAt
             : data.currentTurnDeadlineAt,
+        currentTurnStartedAt:
+          data.currentTurnStartedAt === undefined
+            ? s.currentTurnStartedAt
+            : data.currentTurnStartedAt,
         turnExtensionsRemaining:
           data.turnExtensionsRemaining === undefined
             ? s.turnExtensionsRemaining

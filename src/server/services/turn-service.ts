@@ -20,7 +20,7 @@ import {
   MAX_TURN_EXTENSIONS_PER_CHAPTER,
   TURN_AWAY_STREAK_THRESHOLD,
   TURN_EXTENSION_SEC,
-  TURN_TIMEOUT_SEC,
+  turnAwaitingInputTotalSec,
   turnDeadlineFromNow,
 } from "@/lib/turn/timeout-config";
 import type { Turn } from "@/lib/schemas/domain";
@@ -237,7 +237,7 @@ export async function createFirstTurn(sessionId: string): Promise<string> {
       player_id: first.id,
       phase: sessionRow.phase,
       status: "awaiting_input",
-      deadline_at: turnDeadlineFromNow(TURN_TIMEOUT_SEC),
+      deadline_at: turnDeadlineFromNow(turnAwaitingInputTotalSec()),
     })
     .returning();
 
@@ -270,6 +270,7 @@ export async function createFirstTurn(sessionId: string): Promise<string> {
       player_id: first.id,
       round_number: updatedSession.current_round,
       deadline_at: turn.deadline_at?.toISOString() ?? null,
+      turn_started_at: turn.started_at.toISOString(),
       turn_extensions_remaining: turnExtensionsRemaining,
     });
   } catch (err) {
@@ -513,7 +514,7 @@ export async function advanceTurn(
       player_id: nextPlayer.id,
       phase: sessionRow.phase,
       status: "awaiting_input",
-      deadline_at: turnDeadlineFromNow(TURN_TIMEOUT_SEC),
+      deadline_at: turnDeadlineFromNow(turnAwaitingInputTotalSec()),
     })
     .returning();
 
@@ -558,6 +559,7 @@ export async function advanceTurn(
       player_id: nextPlayer.id,
       round_number: nextRound,
       deadline_at: newTurn.deadline_at?.toISOString() ?? null,
+      turn_started_at: newTurn.started_at.toISOString(),
       turn_extensions_remaining: turnExtensionsRemaining,
     });
   } catch (err) {
@@ -602,7 +604,7 @@ export async function processExpiredTurnForSession(sessionId: string): Promise<b
   if (!awaitingTurn.deadline_at) {
     await db
       .update(turns)
-      .set({ deadline_at: turnDeadlineFromNow(TURN_TIMEOUT_SEC) })
+      .set({ deadline_at: turnDeadlineFromNow(turnAwaitingInputTotalSec()) })
       .where(eq(turns.id, awaitingTurn.id));
     return false;
   }
@@ -733,7 +735,7 @@ export async function extendTurnDeadlineForSession(params: {
     }
 
     const newDeadline = !awaiting.deadline_at
-      ? turnDeadlineFromNow(TURN_TIMEOUT_SEC + TURN_EXTENSION_SEC)
+      ? turnDeadlineFromNow(turnAwaitingInputTotalSec() + TURN_EXTENSION_SEC)
       : new Date(
           Math.max(Date.now(), awaiting.deadline_at.getTime()) +
             TURN_EXTENSION_SEC * 1000,
@@ -934,7 +936,7 @@ export async function resolveHumanDmTurn(params: {
       player_id: nextPlayer.id,
       phase: sessionRow.phase,
       status: "awaiting_input",
-      deadline_at: turnDeadlineFromNow(TURN_TIMEOUT_SEC),
+      deadline_at: turnDeadlineFromNow(turnAwaitingInputTotalSec()),
     })
     .returning();
 
@@ -967,6 +969,7 @@ export async function resolveHumanDmTurn(params: {
       player_id: nextPlayer.id,
       round_number: nextRound,
       deadline_at: newTurn.deadline_at?.toISOString() ?? null,
+      turn_started_at: newTurn.started_at.toISOString(),
       turn_extensions_remaining: turnExtensionsRemaining,
     });
   } catch (err) {

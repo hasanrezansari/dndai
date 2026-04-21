@@ -55,6 +55,11 @@ export const TurnStartedEventSchema = z.object({
   /** ISO timestamp when the turn auto-resolves if no action (campaign RPG). */
   deadline_at: z.iso.datetime().nullable().optional(),
   /**
+   * When `deadline_at` is set: server turn `started_at` (reading grace ends at
+   * started + TURN_READING_GRACE_SEC; action countdown runs until `deadline_at`).
+   */
+  turn_started_at: z.iso.datetime().optional(),
+  /**
    * Uses of "Need more time" left for the acting player this chapter (same value
    * for every subscriber; only the actor's client uses it).
    */

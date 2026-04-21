@@ -810,11 +810,16 @@ export async function loadSessionStatePayload(
 
   let activeTurnId: string | null = null;
   let currentTurnDeadlineAt: string | null = null;
+  let currentTurnStartedAt: string | null = null;
   let turnExtensionsRemaining: number | null = null;
 
   if (sessionRow.current_player_id) {
     const [awaitingTurnRow] = await db
-      .select({ id: turns.id, deadline_at: turns.deadline_at })
+      .select({
+        id: turns.id,
+        deadline_at: turns.deadline_at,
+        started_at: turns.started_at,
+      })
       .from(turns)
       .where(
         and(
@@ -829,6 +834,8 @@ export async function loadSessionStatePayload(
     if (sessionRow.game_kind !== "party") {
       currentTurnDeadlineAt =
         awaitingTurnRow?.deadline_at?.toISOString() ?? null;
+      currentTurnStartedAt =
+        awaitingTurnRow?.started_at?.toISOString() ?? null;
       if (viewer?.userId) {
         const me = mappedPlayers.find((p) => p.userId === viewer.userId);
         if (me?.id === sessionRow.current_player_id) {
@@ -951,6 +958,7 @@ export async function loadSessionStatePayload(
     quest,
     rollingMemories,
     currentTurnDeadlineAt,
+    currentTurnStartedAt,
     turnExtensionsRemaining,
   };
 }

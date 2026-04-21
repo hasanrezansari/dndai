@@ -299,6 +299,7 @@ export function useSessionChannel(
       useGameStore.getState().setTurnClock({
         deadlineAt: parsed.data.deadline_at ?? null,
         extensionsRemaining: isMine ? ext : null,
+        turnStartedAt: parsed.data.turn_started_at ?? null,
       });
       const players = useGameStore.getState().players;
       const name = playerDisplayName(players, parsed.data.player_id);
