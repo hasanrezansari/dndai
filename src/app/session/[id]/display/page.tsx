@@ -18,16 +18,16 @@ import {
 
 function DisplaySkeleton() {
   return (
-    <div className="flex min-h-dvh w-full flex-col bg-[var(--color-obsidian)] xl:h-[100dvh] xl:max-h-[100dvh] xl:flex-row xl:overflow-hidden">
-      <div className="relative flex min-h-0 max-sm:min-h-[42dvh] flex-1 flex-col overflow-hidden bg-[var(--color-deep-void)]">
+    <div className="room-display-root flex min-h-dvh w-full flex-col xl:h-[100dvh] xl:max-h-[100dvh] xl:flex-row xl:overflow-hidden">
+      <div className="room-display-art-well relative flex min-h-0 max-sm:min-h-[42dvh] flex-1 flex-col overflow-hidden">
         <span
-          className="absolute inset-0 animate-shimmer opacity-25 pointer-events-none"
+          className="absolute inset-0 animate-shimmer opacity-[0.18] pointer-events-none"
           aria-hidden
         />
       </div>
-      <div className="max-h-[46dvh] min-h-0 w-full border-t border-[var(--border-divide)] px-4 py-4 sm:px-8 xl:max-h-none xl:flex xl:h-[100dvh] xl:max-h-[100dvh] xl:w-[min(440px,38vw)] xl:max-w-[min(520px,42vw)] xl:shrink-0 xl:flex-col xl:border-l xl:border-t-0 xl:px-6 xl:py-6">
+      <div className="room-display-rail max-h-[46dvh] min-h-0 w-full px-4 py-4 sm:px-8 xl:max-h-none xl:flex xl:h-[100dvh] xl:max-h-[100dvh] xl:w-[min(440px,38vw)] xl:max-w-[min(520px,42vw)] xl:shrink-0 xl:flex-col xl:px-6 xl:py-6">
         <div
-          className="flex min-h-[180px] flex-col rounded-[var(--radius-card)] border border-[var(--border-ui)] bg-[var(--surface-container)]/45 px-6 py-6 backdrop-blur-md sm:px-10 sm:py-8 xl:min-h-0 xl:flex-1"
+          className="room-display-narration-glass flex min-h-[180px] flex-col px-6 py-6 sm:px-10 sm:py-8 xl:min-h-0 xl:flex-1"
           aria-hidden
         >
           <SkeletonText lines={8} />
@@ -201,9 +201,9 @@ function SessionRoomDisplayContent() {
   const roundNumber = session?.currentRound ?? 1;
 
   return (
-    <div className="relative flex min-h-dvh w-full flex-col bg-[var(--color-obsidian)] xl:h-[100dvh] xl:max-h-[100dvh] xl:flex-row xl:overflow-hidden">
+    <div className="room-display-root relative flex min-h-dvh w-full flex-col xl:h-[100dvh] xl:max-h-[100dvh] xl:flex-row xl:overflow-hidden">
       <DiceOverlay />
-      <div className="relative z-0 flex min-h-0 max-sm:min-h-[42dvh] flex-1 flex-col overflow-hidden bg-[var(--color-deep-void)]">
+      <div className="room-display-art-well relative z-0 flex min-h-0 max-sm:min-h-[42dvh] flex-1 flex-col overflow-hidden">
         <RoomDisplayArtFrame
           naturalAspect={sceneAspect}
           className="min-h-0 flex-1"
@@ -232,22 +232,22 @@ function SessionRoomDisplayContent() {
           />
         </RoomDisplayArtFrame>
       </div>
-      <div className="relative z-10 flex max-h-[46dvh] min-h-0 w-full flex-col border-t border-[var(--border-divide)] bg-[var(--color-obsidian)] xl:max-h-none xl:h-[100dvh] xl:max-h-[100dvh] xl:w-[min(440px,38vw)] xl:max-w-[min(520px,42vw)] xl:shrink-0 xl:border-l xl:border-t-0">
+      <div className="room-display-rail relative z-10 flex max-h-[46dvh] min-h-0 w-full flex-col xl:max-h-none xl:h-[100dvh] xl:max-h-[100dvh] xl:w-[min(440px,38vw)] xl:max-w-[min(520px,42vw)] xl:shrink-0">
         {isPartyDisplay && party ? (
           <div className="flex flex-wrap items-center gap-1.5 px-4 pt-3 sm:px-6">
-            <span className="rounded-[var(--radius-pill)] border border-[var(--border-ui-strong)] bg-[var(--color-obsidian)]/90 px-2.5 py-1 text-[9px] font-black uppercase tracking-[0.14em] text-[var(--outline)] backdrop-blur-sm">
+            <span className="rounded-[var(--radius-pill)] border border-[color-mix(in_srgb,var(--outline)_28%,transparent)] bg-[color-mix(in_srgb,var(--glass-bg)_40%,transparent)] px-2.5 py-1 text-[9px] font-black uppercase tracking-[0.14em] text-[var(--outline)] backdrop-blur-md">
               Party
             </span>
-            <span className="rounded-[var(--radius-pill)] border border-[var(--border-ui-strong)] bg-[var(--color-obsidian)]/90 px-2.5 py-1 text-[9px] font-black uppercase tracking-[0.14em] text-[var(--outline)] backdrop-blur-sm">
+            <span className="rounded-[var(--radius-pill)] border border-[color-mix(in_srgb,var(--outline)_28%,transparent)] bg-[color-mix(in_srgb,var(--glass-bg)_40%,transparent)] px-2.5 py-1 text-[9px] font-black uppercase tracking-[0.14em] text-[var(--outline)] backdrop-blur-md">
               Round {roundNumber}
             </span>
-            <span className="rounded-[var(--radius-pill)] border border-[var(--border-ui-strong)] bg-[var(--color-obsidian)]/90 px-2.5 py-1 text-[9px] font-black uppercase tracking-[0.14em] text-[var(--color-silver-muted)] backdrop-blur-sm">
+            <span className="rounded-[var(--radius-pill)] border border-[color-mix(in_srgb,var(--outline)_28%,transparent)] bg-[color-mix(in_srgb,var(--glass-bg)_40%,transparent)] px-2.5 py-1 text-[9px] font-black uppercase tracking-[0.14em] text-[var(--color-silver-muted)] backdrop-blur-md">
               {party.partyPhase} · {party.roundIndex}/{party.totalRounds}
             </span>
           </div>
         ) : null}
         {sceneTitle?.trim() ? (
-          <h2 className="text-fantasy px-4 pt-3 text-base font-black leading-tight tracking-tight text-[var(--color-silver-muted)] sm:px-6 sm:text-lg">
+          <h2 className="text-fantasy px-4 pt-3 text-base font-black leading-tight tracking-tight text-[var(--color-silver-muted)] drop-shadow-[0_2px_14px_rgba(0,0,0,0.45)] sm:px-6 sm:text-lg">
             {sceneTitle.trim()}
           </h2>
         ) : null}

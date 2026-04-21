@@ -71,11 +71,11 @@ export function RoomDisplayArtFrame({
   return (
     <div
       ref={containerRef}
-      className={`flex min-h-0 w-full flex-1 items-center justify-center overflow-hidden bg-[var(--color-deep-void)] ${className}`}
+      className={`flex min-h-0 w-full flex-1 items-center justify-center overflow-hidden bg-transparent ${className}`}
     >
       {fit ? (
         <div
-          className="relative overflow-hidden bg-[var(--color-deep-void)] shadow-[inset_0_0_0_1px_rgba(255,255,255,0.04)]"
+          className="relative overflow-hidden rounded-[var(--radius-card)] bg-[color-mix(in_srgb,var(--color-deep-void)_78%,transparent)] shadow-[inset_0_1px_0_rgba(255,255,255,0.08),0_0_0_1px_rgba(255,255,255,0.06),0_24px_48px_rgba(0,0,0,0.38)] backdrop-blur-sm"
           style={{ width: fit.w, height: fit.h }}
         >
           <div className="absolute inset-0">{children}</div>
