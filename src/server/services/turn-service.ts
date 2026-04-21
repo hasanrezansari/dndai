@@ -133,6 +133,24 @@ async function buildSeatOrderWithStatus(sessionId: string) {
   return { orderedPlayers, seatOrder };
 }
 
+/**
+ * Seats that could receive the first turn right now (linked character sheet, not
+ * dead/unconscious for turn purposes; human_dm DM seats excluded unless solo fallback).
+ * Used to block campaign start when everyone is still on “empty seat”.
+ */
+export async function countPlayableActorsForSession(
+  sessionId: string,
+): Promise<number> {
+  const [sessionRow] = await db
+    .select({ mode: sessions.mode })
+    .from(sessions)
+    .where(eq(sessions.id, sessionId))
+    .limit(1);
+  if (!sessionRow) return 0;
+  const { seatOrder } = await buildSeatOrderWithStatus(sessionId);
+  return playablePlayersInSeatOrder(seatOrder, sessionRow.mode).length;
+}
+
 /** Next turn targets from current DB state (e.g. after HP / conditions are committed). */
 export async function computeNextTurnAfterActor(
   sessionId: string,

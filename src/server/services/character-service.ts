@@ -1,5 +1,7 @@
 import { and, eq } from "drizzle-orm";
 
+import { tryBootstrapCampaignAfterHeroesSessionReady } from "@/server/services/campaign-lobby-bootstrap-service";
+
 import { db } from "@/lib/db";
 import { characters, players, sessions } from "@/lib/db/schema";
 import {
@@ -256,6 +258,8 @@ export async function createCharacter(params: {
       is_ready: true,
     })
     .where(eq(players.id, params.playerId));
+
+  await tryBootstrapCampaignAfterHeroesSessionReady(params.sessionId);
 
   return { characterId: created.id };
 }

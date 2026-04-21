@@ -17,6 +17,7 @@ import {
   computeNextPlayableTurnState,
   computeNextTurnState,
   evaluateTurnOwnership,
+  playablePlayersInSeatOrder,
 } from "@/lib/rules/turn-logic";
 import { acquireTurnLock } from "@/server/services/turn-service";
 
@@ -88,6 +89,43 @@ describe("computeNextTurnState", () => {
       nextRound: 3,
       roundAdvanced: true,
     });
+  });
+});
+
+describe("playablePlayersInSeatOrder", () => {
+  it("human_dm: includes the DM when they are the only non-incapacitated seat (solo host)", () => {
+    const ordered = [
+      {
+        id: "dm-00000000-0000-4000-8000-000000000001",
+        is_dm: true,
+        seat_index: 0,
+        is_incapacitated: false,
+      },
+    ];
+    expect(
+      playablePlayersInSeatOrder(ordered, "human_dm").map((p) => p.id),
+    ).toEqual(["dm-00000000-0000-4000-8000-000000000001"]);
+  });
+
+  it("human_dm: still excludes DM when a non-DM hero is present", () => {
+    const ordered = [
+      {
+        id: "dm-00000000-0000-4000-8000-000000000001",
+        is_dm: true,
+        seat_index: 0,
+        is_incapacitated: false,
+      },
+      {
+        id: "p1-00000000-0000-4000-8000-000000000002",
+        is_dm: false,
+        seat_index: 1,
+        is_incapacitated: false,
+      },
+    ];
+    expect(playablePlayersInSeatOrder(ordered, "human_dm")).toHaveLength(1);
+    expect(playablePlayersInSeatOrder(ordered, "human_dm")[0]!.id).toBe(
+      "p1-00000000-0000-4000-8000-000000000002",
+    );
   });
 });
 

@@ -33,11 +33,21 @@ export function playablePlayersInSeatOrder(
   orderedBySeat: SeatPlayer[],
   sessionMode: string,
 ): SeatPlayer[] {
-  return orderedBySeat.filter((p) => {
+  const filtered = orderedBySeat.filter((p) => {
     if (p.is_incapacitated) return false;
     if (sessionMode === "human_dm" && p.is_dm) return false;
     return true;
   });
+  /**
+   * Human DM: the host row is `is_dm` so they never take “hero” turns in a full party.
+   * If they are the only seat (solo) or everyone else is down / unseated, excluding the DM
+   * leaves **zero** playable actors and start fails after the session is already marked active.
+   * Fall back to any non-incapacitated seat (including the DM) so solo tables can start.
+   */
+  if (sessionMode === "human_dm" && filtered.length === 0) {
+    return orderedBySeat.filter((p) => !p.is_incapacitated);
+  }
+  return filtered;
 }
 
 /** Next playable in seat order after `currentPlayerId` (wrap). If the actor is not in `playable`, still walk from their seat so skips stay fair. */
