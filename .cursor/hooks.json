@@ -1,0 +1,12 @@
+{
+  "version": 1,
+  "hooks": {
+    "sessionEnd": [
+      {
+        "command": ".cursor/hooks/mempalace-sync.sh",
+        "timeout": 20,
+        "failClosed": false
+      }
+    ]
+  }
+}

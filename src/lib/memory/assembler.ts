@@ -1,4 +1,5 @@
 import { and, asc, desc, eq } from "drizzle-orm";
+import { readFile } from "node:fs/promises";
 
 import { db } from "@/lib/db";
 import { isCustomClassesEnabled } from "@/lib/config/features";
@@ -228,11 +229,33 @@ async function resolveStylePolicy(sessionId: string): Promise<string> {
   return custom ? `${STYLE_POLICY}\n${sess!.style_policy}` : STYLE_POLICY;
 }
 
+async function resolveNarrativeContinuityHints(): Promise<string | null> {
+  if (process.env.MEMPALACE_NARRATIVE_CONTINUITY !== "1") return null;
+  const path =
+    process.env.MEMPALACE_NARRATIVE_HINTS_FILE?.trim() ||
+    "docs/NARRATIVE_CONTINUITY_HINTS.md";
+  try {
+    const raw = await readFile(path, "utf-8");
+    const trimmed = raw.trim();
+    if (!trimmed) return null;
+    return truncateToTokenBudget(trimmed, TOKEN_BUDGET.narrativeContinuityHints);
+  } catch {
+    return null;
+  }
+}
+
 export async function buildMemoryBundle(
   workerName: string,
   sessionId: string,
 ): Promise<MemoryBundle> {
-  const [canonicalState, recentEventWindow, rollingSummary, visualBible, stylePolicy] =
+  const [
+    canonicalState,
+    recentEventWindow,
+    rollingSummary,
+    visualBible,
+    stylePolicy,
+    narrativeContinuityHints,
+  ] =
     await Promise.all([
       buildCanonicalState(sessionId),
       buildRecentEventWindow(sessionId),
@@ -241,6 +264,7 @@ export async function buildMemoryBundle(
         ? buildVisualBible(sessionId)
         : Promise.resolve(null),
       resolveStylePolicy(sessionId),
+      workerName === "narrator" ? resolveNarrativeContinuityHints() : Promise.resolve(null),
     ]);
 
   const totalTokens =
@@ -248,7 +272,8 @@ export async function buildMemoryBundle(
     estimateTokens(recentEventWindow) +
     estimateTokens(rollingSummary ?? "") +
     estimateTokens(stylePolicy) +
-    estimateTokens(visualBible ?? "");
+    estimateTokens(visualBible ?? "") +
+    estimateTokens(narrativeContinuityHints ?? "");
 
   if (totalTokens > TOKEN_BUDGET.total) {
     console.warn(
@@ -262,5 +287,6 @@ export async function buildMemoryBundle(
     rollingSummary,
     stylePolicy,
     visualBible,
+    narrativeContinuityHints,
   };
 }

@@ -43,3 +43,11 @@ next-env.d.ts
 
 # local Stitch / design exports (not part of app source)
 /stitch_ashveil_grimoire-2/
+
+# MemPalace per-project files (issue #185)
+mempalace.yaml
+entities.json
+/.venv-mempalace/
+/.cursor/hooks/state/
+/docs/RELEASE_RISK_SUMMARY.md
+/docs/NARRATIVE_CONTINUITY_HINTS.md

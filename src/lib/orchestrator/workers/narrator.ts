@@ -38,6 +38,7 @@ MEMORY CONTEXT:
 - "canonical_state" is the authoritative world state: round, phase, party, NPCs, quest. Use it to stay consistent.
 - "rolling_summary" (if present) is a compressed memory of earlier events: key events, active plot hooks, NPC relationships, world changes. Weave relevant details naturally — do NOT dump facts.
 - "style_rules" (if present) provides additional narration style guidance specific to this campaign.
+- "narrative_continuity_hints" (if present) is advisory memory retrieved from prior incidents/docs. Use only for flavor continuity; never override canonical_state or dice outcomes.
 - "world_bible_excerpt" (if non-empty) is host-supplied premise or setting write-up—treat as canon for tone and facts unless contradicted by newer narrative.
 - "established_situation" (if non-empty) is the last locked-in fiction state from the prior beat: where the party is, travel vs arrival, environment. It OVERRIDES vague impulses to "reset" the scene.
 
@@ -346,6 +347,7 @@ export async function generateNarration(params: {
   canonicalState?: string;
   rollingSummary?: string | null;
   stylePolicy?: string;
+  narrativeContinuityHints?: string | null;
   facilitatorSystemPrompt: string;
   /** Long-form premise excerpt for model context (optional). */
   worldBibleExcerpt?: string;
@@ -383,6 +385,7 @@ export async function generateNarration(params: {
     canonical_state: params.canonicalState ?? "",
     rolling_summary: params.rollingSummary ?? "",
     style_rules: params.stylePolicy ?? "",
+    narrative_continuity_hints: params.narrativeContinuityHints ?? "",
     world_bible_excerpt: params.worldBibleExcerpt ?? "",
     established_situation:
       params.establishedSituation?.trim() ||

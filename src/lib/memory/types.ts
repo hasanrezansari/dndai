@@ -4,6 +4,7 @@ export interface MemoryBundle {
   rollingSummary: string | null;
   stylePolicy: string;
   visualBible: string | null;
+  narrativeContinuityHints: string | null;
 }
 
 export interface RollingSummaryContent {
@@ -31,5 +32,6 @@ export const TOKEN_BUDGET = {
   rollingSummary: 600,
   stylePolicy: 200,
   visualBible: 300,
-  total: 3100,
+  narrativeContinuityHints: 300,
+  total: 3400,
 } as const;
